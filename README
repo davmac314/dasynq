@@ -1,0 +1,410 @@
+Asynchronous event notification framework.
+
+- Support multithreading, but not by having thread-safety built-in.
+- Handle event queues that do spurious notification etc well.
+- Edge vs level triggered
+  Not sure if we should support both? level triggered is less powerful.
+  (can add support for edge later, probably a separate  API).
+  Edge triggered is the only variant that makes sense when threads are
+  involved. It is both more flexible and more complicated.
+
+  It's possible to simulate edge triggered from level-triggered by:
+  - using a mutex to prevent multiple threads accessing the readiness
+    queue at the same time and
+  - removing/disarming notification when we get an event
+  - client must provide a re-arm notification (if it desires re-arming)
+    when it's done processing the event. (That is, the client effectively
+    generates the "down" edge).
+  (this is imperfect simulation, since edges generated won't be seen by
+  the underlying mechanism if the channel is left in the un-ready state;
+  but this doesn't matter for practical purposes).
+
+  It's also possible to simulate level triggered from edge:
+  - mark the event ready when an edge is detected
+  - always process the channel when it is marked 'ready'
+  - after processing (when informed by client), check channel readiness
+    (using eg poll()) and clear the ready mark if the channel is no longer
+    ready
+  - as noted above, level triggered does not make sense if using
+    multiple threads (with perhaps some exceptions - eg if accepting
+    connections from a socket, it might be fine to have multiple threads
+    acting on the same socket at the same time - though this could have
+    other complications).
+
+  In both cases, the client needs to inform the mechanism that it has
+  done processing a channel - in the simplest case, this is done by returning
+  from the handler. (It may elect not to do this if it instead
+  opts to close the channel for instance).
+
+- "One shot" support (channel is automatically disarmed when an event
+   is delivered).
+  - eg linux epoll supports this, must be set per watched descriptor.
+  - good for multi-threaded programs as only one thread will see an
+    event.
+  - removes need for edge triggered? (A one-shot event is always
+    effectively edge triggered...)
+  - but again requires that the client request (if desired) that the
+    channel be re-armed when it is done processing.
+  - re-arming in edge-triggered is prone to a race hazard: the descriptor
+    may become ready before it is armed, thus not reporting a readiness
+    event (because there is no edge). poll() or similar must be used
+    after arming, to overcome this (also leading to the possibility of
+    a double notification, once from poll and once from the AEN).
+    - because of this it is probably best to combine one-shot with
+      level-triggered, rather than edge-triggered. This effectively
+      gives you the poll() check for free.
+
+- So:
+  - backing mechanims could be any of:
+    - level triggered (poll/select)
+    - level triggered with one-shot (epoll)
+    - edge triggered (epoll)
+  - For the event watcher, the interface is the same[ish] betwen edge- and level-
+    triggered.
+  - the watcher can easily specify if it wants edge or level triggered semantics by
+    its return from the callback:
+    - disarm, supported naturally by one-shot, trivial with edge/level triggered
+    - rearm (the client guarantees that it has generated an edge)
+    - rearm/part-processed, (i.e. client wants callback re-called if I/O is still possible,
+      but may not have generated an edge); supported naturally only by level-triggered.
+  - Most backing mechanisms do not support priority or round-robinning at all.
+    To get this, you really need an edge-triggered mechanism (though it can be emulated from
+    a level-triggered mechanism of course) since you want to maintain your priority queue
+    with ready events separately from the mechanism itself.
+
+
+Multiple event loops.
+ - File descriptors are generally no problem
+ - Signals might not be a problem, if you don't try to add listeners for the same signal
+   to two different event loops.
+ - Listening for child process status events, however, generally requires listening for
+   the SIGCHLD signal. If only one loop can listen for any one signal, this implies that
+   only one loop could listen for child process events.
+   - On BSD with kqueue (eg OpenBSD, FreeBSD, possibly others, possibly all) there is no
+     problem, because kqueue can listen for status events for specific processes, and
+     for specific signals. (however, it's still not really feasible to listen to the same
+     signal or child process in two different event loops without further co-ordination -
+     because kqueue only reports events, they still need to be *consumed*).
+   - On Linux, the clone() system call allows for specifying a different child status
+     signal, but the requirement to use clone() rather than fork() is unwieldy.
+   - On Linux, signalfd() can be used to create a file descriptor which can be shared
+     by event loops so that any event loop can receive SIGCHLD notification. However,
+     the child status must usually be retrieved by eg wait() and the difficulty is in
+     getting the child status to the correct event loop(s).
+   - (On other OSes can emulate signalfd by having a signal handler write to a pipe,
+      though care is needed to avoid blocking on the write).
+   - So on Linux or OSes without kqueue, there needs to be a master table of process IDs
+     together with the event loop(s) watching them (it's probably reasonable that
+     each process can be watched on only a single loop). This table would need to be manipulated
+     in a thread-safe manner (i.e. possibly protected by a mutex). There would need to
+     be a way to signal any event loop in the table (eventfd on Linux, pipe otherwise).
+     It should be possible to have entries in the table to watch events for any process as
+     well as for a specific process.
+     - It would be nice, though, if there was little/no cost when using a single event loop...
+       I'm thinking:
+       - hashmap (pid_t -> vector) protected by a mutex; -1 maps to "all processes"
+         - vector contains pairs: watcher ptr, event loop ptr
+       - global fd protected by same mutex, contains ref to signalfd (or pipe emulation)
+         - first loop to get a child process watcher initialises it.
+         - a global reference counter counts the loops using it.
+       - actually, we want to avoid allocation when queing events. The hashmap could be a
+         fixed-length array pointing to a single watcher b-tree where the loop and tree
+         metadata is stored in the watcher node.
+ - It's nice if we can embed an event loop within another event loop. epoll allows this.
+   kqueue allows this in theory, but apparently on some OSes it doesn't report events.
+
+
+Seperating event detection from processing
+ - AEN mechanism and "event loop" are two different things, latter uses the former
+ - AEN parameterized by the type of data it can associate with event (void *? int?)
+ - AEN may support one or both of edge triggered, level triggered; may or may not
+   support one-shot.
+ - AEN can watch files, can _maybe_ watch signals, _maybe_ child processes.
+   can _maybe_ watch signals without assistance from the master event loop;
+   can _maybe_ watch child processes without assistance from the master event loop.
+
+
+Prioritised events
+ - We might always want to process some events before others, i.e. assign event types an
+   absolute priority.
+ - Consider signals, where two signals are assigned different priority. On linux we
+   watch the signals using a signalfd. If we receive a signal, we can't tell which one
+   until we consume it. The problem is that we potentially have to consume lots of
+   lower-priority signals without processing them (yet) and that means that (ideally)
+   we should re-queue them, but we don't want unbounded allocation.
+   - Note that it's not generally ok to discard signals, because they may have been
+     queued reliably (i.e. with sigqueue). It's best to leave them queued if we can't
+     process them.
+   - could split the signalfd: one per signal (or one per priority level)
+   - alternatively: use signalfd for readiness only (do not consume signals via it);
+     remove low-priority signals from the watched set when any higher-priority events
+     are pending.
+ - AEN mechanisms don't generally support priority. We need to add it ourselves. Priority
+   heap implementation seems like a natural choice.
+ - priority might not be a simple integer. Bandwidth sharing (among channels with
+   equal priority) can be achieved by adding a second component to the priority which
+   records the number of bytes that have passed through the channel (it may need to
+   be reset periodically).
+
+
+Multi-threading is the big issue.
+
+- Some, but not all, AEN mechanisms will require using a mutex (on the
+  userspace side) to be thread-safe for adding/removing watched objects
+   (eg "epoll" probably won't need a mutex; "poll" will because it must
+    maintain a user-space list)
+- Some mechanisms present difficulty in adding to a watch set while it
+  is currently being polled. Eg "poll", we need to interrupt the poll
+  somehow to notify it if the watch set changes.
+- If level-triggered (without "one shot"), some events might be given to
+  two separate threads.
+  In some cases this doesn't matter: eg accepting connections from a socket,
+    if the socket is set non-blocking then an extraneous accept() is not
+    harmful.
+  In some cases it does: reading from an ordered stream
+  It is dependent on the event type. A mutex may be required to prevent
+  any issues (of course, this is only needed if the clientprogram is
+  multithreaded). Even with a mutex there will be spurious notifications:
+  that is, a notification is seen in some thread but the event is being
+  or has been handled already by another thread.
+
+  Only the client knows if the distinction matters for a particular
+  channel.
+
+- If edge-triggered, without "one shot", a client may unknowingly cause
+  a downward edge by reading or writing some data. There is no way for the
+  client to detect this. If an upward edge then occurs (eg more data
+  becomes available) then this event may be reported to another thread,
+  leading to two threads processing the same channel. So there needs to
+  be either a mutex in the handler or a flag maintained by the library
+  to prevent double-handling.
+
+In general the client will need to:
+  - require edge-triggered, i.e have edges synthesized by the library if
+    necessary - which means the library must provide this facility
+       OR
+  - handle level-triggered (in which case it will still work with edge
+    triggered, generally). This might be a pain for multi-threaded programs
+    though.
+    - the library could provide a mutex type to be used for protecting
+      handles. Client must:
+      - test-acquire mutex (no-op if one-shot, or if edge-triggered and
+        the library maintains a "processing" flag for each handler itself).
+         - if fails, mutex aquired by other thread; return immediately
+      - perform I/O (using non-blocking I/O or a prior poll test, since
+        available I/O might have been consumed/saturated if the event was
+        already handled by another thread).
+        - the poll test isn't necessary, though, if the AENM is using
+          one-shot triggers. So it should be templated out in that case.
+      - release mutex
+      - re-arm watch (may be a no-op if using one-shot AEN).
+        - should be an optional param to re-arm : a boolean indicating whether
+          the client knows it exhausted the I/O space. If false, the library
+          doesn't necessarily need to rearm the watch in the AEN if it's
+          maintaing a seperate ready list (it may generate a single spurious
+          notification, the client will need to use non-blocking I/O).
+ ?? might client require level triggered? I suppose mandating the re-arm
+    effectively gives level triggered anyway. But some AENs support
+    level triggered without one-shot, which might be useful, eg accepting
+    connections from a socket.
+    - without restricting the handler from running at most once at a
+      time, it becomes difficult (or impossible?) to safely delete the
+      handler. It becomes the client responsibility to do so only when
+      no thread is polling or processing events.
+    - supporting this in general is going to mean the library has to
+      deal in different ways with different handlers. I.e. for some
+      handlers it must not call them when they are currently processing,
+      for others it may.
+
+
+- For multithreaded operation, there is a general difficulty with AEN
+  mechanisms when you want to remove something from the watch list. In
+  general we want to be confident after doing so that we could delete
+  associated handler structures. However, an event might come in and be
+  delivered to another thread just as we ask for the removal. Some AENs
+  allow to determine this has happened (search EPOLL_CTL_DISABLE, though
+  the patch apparently didn't make it in; kqueue has a similar mechanism)
+  but even if you can detect it there is still the problem of how to know
+  when the processing has finished. Some AENs (again, kqueue) have a
+  mechanism to send a 'user event' to a watched descriptor which could be
+  as a signal to delete the handler (it will only be delivered once the
+  previous event is handled, assuming "one shot" delivery mode). However
+  the library client must then be able to deal with these delete requests,
+  which seems to be an unescapable requirement.
+
+  In the epoll world, we need to work around the limitations. A way
+  of doing that is to have a mutex for the epoll fd, allow only one thread
+  to poll events at a time, and to immediately mark handlers as active once
+  the events are received (with the mutex still held). The mutex can be
+  released while the events are processed. This effectively gives us the
+  EPOLL_CTL_DISABLE functionality (i.e. the ability to check whether a
+  there is an event currently being processed).
+
+  Removing an fd from observation
+  checks the 'processing' status of the handler and if it is set, marks
+  the handler for deletion (sets a mark). Processing status and deletion
+  mark both reside in the handler and must be protected by a mutex in the
+  handler (or otherwise must reside in a map mainted per epoll fd).
+  However, this would also require the epoll fd mutex to be acquired to
+  prevent events rolling on in the meantime, which is problematic because
+  it may block. To prevent blocking we would need to signal the epoll fd and
+  cause the current waiter, if any, to wake temporarily (and release the
+  epoll mutex). To avoid race conditions then we actually need to have
+  the deletion processing done in the handler for that epoll wakeup signal.
+  So the process for watch removal becomes:
+   - remove fd from epoll set via epoll system call
+   - test-acquire the epoll mutex (necessary to ensure that no pending events
+      on the channel are still being or are about to be processed):
+   - if successful:
+       - acquire handler mutex
+       - check the 'processing' flag in the handler;
+       - if set, mark the 'delete' flag in the handler
+       - otherwise, delete the handler (perhaps with mutexes no longer held?)
+       - release the handler mutex
+       - release the epoll mutex
+   - if unsucessful (other thread currently waiting for events):
+       - obtain the mutex D, protecting the 'to delete' list
+       - add entry to the 'to delete' list
+       - we must now make sure the deletion is processed, in case there are
+         no longer any threads polling the epoll set:
+       - test-acquire the epoll mutex
+       - if successful:
+         - process the deletion list (delete items in it)
+         - release D
+         - release epoll mutex
+       - otherwise:
+         - signal the event poll fd in order to wake the thread currently in
+           epoll_wait
+         - release D
+
+  The poll process is:
+   - acquire epoll mutex
+   - poll for events
+   - for each active events handler:
+     - acquire handler mutex
+     - mark handler as 'processing'
+     - release handler mutex
+   - release epoll mutex ???
+   - for each active events handler:
+     - call the handler
+     - acquire handler mutex
+     - clear 'processing' flag for handler
+     - check 'delete' flag and delete handler if set
+     - release handler mutex
+   - acquire deletion list mutex ('D')
+   - call delete handler for all items in 'current_delete_list'
+     and clear the list
+   - release mutex D
+  After processing any event:
+   - clear the 'processing' flag.
+   - check the delete flag and call the delete method if set.
+  * Note that storing the processing/delete-mark in the handler means that
+    a handler can only be responsible for a single fd and only for a single
+    event set. This is probably the expected case anyway.
+  * When a handler is deleted it should close the fd it's responsible for. This
+    should not be done earlier to prevent a new file being opened with the same
+    fd, which might generate events that will then be processed by the wrong
+    handler (which may then consume data from the re-opened fd).
+  * If the above technique is used a handler cannot (immediately) delete
+    itself during processing (because its flags must be checked once
+    processing has finished). It can of course set the 'delete' flag, and does
+    not in this case need to acquire its own mutex first if the 'delete' flag
+    is atomic.
+
+- Actually, a per-handler mutex is not required - just have a 'handler mutex'.
+  This can actually be the same mutex as the deletion list mutex!
+
+- An alternative to the above would be to keep a set/list of
+  handlers in a mutex-protected structure associated with the epoll queue. Then it
+  would be possible to call epoll_wait without first acquiring the epoll mutex.
+  - deleting a handler is  simpler; just acquire the mutex, check the handler
+    processing flag and either set the delete flag or just perform the delete
+    (which also requires removing the handler from the set).
+  - another benefit is that the delete/processing flags do not need to be *in*
+    the handler - they can be stored alongside the handler references.
+  - events may come in for an fd that is no longer being watched, so it's
+    necessary to check the list before processing. If this list is keyed by fd,
+    that's pretty trivial - the handler for the fd will be null if it has
+    been removed.
+  - the problem? There is no way to guarantee that there is no thread that has
+    received and is still to process an event for an fd we have unwatched (and
+    for which the handler has been removed). Now suppose that a file is
+    opened, re-using the same fd, and this is then added to the epoll set. A
+    spurious event will now be seen for this newly-added fd.
+    - but this is probably ok, because we can use non-blocking I/O??
+      I.e. it is ok if we are allowed to generate spurious notifications.
+  
+
+- epoll doesn't guarantee that closing an fd prevents further events being
+  reported for the fd (if there are multiple fds referring to the same
+  underlying file handle, due to dup() or similar). (manually deleting the
+  fd from the epoll set does work).
+  In general this may be true of other APIs. Clients are therefore required
+  to explicitly remove fds from observation. (Although in general using
+  non-blocking I/O makes this a non-problem).
+  - in edge triggered mode, we can't reliably detect the *falling* edge and
+    thus a second thread may be woken to process the same fd. EPOLLONESHOT
+    solves this problem, or the 'processing' flag can be used for similar
+    effect. If using EPOLLONESHOT, we need to re-arm the descriptor after
+    processing. This could be done by the library, but it may need to check
+    that the descriptor wasn't removed from the watch set during processing.
+
+  
+- one pending design decision: should the library keep a queue of handlers
+  that having I/O pending or should this be the client's responsibility? Putting
+  it to the client seems more flexible, but probably has drawbacks in terms
+  of managing multiple threads polling (client would have to notify any
+  pollers, so that they can stop waiting for events and start processing
+  queued events).
+  - in fact this will be tricky even if managed by the library. Must:
+    - keep track of how many pollers there are, and of how many pending channels
+      that are not currently being processed
+    - if at any point both are non-zero, wake pollers (or at least as many
+      as there are channels pending to be processed).
+    - to avoid races the counters must be protected by the same mutex.
+      Individual atomic counters won't cut it. (Could possibly get away
+      with using an atomic int split in two 16-bit halves, and
+      adjust it with compare-and-exchange...)
+  - so leave it to the client?
+    - library has a 'wake_pollers(int)' method to wake a specified number
+      of pollers.
+  - if (even a simple) queue is implemented in the library, the client can
+    anyway implement its own queue, i.e. on receiving a readiness notification
+    it can disarming() the channel and then queue it, and rearm() it once
+    it has exhausted available I/O space.
+
+
+
+So operations for the queue:
+  - add()  add a channel with handler
+  - rearm()  (rearm a channel)
+  - disarm()  (disarm a channel)
+     note: other threads may still be processing events for the
+           channel
+  - h_rearm()  // only callable from the notification handler
+  - h_disarm()  //   "  "        "     "     "          "
+     note: eithe [h_]rearm() or [h_]disarm) should be
+     called before returning from a handler, otherwise the armed state
+     of the handler becomes unspecified.
+     When calling h_disarm() from a handler, it's guaranteed that
+     no more events will be issued to the handler until the channel
+     is rearmed.
+  - remove()   (remove a channel)
+      note: other threads may still be processing events for the
+            channel. A removed() callback will be made to the handler
+            once it is removed and no more threads are processing
+            events for it.
+  - wake_pollers(int n)  wake at least n threads that are currently
+            polling for an event, causing the poll to return without
+            processing an event.
+  - poll()  wait for one event and process it (possibly processing
+            more than one event if several events are immediately
+            available).
+  - poll_nowait()   check for and process one or more events, but
+            do not wait for new events.
+
+  // Not sure about these two. Not necessary?:
+  - poll_loop() continuously wait for and process events.
+  - shutdown()  cause poll_loop() to exit as soon as possible.
+            All other methods may not function correctly after
+            shutdown is called.
