@@ -337,22 +337,57 @@ template <typename T_Mutex> class EventLoop
     friend class PosixSignalWatcher<T_Mutex>;
     //friend class SignalFdWatcher<T_Mutex>;
     
-    T_Mutex wait_lock;  // wait lock, used to prevent multiple threads from waiting
-                        // on the event queue simultaneously.
     
     EpollLoop<EventDispatch<T_Mutex, EpollTraits>> loop_mech;
 
+    // There is a complex problem with most asynchronous event notification mechanisms
+    // when used in a multi-threaded environment. Generally, a file descriptor or other
+    // event type that we are watching will be associated with some data used to manage
+    // that event source. For example a web server needs to maintain information about
+    // each client connection, such as the state of the connection (what protocol version
+    // has been negotiated, etc; if a transfer is taking place, what file is being
+    // transferred etc).
+    //
+    // However, sometimes we want to remove an event source (eg webserver wants to drop
+    // a connection) and delete the associated data. The problem here is that it is
+    // difficult to be sure when it is ok to actually remove the data, since when
+    // requesting to unwatch the source in one thread it is still possible that an
+    // event from that source is just being reported to another thread (in which case
+    // the data will be needed).
+    //
+    // To solve that, we:
+    // - allow only one thread to poll for events at a time, using a lock
+    // - use the same lock to prevent polling, if we want to unwatch an event source
+    // - generate an event to interrupt any polling that may already be occurring in
+    //   another thread
+    // - mark handlers as active if they are currently executing, and
+    // - when removing an active handler, simply set a flag which causes it to be
+    //   removed once the current processing is finished, rather than removing it
+    //   immediately.
+    //
+    // In particular the lock mechanism for preventing multiple threads polling and
+    // for allowing polling to be interrupted is tricky. We can't use a simple mutex
+    // since there is significant chance that it will be highly contended and there
+    // are no guarantees that its acquisition will be fair. In particular, we don't
+    // want a thread that is trying to unwatch a source being starved while another
+    // thread polls the event source.
+    //
+    // So, we use two wait queues protected by a single mutex. The "attn_waitqueue"
+    // (attention queue) is the high-priority queue, used for threads wanting to
+    // unwatch event sources. The "wait_waitquueue" is the queue used by threads
+    // that wish to actually poll for events.
+    // - The head of the "attn_waitqueue" is always the holder of the lock
+    // - Therefore, a poll-waiter must be moved from the wait_waitqueue to the
+    //   attn_waitqueue to actually gain the lock. This is only done if the
+    //   attn_waitqueue is otherwise empty.
+    // - The mutex only protects manipulation of the wait queues, and so should not
+    //   be highly contended.
+    
+    T_Mutex wait_lock;  // wait lock, used to prevent multiple threads from waiting
+                        // on the event queue simultaneously.
     waitqueue<T_Mutex> attn_waitqueue;
     waitqueue<T_Mutex> wait_waitqueue;
     
-    // TODO thread safety for event loop mechanism is tricky in subtle ways. The same
-    // mutex used to prevent two threads from polling at the same time should not be
-    // used to guard add/delete watch.
-    
-    // At least, the mutex should only be locked once there is no blocking needed
-    // (i.e. once events have actually been received), but that probably pushes
-    // locking responsibility down into the mechanism layer (or at least requires
-    // a callback from the mechanism layer).
     
     void registerSignal(PosixSignalWatcher<T_Mutex> *callBack, int signo)
     {
@@ -377,6 +412,8 @@ template <typename T_Mutex> class EventLoop
         loop_mech.addFdWatch(fd, callback, eventmask);
     }
 
+    // Acquire the attention lock (when held, ensures that no thread is polling the AEN
+    // mechanism).
     void getAttnLock(waitqueue_node<T_Mutex> &qnode)
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
@@ -386,6 +423,8 @@ template <typename T_Mutex> class EventLoop
         }        
     }
     
+    // Acquire the poll-wait lock (to be held when polling the AEN mechanism; lower
+    // priority than the attention lock).
     void getPollwaitLock(waitqueue_node<T_Mutex> &qnode)
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
@@ -402,6 +441,7 @@ template <typename T_Mutex> class EventLoop
         }    
     }
     
+    // Release the poll-wait/attention lock.
     void releaseLock(waitqueue_node<T_Mutex> &qnode)
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
