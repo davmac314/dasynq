@@ -202,7 +202,7 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
 {
     friend class EventLoop<T_Mutex>;
 
-    T_Mutex queue_lock; // lock to protect active queue
+    // T_Mutex queue_lock; // lock to protect active queue and AEN internal structures
     
     
     // queue data structure/pointer
@@ -215,6 +215,9 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
     // - beginEventBatch/endEventBatch? (to allow locking)
     
     protected:
+    T_Mutex lock;
+    
+    /*
     void beginEventBatch()
     {
         queue_lock.lock();
@@ -224,6 +227,7 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
     {
         queue_lock.unlock();
     }
+    */
     
     void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
     {
@@ -267,7 +271,7 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
     // were queued
     bool processEvents() noexcept
     {
-        queue_lock.lock();
+        lock.lock();
         
         // So this pulls *all* currently pending events and processes them in the current thread.
         // That's probably good for throughput, but maybe the behavior should be configurable.
@@ -293,17 +297,17 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
             }
         }
         
-        queue_lock.unlock();
+        lock.unlock();
         
         while (pqueue != nullptr) {
             pqueue->dispatch(); // TODO: handle re-arm etc
                      // (need to do this with lock)
-            queue_lock.lock();
+            lock.lock();
             pqueue->active = false;
             if (pqueue->deleteme) {
                 pqueue->watchRemoved();
             }
-            queue_lock.unlock();
+            lock.unlock();
             pqueue = pqueue->next;    
         }
         
@@ -315,7 +319,7 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
         // This is only called when the attention lock is held, so if the watcher is not
         // active now, it cannot become active during execution of this function.
         
-        queue_lock.lock();
+        lock.lock();
         
         if (watcher->active) {
             watcher->deleteme = true;
@@ -325,7 +329,7 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
             watcher->watchRemoved();
         }
         
-        queue_lock.unlock();
+        lock.unlock();
     }
 };
 

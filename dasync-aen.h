@@ -1,5 +1,7 @@
 #include <map>
 #include <system_error>
+#include <mutex>
+#include <type_traits>
 
 #include <sys/epoll.h>
 #include <sys/signalfd.h>
@@ -73,15 +75,17 @@ template <class Base> class EpollLoop : Base
     std::map<int, void *> sigdataMap;
 
     // Base contains:
-    //   receiveSignal(SigInfo &, user *)
-    //   receiveFdEvent(FD_r, user *, int flags)
+    //   lock - a lock that can be used to protect internal structure.
+    //          receive*() methods should be called with lock held.
+    //   receiveSignal(SigInfo &, user *) noexcept
+    //   receiveFdEvent(FD_r, user *, int flags) noexcept
     
     using SigInfo = EpollTraits::SigInfo;
     using FD_r = typename Base::FD_r;
     
     void processEvents(epoll_event *events, int r)
     {
-        Base::beginEventBatch();
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
         for (int i = 0; i < r; i++) {
             void * ptr = events[i].data.ptr;
@@ -89,13 +93,17 @@ template <class Base> class EpollLoop : Base
             if (ptr == &sigfd) {
                 // Signal
                 SigInfo siginfo;
-                read(sigfd, &siginfo.info, sizeof(siginfo.info));
-                // TODO thread-safety for sigdataMap
-                auto iter = sigdataMap.find(siginfo.get_signo());
-                if (iter != sigdataMap.end()) {
-                    void *userdata = (*iter).second;
-                    Base::receiveSignal(siginfo, userdata);
+                while (true) {
+                    int r = read(sigfd, &siginfo.info, sizeof(siginfo.info));
+                    if (r == -1) break;
+                    sigdelset(&sigmask, siginfo.get_signo());
+                    auto iter = sigdataMap.find(siginfo.get_signo());
+                    if (iter != sigdataMap.end()) {
+                        void *userdata = (*iter).second;
+                        Base::receiveSignal(siginfo, userdata);
+                    }
                 }
+                signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
             }
             else {
                 int flags = 0;
@@ -104,8 +112,6 @@ template <class Base> class EpollLoop : Base
                 Base::receiveFdEvent(FD_r(), ptr, flags);
             }            
         }
-        
-        Base::endEventBatch();
     }
     
     public:
@@ -117,7 +123,6 @@ template <class Base> class EpollLoop : Base
      */
     EpollLoop() : sigfd(-1)
     {
-        // sigemptyset(&smask);
         epfd = epoll_create1(EPOLL_CLOEXEC);
         if (epfd == -1) {
             throw std::system_error(errno, std::system_category());
@@ -132,7 +137,6 @@ template <class Base> class EpollLoop : Base
             close(sigfd);
         }
     }
-    
     
     // flags:  in_events | out_events
     void addFdWatch(int fd, void *userdata, int flags)
@@ -202,8 +206,8 @@ template <class Base> class EpollLoop : Base
     // Note signal should be masked before call.
     void addSignalWatch(int signo, void *userdata)
     {
-        // TODO:
-        // Not thread-safe!
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+
         sigdataMap[signo] = userdata;
 
         // Modify the signal fd to watch the new signal
@@ -222,15 +226,16 @@ template <class Base> class EpollLoop : Base
             // No need for EPOLLONESHOT - we can pull the signals out
             // as we see them.
             if (epoll_ctl(epfd, EPOLL_CTL_ADD, sigfd, &epevent) == -1) {
+                close(sigfd);
                 throw new std::system_error(errno, std::system_category());        
             }
-            
         }
     }
     
     void removeSignalWatch(int signo)
     {
-        // Not thread-safe!
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        
         sigdelset(&sigmask, signo);
         signalfd(sigfd, &sigmask, 0);
     }
