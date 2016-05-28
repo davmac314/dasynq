@@ -81,6 +81,8 @@ template <class Base> class EpollLoop : Base
     
     void processEvents(epoll_event *events, int r)
     {
+        Base::beginEventBatch();
+        
         for (int i = 0; i < r; i++) {
             void * ptr = events[i].data.ptr;
             
@@ -102,6 +104,8 @@ template <class Base> class EpollLoop : Base
                 Base::receiveFdEvent(FD_r(), ptr, flags);
             }            
         }
+        
+        Base::endEventBatch();
     }
     
     public:
@@ -198,6 +202,7 @@ template <class Base> class EpollLoop : Base
     // Note signal should be masked before call.
     void addSignalWatch(int signo, void *userdata)
     {
+        // TODO:
         // Not thread-safe!
         sigdataMap[signo] = userdata;
 

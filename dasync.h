@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include <vector>
 #include <atomic>
+#include <condition_variable>
 #include <cstdint>
 #include <map>
 
@@ -20,21 +21,23 @@
 
 
 // TODO put all private API in nested namespace / class private members
-
 // TODO consider using atomic variables instead of explicit locking where appropriate
 
 // Allow optimisation of empty classes by including this in the body:
 // May be included as the last entry for a class which is only
 // _potentially_ empty.
+
+/*
 #ifdef __GNUC__
 #ifdef __clang__
-#define EMPTY_BODY private: xxasdfadsf char empty_fill[0] ;
+#define EMPTY_BODY private: char empty_fill[0];
 #else
 #define EMPTY_BODY private: char empty_fill[0];
 #endif
 #else
 #define EMPTY_BODY
 #endif
+*/
 
 namespace dasync {
 
@@ -80,6 +83,12 @@ class BaseWatcher
     
     public:
     BaseWatcher() : active(0), deleteme(0), next(nullptr) { }
+    
+    // Called when the watcher has been removed.
+    // When called it is guaranteed that:
+    // - the dispatch method is not currently running
+    // - the dispatch method will not be called.
+    virtual void watchRemoved() noexcept { }
 };
 
 
@@ -104,13 +113,97 @@ class BaseSignalWatcher : public BaseWatcher
 
 template <typename T_Mutex> class EventLoop;
 
+
+// Classes for implementing a fair(ish) wait queue.
+// A queue node can be signalled when it reaches the head of
+// the queue.
+
+template <typename T_Mutex> class waitqueue;
+template <typename T_Mutex> class waitqueue_node;
+
+// Select an appropriate conditiona variable type for a mutex:
+// condition_variable if mutex is std::mutex, or condition_variable_any
+// otherwise.
+template <class T_Mutex> class condvarSelector;
+
+template <> class condvarSelector<std::mutex>
+{
+    public:
+    typedef std::condition_variable condvar;
+};
+
+template <class T_Mutex> class condvarSelector
+{
+    public:
+    typedef std::condition_variable_any condvar;
+};
+
+template <> class waitqueue_node<NullMutex>
+{
+    // Specialised waitqueue_node for NullMutex.
+    // TODO can this be reduced to 0 data members?
+    friend class waitqueue<NullMutex>;
+    waitqueue_node * next = nullptr;
+    
+    public:
+    void wait(std::unique_lock<NullMutex> &ul) { }
+    void signal() { }
+};
+
+template <typename T_Mutex> class waitqueue_node
+{
+    typename condvarSelector<T_Mutex>::condvar condvar;
+    friend class waitqueue<T_Mutex>;
+    waitqueue_node * next = nullptr;
+    
+    public:
+    void signal()
+    {
+        condvar.notify_one();
+    }
+    
+    void wait(std::unique_lock<T_Mutex> &mutex_lock)
+    {
+        condvar.wait(mutex_lock);
+    }
+};
+
+template <typename T_Mutex> class waitqueue
+{
+    waitqueue_node<T_Mutex> * tail = nullptr;
+    waitqueue_node<T_Mutex> * head = nullptr;
+
+    public:
+    waitqueue_node<T_Mutex> * unqueue()
+    {
+        head = head->next;
+        return head;
+    }
+    
+    waitqueue_node<T_Mutex> * getHead()
+    {
+        return head;
+    }
+    
+    void queue(waitqueue_node<T_Mutex> *node)
+    {
+        if (tail) {
+            tail->next = node;
+        }
+        else {
+            head = node;
+        }
+    }
+};
+
+
+
 template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
 {
     friend class EventLoop<T_Mutex>;
 
     T_Mutex queue_lock; // lock to protect active queue
-    T_Mutex wait_lock;  // wait lock, used to prevent multiple threads from waiting
-                        // on the event queue simultaneously.
+    
     
     // queue data structure/pointer
     BaseWatcher * first;
@@ -122,6 +215,16 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
     // - beginEventBatch/endEventBatch? (to allow locking)
     
     protected:
+    void beginEventBatch()
+    {
+        queue_lock.lock();
+    }
+    
+    void endEventBatch()
+    {
+        queue_lock.unlock();
+    }
+    
     void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
     {
         // Put callback in queue:
@@ -129,7 +232,7 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
         BaseSignalWatcher * bwatcher = (BaseSignalWatcher *) watcher;
         
         if (bwatcher->deleteme) {
-            // TODO handle this.
+            return;
         }
         
         bwatcher->siginfo = siginfo;
@@ -171,32 +274,58 @@ template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
         
         BaseWatcher * pqueue = first;
         first = nullptr;
-        bool active;
+        bool active = false;
         
+        BaseWatcher * prev = nullptr;
         for (BaseWatcher * q = pqueue; q != nullptr; q = q->next) {
             if (q->deleteme) {
-                // TODO
-                // try-lock the wait_lock; if successful, unlock and delete
-                //                         lf unsuccesful, re-queue
+                q->watchRemoved();
+                if (prev) {
+                    prev->next = q->next;
+                }
+                else {
+                    pqueue = q->next;
+                }
             }
-            q->active = true;
-            active = true;
+            else {
+                q->active = true;
+                active = true;
+            }
         }
         
         queue_lock.unlock();
         
         while (pqueue != nullptr) {
             pqueue->dispatch(); // TODO: handle re-arm etc
-                     // TODO need to do this with lock
+                     // (need to do this with lock)
             queue_lock.lock();
             pqueue->active = false;
+            if (pqueue->deleteme) {
+                pqueue->watchRemoved();
+            }
             queue_lock.unlock();
-                // TODO check delete flag; if set while active,
-                // we can remove immediately.
             pqueue = pqueue->next;    
         }
         
         return active;
+    }
+    
+    void issueDelete(BaseWatcher *watcher) noexcept
+    {
+        // This is only called when the attention lock is held, so if the watcher is not
+        // active now, it cannot become active during execution of this function.
+        
+        queue_lock.lock();
+        
+        if (watcher->active) {
+            watcher->deleteme = true;
+        }
+        else {
+            // Actually do the delete.
+            watcher->watchRemoved();
+        }
+        
+        queue_lock.unlock();
     }
 };
 
@@ -208,17 +337,13 @@ template <typename T_Mutex> class EventLoop
     friend class PosixSignalWatcher<T_Mutex>;
     //friend class SignalFdWatcher<T_Mutex>;
     
-    T_Mutex mutex;
-    EpollLoop<EventDispatch<T_Mutex, EpollTraits>> loop_mech;
+    T_Mutex wait_lock;  // wait lock, used to prevent multiple threads from waiting
+                        // on the event queue simultaneously.
     
-    // TODO do we need this here?
-    class Locker {
-        T_Mutex &mutex;
-        
-        public:
-        Locker(T_Mutex &m) : mutex(m) { mutex.lock(); }
-        ~Locker() { mutex.unlock(); }
-    };
+    EpollLoop<EventDispatch<T_Mutex, EpollTraits>> loop_mech;
+
+    waitqueue<T_Mutex> attn_waitqueue;
+    waitqueue<T_Mutex> wait_waitqueue;
     
     // TODO thread safety for event loop mechanism is tricky in subtle ways. The same
     // mutex used to prevent two threads from polling at the same time should not be
@@ -233,10 +358,64 @@ template <typename T_Mutex> class EventLoop
     {
         loop_mech.addSignalWatch(signo, callBack);
     }
+    
+    void deregisterSignal(PosixSignalWatcher<T_Mutex> *callBack, int signo) noexcept
+    {
+        loop_mech.removeSignalWatch(signo);
+        
+        waitqueue_node<T_Mutex> qnode;
+        getAttnLock(qnode);        
+        
+        EventDispatch<T_Mutex, EpollTraits> & ed = (EventDispatch<T_Mutex, EpollTraits> &) loop_mech;
+        ed.issueDelete(callBack);
+        
+        releaseLock(qnode);
+    }
 
     void registerFd(PosixFdWatcher<T_Mutex> *callback, int fd, int eventmask)
     {
         loop_mech.addFdWatch(fd, callback, eventmask);
+    }
+
+    void getAttnLock(waitqueue_node<T_Mutex> &qnode)
+    {
+        std::unique_lock<T_Mutex> ulock(wait_lock);
+        attn_waitqueue.queue(&qnode);        
+        while (attn_waitqueue.getHead() != &qnode) {
+            qnode.wait(ulock);
+        }        
+    }
+    
+    void getPollwaitLock(waitqueue_node<T_Mutex> &qnode)
+    {
+        std::unique_lock<T_Mutex> ulock(wait_lock);
+        if (attn_waitqueue.getHead() == nullptr) {
+            // Queue is completely empty:
+            attn_waitqueue.queue(&qnode);
+        }
+        else {
+            wait_waitqueue.queue(&qnode);
+        }
+        
+        while (attn_waitqueue.getHead() != &qnode) {
+            qnode.wait(ulock);
+        }    
+    }
+    
+    void releaseLock(waitqueue_node<T_Mutex> &qnode)
+    {
+        std::unique_lock<T_Mutex> ulock(wait_lock);
+        waitqueue_node<T_Mutex> * nhead = attn_waitqueue.unqueue();
+        if (nhead != nullptr) {
+            nhead->signal();
+        }
+        else {
+            nhead = wait_waitqueue.getHead();
+            if (nhead != nullptr) {
+                attn_waitqueue.queue(nhead);
+                nhead->signal();
+            }
+        }                
     }
     
     public:
@@ -244,257 +423,22 @@ template <typename T_Mutex> class EventLoop
     {
         EventDispatch<T_Mutex, EpollTraits> & ed = (EventDispatch<T_Mutex, EpollTraits> &) loop_mech;
         while (! ed.processEvents()) {
+
+            waitqueue_node<T_Mutex> qnode;
+            
             // We only allow one thread to poll the mechanism at any time, since otherwise
             // removing event watchers is a nightmare beyond comprehension.
-            ed.wait_lock.lock();
+            getPollwaitLock(qnode);
+            
+            // Pull events from the AEN mechanism and insert them in our internal queue:
             loop_mech.pullEvents(true);
-            ed.wait_lock.unlock();
-            // TODO process event queue
+            
+            // Now release the wait lock:
+            releaseLock(qnode);
         }
     }
 };
 
-
-// TODO move non-type-arg dependent members into a non-template base class
-/*
-template <typename T_Mutex>
-class EventLoopOld
-{
-    friend class PosixFdWatcher<T_Mutex>;
-    friend class PosixSignalWatcher<T_Mutex>;
-    friend class SignalFdWatcher<T_Mutex>;
-
-private:
-    int epfd; // epoll fd
-    int signalfd; // signalfd fd; -1 if not initialised
-    
-    T_Mutex mutex;
-    SignalFdWatcher<T_Mutex> signalWatcher;
-    
-    struct FdInfo {
-        PosixFdWatcher<T_Mutex> * handler;
-        
-        // Could possibly move the processing/armed/deactivate flags
-        // here (from the PosixFdWatcher structure).
-    };
-    
-    // protected by the mutex:
-    sigset_t smask;  // signal mask to look at
-    BaseSignalWatcher *signalCallbacks[NSIG];
-    std::vector<FdInfo> fdinfo;
-
-    // Register a signal handler for a given signal. Reception of the signal
-    // should be blocked by the caller. Having more than one handler for a
-    // particular signal, including across different event loops, is not
-    // supported.
-    void registerSignal(PosixSignalWatcher<T_Mutex> *callBack, int signo)
-    {
-        mutex.lock();
-        
-        sigaddset(&smask, signo);
-        //signalCallbacks[signo] = static_cast<BaseSignalWatcher *>(callBack); // DAV XXX
-        signalCallbacks[signo] = callBack;
-        
-        if (signalfd == -1) {
-            signalfd = ::signalfd(signalfd, &smask, SFD_NONBLOCK | SFD_CLOEXEC);
-            if (signalfd == -1) {
-                mutex.unlock();
-                throw std::system_error(errno, std::system_category());                
-            }
-            
-            // Now add the signal fd to the epoll set:
-            mutex.unlock();
-            registerFd(&signalWatcher, signalfd, in_events);            
-        }
-        else {
-            // Just have to add the requested signal to the mask
-            signalfd = ::signalfd(signalfd, &smask, 0);
-            mutex.unlock();
-        }
-    }
-    
-    // Event mask should be in_events / out_events
-    // may throw allocation exception
-    void registerFd(PosixFdWatcher<T_Mutex> *callback, int fd, int eventmask)
-    {
-        struct epoll_event epevent;
-        epevent.data.fd = fd;
-        // epevent.data.ptr = callback;
-        
-        callback->processing = 0;
-        callback->deactivate = 0;
-        
-        mutex.lock();
-        if (fdinfo.size() <= (unsigned)fd) fdinfo.resize(fd + 1);
-        fdinfo[fd].handler = callback;
-        mutex.unlock();
-        
-        epevent.events = EPOLLONESHOT;
-        if (eventmask & in_events) {
-            epevent.events |= EPOLLIN;
-        }
-        if (eventmask & out_events) {
-            epevent.events |= EPOLLOUT;
-        }
-
-        if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &epevent) == -1) {
-            throw new std::system_error(errno, std::system_category());        
-        }
-    }
-    
-    void deregisterFd(PosixFdWatcher<T_Mutex> *callback, int fd)
-    {
-        mutex.lock();
-        // assert ( fdinfo[fd].handler == callback )
-        
-        if (callback->processing) {
-            callback->deactivate = 1;
-            mutex.unlock();
-            // deactivation call will now be made when processing is finished
-        }
-        else {
-            fdinfo[fd].handler = nullptr;
-            epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
-            mutex.unlock();
-            callback->deactivated();
-        }
-    }
-    
-    // Deactivate watcher immediately, only callable from event callback
-    void deactivateFd(PosixFdWatcher<T_Mutex> *callback, int fd)
-    {
-        mutex.lock();
-        fdinfo[fd].handler = nullptr;
-        epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
-        mutex.unlock();
-    }
-    
-    // Process signals noticed on the signal fd.
-    void processSignalFd()
-    {
-        struct timespec timeout;
-        timeout.tv_sec = 0;
-        timeout.tv_nsec = 0;
-        
-        siginfo_t siginfo;
-        
-        int signum = sigtimedwait(&smask, &siginfo, &timeout);
-        while (signum != -1) {
-            if (signalCallbacks[signum] != 0) {
-                signalCallbacks[signum]->gotSignal(signum, SignalInfo(&siginfo));
-            }
-            // Check for more signals:
-            signum = sigtimedwait(&smask, &siginfo, &timeout);
-        }
-    }
-    
-    void processEvents(epoll_event *events, int r)
-    {
-        mutex.lock();
-            
-        for (int i = 0; i < r; i++) {
-            int fd = events[i].data.fd;
-            //PosixFdWatcher<T_Mutex> * pfw = (PosixFdWatcher<T_Mutex> *) events[i].data.ptr;
-            PosixFdWatcher<T_Mutex> * pfw = fdinfo[fd].handler;
-                        
-            if (pfw == nullptr) continue;
-
-            if (pfw->processing) {
-                // This shouldn't actually happen, if EPOLLONESHOT is working correctly.
-                // But it seems better to be safe:
-                continue;
-            }            
-            pfw->processing = 1;
-            
-            // We actually call the handler with the mutex unlocked, to avoid deadlock if
-            // the handler calls back to the event loop (and also to avoid holding the
-            // mutex for too long):
-            mutex.unlock();
-            
-            int flags = 0;
-            (events[i].events & EPOLLIN) && (flags |= in_events);
-            (events[i].events & EPOLLOUT) && (flags |= out_events);
-            Rearm r = pfw->fdReady(this, FD_r(), flags);
-            
-            // We are using one-shot events (EPOLLONESHOT), so must re-arm the descriptor if
-            // it is supposed to be armed; but first we check if it's scheduled for
-            // deactivation.
-            
-            mutex.lock();
-            
-            pfw->processing = 0;
-            
-            if (pfw->deactivate) {
-                // deactivate is only set once the fd is already removed from epoll set
-                // it should now be safe to deactivate:
-                
-                mutex.unlock();
-                pfw->deactivated();
-                mutex.lock();
-            }
-            else if (r == Rearm::REARM) {
-                events[i].events = EPOLLONESHOT;
-                if (pfw->in_events) events[i].events |= EPOLLIN;
-                if (pfw->out_events) events[i].events |= EPOLLOUT;
-                epoll_ctl(epfd, EPOLL_CTL_MOD, events[i].data.fd, &events[i]);
-            }
-        }
-        
-        mutex.unlock();
-    }
-
-public:
-    typedef T_Mutex mutex_t;
-    
-    // EventLoop constructor.
-    //
-    // Throws std::system_error if the event loop cannot be initialised.
-    EventLoop() : signalfd(-1)
-    {
-        sigemptyset(&smask);
-        epfd = epoll_create1(EPOLL_CLOEXEC);
-        if (epfd == -1) {
-            throw std::system_error(errno, std::system_category());
-        }
-    }
-    
-    ~EventLoop()
-    {
-        close(epfd);
-        if (signalfd != -1) {
-            close(signalfd);
-        }
-    }
-    
-    // Run any events that are currently pending
-    void checkEvents()
-    {
-        epoll_event events[10];
-        int r = epoll_wait(epfd, events, 10, 0);
-        if (r == -1 || r == 0) {
-            // signal or no events
-            return;
-        }
-    
-        processEvents(events, r);
-    }
-
-    // Wait for any event and then process it before returning. May process
-    // more than one event.
-    void run()
-    {
-        epoll_event events[10];
-
-        int r = epoll_wait(epfd, events, 10, -1);
-        if (r == -1) {
-            // presumably got a signal that we are not watching.
-            return;
-        }
-        
-        processEvents(events, r);
-    }
-};
-*/
 
 
 typedef EventLoop<NullMutex> NEventLoop;
