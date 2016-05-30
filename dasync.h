@@ -49,16 +49,25 @@ enum class Rearm
 {
     /** Re-arm the event watcher so that it receives further events */
     REARM,
-    /** Disarm the event handler so that it receives no further events, until it is re-armed explicitly */
-    DISARM
+    /** Disarm the event watcher so that it receives no further events, until it is re-armed explicitly */
+    DISARM,
+    /** Remove the event watcher */
+    REMOVE
 };
 
+
+namespace {
+    enum class WatchType
+    {
+        SIGNAL,
+        FD
+    };
+}
 
 // Forward declarations:
 template <typename T_Mutex> class EventLoop;
 template <typename T_Mutex> class PosixFdWatcher;
 template <typename T_Mutex> class PosixSignalWatcher;
-
 
 // Information about a received signal.
 // This is essentially a wrapper for the POSIX siginfo_t; its existence allows for mechanisms that receive
@@ -66,273 +75,268 @@ template <typename T_Mutex> class PosixSignalWatcher;
 using SigInfo = EpollTraits::SigInfo;
 
 
-
-// (non-public API)
-// Represents a queued event notification
-class BaseWatcher
-{
-    template <typename T_Mutex, typename Traits> friend class EventDispatch;
-    //friend class BaseSignalWatcher;
+namespace {
+    // (non-public API)
     
-    int active : 1;
-    int deleteme : 1;
+    template <typename T_Mutex, typename Traits> class EventDispatch;
     
-    BaseWatcher * next;
-    
-    virtual void dispatch() { }
-    
-    public:
-    BaseWatcher() : active(0), deleteme(0), next(nullptr) { }
-    
-    // Called when the watcher has been removed.
-    // When called it is guaranteed that:
-    // - the dispatch method is not currently running
-    // - the dispatch method will not be called.
-    virtual void watchRemoved() noexcept { }
-};
-
-
-// (Non-template) Base signal event - not part of public API
-class BaseSignalWatcher : public BaseWatcher
-{
-    template <typename T_Mutex, typename Traits> friend class EventDispatch;
-
-    SigInfo siginfo;    
-
-    void dispatch() override
+    // Represents a queued event notification
+    class BaseWatcher
     {
-        gotSignal(siginfo.get_signo(), siginfo);
-    }
-
-    public:
-    virtual void gotSignal(int signo, SigInfo siginfo) = 0;
-    // TODO should siginfo parameter be reference?
-};
-
-//extern BaseSignalWatcher * signalEvents[NSIG];
-
-template <typename T_Mutex> class EventLoop;
-
-
-// Classes for implementing a fair(ish) wait queue.
-// A queue node can be signalled when it reaches the head of
-// the queue.
-
-template <typename T_Mutex> class waitqueue;
-template <typename T_Mutex> class waitqueue_node;
-
-// Select an appropriate conditiona variable type for a mutex:
-// condition_variable if mutex is std::mutex, or condition_variable_any
-// otherwise.
-template <class T_Mutex> class condvarSelector;
-
-template <> class condvarSelector<std::mutex>
-{
-    public:
-    typedef std::condition_variable condvar;
-};
-
-template <class T_Mutex> class condvarSelector
-{
-    public:
-    typedef std::condition_variable_any condvar;
-};
-
-template <> class waitqueue_node<NullMutex>
-{
-    // Specialised waitqueue_node for NullMutex.
-    // TODO can this be reduced to 0 data members?
-    friend class waitqueue<NullMutex>;
-    waitqueue_node * next = nullptr;
-    
-    public:
-    void wait(std::unique_lock<NullMutex> &ul) { }
-    void signal() { }
-};
-
-template <typename T_Mutex> class waitqueue_node
-{
-    typename condvarSelector<T_Mutex>::condvar condvar;
-    friend class waitqueue<T_Mutex>;
-    waitqueue_node * next = nullptr;
-    
-    public:
-    void signal()
-    {
-        condvar.notify_one();
-    }
-    
-    void wait(std::unique_lock<T_Mutex> &mutex_lock)
-    {
-        condvar.wait(mutex_lock);
-    }
-};
-
-template <typename T_Mutex> class waitqueue
-{
-    waitqueue_node<T_Mutex> * tail = nullptr;
-    waitqueue_node<T_Mutex> * head = nullptr;
-
-    public:
-    waitqueue_node<T_Mutex> * unqueue()
-    {
-        head = head->next;
-        return head;
-    }
-    
-    waitqueue_node<T_Mutex> * getHead()
-    {
-        return head;
-    }
-    
-    void queue(waitqueue_node<T_Mutex> *node)
-    {
-        if (tail) {
-            tail->next = node;
-        }
-        else {
-            head = node;
-        }
-    }
-};
-
-
-
-template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
-{
-    friend class EventLoop<T_Mutex>;
-
-    // T_Mutex queue_lock; // lock to protect active queue and AEN internal structures
-    
-    
-    // queue data structure/pointer
-    BaseWatcher * first;
-
-    // TODO receiveXXX need to be bracketed by queue_lock lock and unlock.
-    // AEN can notify just before and after delivering a set of events?
-    // - Maybe need doMechanismLock and doMechanismUnlock? AEN mechanism may not be thread safe,
-    //   gives it a way to lock a mutex if necessary
-    // - beginEventBatch/endEventBatch? (to allow locking)
-    
-    protected:
-    T_Mutex lock;
-    
-    /*
-    void beginEventBatch()
-    {
-        queue_lock.lock();
-    }
-    
-    void endEventBatch()
-    {
-        queue_lock.unlock();
-    }
-    */
-    
-    void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
-    {
-        // Put callback in queue:
-        PosixSignalWatcher<T_Mutex> * watcher = static_cast<PosixSignalWatcher<T_Mutex> *>(userdata);
-        BaseSignalWatcher * bwatcher = (BaseSignalWatcher *) watcher;
+        template <typename T_Mutex, typename Traits> friend class EventDispatch;
         
-        if (bwatcher->deleteme) {
-            return;
+        protected:
+        WatchType watchType;
+        int active : 1;
+        int deleteme : 1;
+        
+        BaseWatcher * next;
+        
+        public:
+        BaseWatcher(WatchType wt) : watchType(wt), active(0), deleteme(0), next(nullptr) { }
+        
+        // Called when the watcher has been removed.
+        // When called it is guaranteed that:
+        // - the dispatch method is not currently running
+        // - the dispatch method will not be called.
+        virtual void watchRemoved() noexcept { }
+    };
+
+
+    // (Non-template) Base signal event - not part of public API
+    class BaseSignalWatcher : public BaseWatcher
+    {
+        template <typename T_Mutex, typename Traits> friend class EventDispatch;
+
+        SigInfo siginfo;
+
+        protected:
+        BaseSignalWatcher() : BaseWatcher(WatchType::SIGNAL) { }
+
+        public:
+        typedef SigInfo &SigInfo_p;
+        
+        virtual Rearm gotSignal(int signo, SigInfo_p siginfo) = 0;
+        // TODO should siginfo parameter be reference?
+    };
+
+
+    // Classes for implementing a fair(ish) wait queue.
+    // A queue node can be signalled when it reaches the head of
+    // the queue.
+
+    template <typename T_Mutex> class waitqueue;
+    template <typename T_Mutex> class waitqueue_node;
+
+    // Select an appropriate conditiona variable type for a mutex:
+    // condition_variable if mutex is std::mutex, or condition_variable_any
+    // otherwise.
+    template <class T_Mutex> class condvarSelector;
+
+    template <> class condvarSelector<std::mutex>
+    {
+        public:
+        typedef std::condition_variable condvar;
+    };
+
+    template <class T_Mutex> class condvarSelector
+    {
+        public:
+        typedef std::condition_variable_any condvar;
+    };
+
+    template <> class waitqueue_node<NullMutex>
+    {
+        // Specialised waitqueue_node for NullMutex.
+        // TODO can this be reduced to 0 data members?
+        friend class waitqueue<NullMutex>;
+        waitqueue_node * next = nullptr;
+        
+        public:
+        void wait(std::unique_lock<NullMutex> &ul) { }
+        void signal() { }
+    };
+
+    template <typename T_Mutex> class waitqueue_node
+    {
+        typename condvarSelector<T_Mutex>::condvar condvar;
+        friend class waitqueue<T_Mutex>;
+        waitqueue_node * next = nullptr;
+        
+        public:
+        void signal()
+        {
+            condvar.notify_one();
         }
         
-        bwatcher->siginfo = siginfo;
-        // TODO for now, I'll set it active; but this prevents it being deleted until we can next
-        // process events, so once we have a proper linked list or better structure should probably
-        // remove this:
-        bwatcher->active = true;
-        
-        // Put in queue:
-        BaseWatcher * prev_first = first;
-        first = bwatcher;
-        bwatcher->next = prev_first;
-    }
-    
-    void receiveFdEvent(typename Traits::FD_r fd_r, void * userdata, int flags)
-    {
-        // TODO put callback in queue
-    }
-    
-    // TODO is this needed?:
-    BaseWatcher * pullEvent()
-    {
-        if (first) {
-            BaseWatcher * r = first;
-            first = first->next;
-            return r;
+        void wait(std::unique_lock<T_Mutex> &mutex_lock)
+        {
+            condvar.wait(mutex_lock);
         }
-        return nullptr;
-    }
-    
-    // Process any pending events, return true if any events were processed or false if none
-    // were queued
-    bool processEvents() noexcept
+    };
+
+    template <typename T_Mutex> class waitqueue
     {
-        lock.lock();
+        waitqueue_node<T_Mutex> * tail = nullptr;
+        waitqueue_node<T_Mutex> * head = nullptr;
+
+        public:
+        waitqueue_node<T_Mutex> * unqueue()
+        {
+            head = head->next;
+            return head;
+        }
         
-        // So this pulls *all* currently pending events and processes them in the current thread.
-        // That's probably good for throughput, but maybe the behavior should be configurable.
+        waitqueue_node<T_Mutex> * getHead()
+        {
+            return head;
+        }
         
-        BaseWatcher * pqueue = first;
-        first = nullptr;
-        bool active = false;
-        
-        BaseWatcher * prev = nullptr;
-        for (BaseWatcher * q = pqueue; q != nullptr; q = q->next) {
-            if (q->deleteme) {
-                q->watchRemoved();
-                if (prev) {
-                    prev->next = q->next;
-                }
-                else {
-                    pqueue = q->next;
-                }
+        void queue(waitqueue_node<T_Mutex> *node)
+        {
+            if (tail) {
+                tail->next = node;
             }
             else {
-                q->active = true;
-                active = true;
+                head = node;
             }
         }
-        
-        lock.unlock();
-        
-        while (pqueue != nullptr) {
-            pqueue->dispatch(); // TODO: handle re-arm etc
-                     // (need to do this with lock)
-            lock.lock();
-            pqueue->active = false;
-            if (pqueue->deleteme) {
-                pqueue->watchRemoved();
-            }
-            lock.unlock();
-            pqueue = pqueue->next;    
-        }
-        
-        return active;
-    }
-    
-    void issueDelete(BaseWatcher *watcher) noexcept
-    {
-        // This is only called when the attention lock is held, so if the watcher is not
-        // active now, it cannot become active during execution of this function.
-        
-        lock.lock();
-        
-        if (watcher->active) {
-            watcher->deleteme = true;
-        }
-        else {
-            // Actually do the delete.
-            watcher->watchRemoved();
-        }
-        
-        lock.unlock();
-    }
-};
+    };
 
+    template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
+    {
+        friend class EventLoop<T_Mutex>;
+
+        // queue data structure/pointer
+        BaseWatcher * first;
+
+        // TODO receiveXXX need to be bracketed by queue_lock lock and unlock.
+        // AEN can notify just before and after delivering a set of events?
+        // - Maybe need doMechanismLock and doMechanismUnlock? AEN mechanism may not be thread safe,
+        //   gives it a way to lock a mutex if necessary
+        // - beginEventBatch/endEventBatch? (to allow locking)
+        
+        protected:
+        T_Mutex lock;
+        
+        void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
+        {
+            // Put callback in queue:
+            PosixSignalWatcher<T_Mutex> * watcher = static_cast<PosixSignalWatcher<T_Mutex> *>(userdata);
+            BaseSignalWatcher * bwatcher = (BaseSignalWatcher *) watcher;
+            
+            if (bwatcher->deleteme) {
+                return;
+            }
+            
+            bwatcher->siginfo = siginfo;
+            // TODO for now, I'll set it active; but this prevents it being deleted until we can next
+            // process events, so once we have a proper linked list or better structure should probably
+            // remove this:
+            bwatcher->active = true;
+            
+            // Put in queue:
+            BaseWatcher * prev_first = first;
+            first = bwatcher;
+            bwatcher->next = prev_first;
+        }
+        
+        void receiveFdEvent(typename Traits::FD_r fd_r, void * userdata, int flags)
+        {
+            // TODO put callback in queue
+        }
+        
+        // TODO is this needed?:
+        BaseWatcher * pullEvent()
+        {
+            if (first) {
+                BaseWatcher * r = first;
+                first = first->next;
+                return r;
+            }
+            return nullptr;
+        }
+        
+        // Process any pending events, return true if any events were processed or false if none
+        // were queued
+        bool processEvents() noexcept
+        {
+            lock.lock();
+            
+            // So this pulls *all* currently pending events and processes them in the current thread.
+            // That's probably good for throughput, but maybe the behavior should be configurable.
+            
+            BaseWatcher * pqueue = first;
+            first = nullptr;
+            bool active = false;
+            
+            BaseWatcher * prev = nullptr;
+            for (BaseWatcher * q = pqueue; q != nullptr; q = q->next) {
+                if (q->deleteme) {
+                    q->watchRemoved();
+                    if (prev) {
+                        prev->next = q->next;
+                    }
+                    else {
+                        pqueue = q->next;
+                    }
+                }
+                else {
+                    q->active = true;
+                    active = true;
+                }
+            }
+            
+            lock.unlock();
+            
+            while (pqueue != nullptr) {
+                Rearm rearmType;
+                
+                switch (pqueue->watchType) {
+                case WatchType::SIGNAL: {
+                    BaseSignalWatcher *bsw = (BaseSignalWatcher *) pqueue;
+                    rearmType = bsw->gotSignal(bsw->siginfo.get_signo(), bsw->siginfo);
+                    break;
+                }
+                default: ;
+                }
+            
+                lock.lock();
+                pqueue->active = false;
+                if (pqueue->deleteme) {
+                    pqueue->watchRemoved();
+                    lock.unlock();
+                }
+                else {
+                    lock.unlock();
+                    // TODO handle re-arm here
+                    // Tricky! Races/deadlocks!
+                }
+                pqueue = pqueue->next;    
+            }
+            
+            return active;
+        }
+        
+        void issueDelete(BaseWatcher *watcher) noexcept
+        {
+            // This is only called when the attention lock is held, so if the watcher is not
+            // active now, it cannot become active during execution of this function.
+            
+            lock.lock();
+            
+            if (watcher->active) {
+                watcher->deleteme = true;
+            }
+            else {
+                // Actually do the delete.
+                watcher->watchRemoved();
+            }
+            
+            lock.unlock();
+        }
+    };
+}
 
 
 template <typename T_Mutex> class EventLoop
@@ -491,17 +495,6 @@ typedef EventLoop<DMutex> TEventLoop;
 // from dasync.cc:
 TEventLoop & getSystemLoop();
 
-
-/*
-template <typename T_Mutex> Rearm SignalFdWatcher<T_Mutex>::fdReady(EventLoop<T_Mutex> *eloop, FD_r fdr, int flags)
-{
-    // processSignalFd(&eloop->smask);
-    eloop->processSignalFd();
-    return Rearm::REARM;
-}
-*/
-
-
 // Posix signal event
 template <typename T_Mutex>
 class PosixSignalWatcher : private BaseSignalWatcher
@@ -509,6 +502,8 @@ class PosixSignalWatcher : private BaseSignalWatcher
     friend class EventLoop<T_Mutex>;
     
 public:
+    using SigInfo_p = BaseSignalWatcher::SigInfo_p;
+
     // If an attempt is made to register with more than one event loop at
     // a time, behaviour is undefined.
     inline void registerWith(EventLoop<T_Mutex> *eloop, int signo)
@@ -516,9 +511,9 @@ public:
         eloop->registerSignal(this, signo);
     }
     
-    virtual void gotSignal(int signo, SigInfo info) = 0;
+    //virtual void gotSignal(int signo, SigInfo info) = 0;
 };
 
-}  // namespace org_davmac
+}  // namespace dasync
 
 #endif
