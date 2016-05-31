@@ -76,7 +76,7 @@ template <class Base> class EpollLoop : Base
 
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
-    //          receive*() methods should be called with lock held.
+    //          receive*() methods will be called with lock held.
     //   receiveSignal(SigInfo &, user *) noexcept
     //   receiveFdEvent(FD_r, user *, int flags) noexcept
     
@@ -166,6 +166,11 @@ template <class Base> class EpollLoop : Base
         epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
     }
     
+    void removeFdWatch_nolock(int fd)
+    {
+        removeFdWatch(fd);
+    }
+    
     void enableFdWatch(int fd, void *userdata, int flags)
     {
         struct epoll_event epevent;
@@ -186,6 +191,11 @@ template <class Base> class EpollLoop : Base
         if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &epevent) == -1) {
             throw new std::system_error(errno, std::system_category());        
         }
+    }
+    
+    void enableFdWatch_nolock(int fd, void *userdata, int flags)
+    {
+        enableFdWatch(fd, userdata, flags);
     }
     
     void disableFdWatch(int fd)
@@ -232,12 +242,23 @@ template <class Base> class EpollLoop : Base
         }
     }
     
-    void removeSignalWatch(int signo)
+    // Note, called with lock held:
+    void rearmSignalWatch_nolock(int signo) noexcept
     {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        
+        sigaddset(&sigmask, signo);
+        signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
+    }
+    
+    void removeSignalWatch_nolock(int signo) noexcept
+    {
         sigdelset(&sigmask, signo);
         signalfd(sigfd, &sigmask, 0);
+    }
+
+    void removeSignalWatch(int signo) noexcept
+    {
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        removeSignalWatch_nolock(signo);
     }
     
     // If events are pending, process an unspecified number of them.

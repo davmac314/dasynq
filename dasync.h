@@ -51,18 +51,10 @@ enum class Rearm
     REARM,
     /** Disarm the event watcher so that it receives no further events, until it is re-armed explicitly */
     DISARM,
-    /** Remove the event watcher */
+    /** Remove the event watcher (and call "removed" callback) */
     REMOVE
 };
 
-
-namespace {
-    enum class WatchType
-    {
-        SIGNAL,
-        FD
-    };
-}
 
 // Forward declarations:
 template <typename T_Mutex> class EventLoop;
@@ -74,9 +66,17 @@ template <typename T_Mutex> class PosixSignalWatcher;
 // equivalent signal information in a different format (eg signalfd on Linux).
 using SigInfo = EpollTraits::SigInfo;
 
+//using FD_s = EpollTraits::FD_s;
+//using FD_r = EpollTraits::FD_r;
 
-namespace {
+namespace dprivate {
     // (non-public API)
+
+    enum class WatchType
+    {
+        SIGNAL,
+        FD
+    };
     
     template <typename T_Mutex, typename Traits> class EventDispatch;
     
@@ -84,6 +84,7 @@ namespace {
     class BaseWatcher
     {
         template <typename T_Mutex, typename Traits> friend class EventDispatch;
+        template <typename T_Mutex> friend class dasync::EventLoop;
         
         protected:
         WatchType watchType;
@@ -107,6 +108,7 @@ namespace {
     class BaseSignalWatcher : public BaseWatcher
     {
         template <typename T_Mutex, typename Traits> friend class EventDispatch;
+        template <typename T_Mutex> friend class dasync::EventLoop;
 
         SigInfo siginfo;
 
@@ -117,9 +119,23 @@ namespace {
         typedef SigInfo &SigInfo_p;
         
         virtual Rearm gotSignal(int signo, SigInfo_p siginfo) = 0;
-        // TODO should siginfo parameter be reference?
     };
-
+    
+    class BaseFdWatcher : public BaseWatcher
+    {
+        template <typename T_Mutex, typename Traits> friend class EventDispatch;
+        template <typename T_Mutex> friend class dasync::EventLoop;
+        
+        protected:
+        int watch_fd;
+        int watch_flags;
+        int event_flags;
+        
+        BaseFdWatcher() : BaseWatcher(WatchType::FD) { }
+        
+        public:
+        virtual Rearm gotEvent(int fd, int flags) = 0;
+    };
 
     // Classes for implementing a fair(ish) wait queue.
     // A queue node can be signalled when it reaches the head of
@@ -203,6 +219,7 @@ namespace {
         }
     };
 
+    // This class serves as the base class (mixin) for the AEN mechanism class.
     template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
     {
         friend class EventLoop<T_Mutex>;
@@ -244,6 +261,20 @@ namespace {
         void receiveFdEvent(typename Traits::FD_r fd_r, void * userdata, int flags)
         {
             // TODO put callback in queue
+            PosixFdWatcher<T_Mutex> * watcher = static_cast<PosixFdWatcher<T_Mutex> *>(userdata);
+            BaseFdWatcher * bwatcher = (BaseFdWatcher *) watcher;
+            
+            if (bwatcher->deleteme) {
+                return;
+            }
+            
+            bwatcher->event_flags = flags;
+            bwatcher->active = true;
+            
+            // Put in queue:
+            BaseWatcher * prev_first = first;
+            first = bwatcher;
+            bwatcher->next = prev_first;
         }
         
         // TODO is this needed?:
@@ -255,67 +286,6 @@ namespace {
                 return r;
             }
             return nullptr;
-        }
-        
-        // Process any pending events, return true if any events were processed or false if none
-        // were queued
-        bool processEvents() noexcept
-        {
-            lock.lock();
-            
-            // So this pulls *all* currently pending events and processes them in the current thread.
-            // That's probably good for throughput, but maybe the behavior should be configurable.
-            
-            BaseWatcher * pqueue = first;
-            first = nullptr;
-            bool active = false;
-            
-            BaseWatcher * prev = nullptr;
-            for (BaseWatcher * q = pqueue; q != nullptr; q = q->next) {
-                if (q->deleteme) {
-                    q->watchRemoved();
-                    if (prev) {
-                        prev->next = q->next;
-                    }
-                    else {
-                        pqueue = q->next;
-                    }
-                }
-                else {
-                    q->active = true;
-                    active = true;
-                }
-            }
-            
-            lock.unlock();
-            
-            while (pqueue != nullptr) {
-                Rearm rearmType;
-                
-                switch (pqueue->watchType) {
-                case WatchType::SIGNAL: {
-                    BaseSignalWatcher *bsw = (BaseSignalWatcher *) pqueue;
-                    rearmType = bsw->gotSignal(bsw->siginfo.get_signo(), bsw->siginfo);
-                    break;
-                }
-                default: ;
-                }
-            
-                lock.lock();
-                pqueue->active = false;
-                if (pqueue->deleteme) {
-                    pqueue->watchRemoved();
-                    lock.unlock();
-                }
-                else {
-                    lock.unlock();
-                    // TODO handle re-arm here
-                    // Tricky! Races/deadlocks!
-                }
-                pqueue = pqueue->next;    
-            }
-            
-            return active;
         }
         
         void issueDelete(BaseWatcher *watcher) noexcept
@@ -345,6 +315,13 @@ template <typename T_Mutex> class EventLoop
     friend class PosixSignalWatcher<T_Mutex>;
     //friend class SignalFdWatcher<T_Mutex>;
     
+    template <typename T, typename U> using EventDispatch = dprivate::EventDispatch<T,U>;
+    template <typename T> using waitqueue = dprivate::waitqueue<T>;
+    template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
+    using BaseWatcher = dprivate::BaseWatcher;
+    using BaseSignalWatcher = dprivate::BaseSignalWatcher;
+    using BaseFdWatcher = dprivate::BaseFdWatcher;
+    using WatchType = dprivate::WatchType;
     
     EpollLoop<EventDispatch<T_Mutex, EpollTraits>> loop_mech;
 
@@ -466,12 +443,109 @@ template <typename T_Mutex> class EventLoop
         }                
     }
     
+    void processSignalRearm(BaseSignalWatcher * bsw, Rearm rearmType)
+    {
+        // Called with lock held
+        if (rearmType == Rearm::REARM) {
+            loop_mech.rearmSignalWatch_nolock(bsw->siginfo.get_signo());
+        }
+        else if (rearmType == Rearm::REMOVE) {
+            loop_mech.removeSignalWatch_nolock(bsw->siginfo.get_signo());
+        }
+    }
+
+    void processFdRearm(BaseFdWatcher * bfw, Rearm rearmType)
+    {
+        // Called with lock held
+        if (rearmType == Rearm::REARM) {
+            loop_mech.enableFdWatch_nolock(bfw->watch_fd, bfw, bfw->watch_flags);
+        }
+        else if (rearmType == Rearm::REMOVE) {
+            loop_mech.removeFdWatch_nolock(bfw->watch_fd);
+        }
+    }
+
+    bool processEvents() noexcept
+    {
+        EventDispatch<T_Mutex, EpollTraits> & ed = (EventDispatch<T_Mutex, EpollTraits> &) loop_mech;
+        ed.lock.lock();
+        
+        // So this pulls *all* currently pending events and processes them in the current thread.
+        // That's probably good for throughput, but maybe the behavior should be configurable.
+        
+        BaseWatcher * pqueue = ed.first;
+        ed.first = nullptr;
+        bool active = false;
+        
+        BaseWatcher * prev = nullptr;
+        for (BaseWatcher * q = pqueue; q != nullptr; q = q->next) {
+            if (q->deleteme) {
+                q->watchRemoved();
+                if (prev) {
+                    prev->next = q->next;
+                }
+                else {
+                    pqueue = q->next;
+                }
+            }
+            else {
+                q->active = true;
+                active = true;
+            }
+        }
+        
+        ed.lock.unlock();
+        
+        while (pqueue != nullptr) {
+            Rearm rearmType;
+            
+            switch (pqueue->watchType) {
+            case WatchType::SIGNAL: {
+                BaseSignalWatcher *bsw = static_cast<BaseSignalWatcher *>(pqueue);
+                rearmType = bsw->gotSignal(bsw->siginfo.get_signo(), bsw->siginfo);
+                break;
+            }
+            case WatchType::FD: {
+                BaseFdWatcher *bfw = static_cast<BaseFdWatcher *>(pqueue);
+                rearmType = bfw->gotEvent(bfw->watch_fd, bfw->event_flags);
+                break;
+            }
+            default: ;
+            }
+            
+            ed.lock.lock();
+            
+            pqueue->active = false;
+            if (pqueue->deleteme) {
+                rearmType = Rearm::REMOVE;
+            }
+            switch (pqueue->watchType) {
+            case WatchType::SIGNAL:
+                processSignalRearm(static_cast<BaseSignalWatcher *>(pqueue), rearmType);
+                break;
+            case WatchType::FD:
+                processFdRearm(static_cast<BaseFdWatcher *>(pqueue), rearmType);
+                break;
+            default: ;
+            }
+            
+            if (rearmType == Rearm::REMOVE) {
+                pqueue->watchRemoved();
+            }
+            
+            ed.lock.unlock();
+            
+            pqueue = pqueue->next;
+        }
+        
+        return active;
+    }
+
+    
     public:
     void run() noexcept
     {
-        EventDispatch<T_Mutex, EpollTraits> & ed = (EventDispatch<T_Mutex, EpollTraits> &) loop_mech;
-        while (! ed.processEvents()) {
-
+        while (! processEvents()) {
             waitqueue_node<T_Mutex> qnode;
             
             // We only allow one thread to poll the mechanism at any time, since otherwise
@@ -490,14 +564,14 @@ template <typename T_Mutex> class EventLoop
 
 
 typedef EventLoop<NullMutex> NEventLoop;
-typedef EventLoop<DMutex> TEventLoop;
+typedef EventLoop<std::mutex> TEventLoop;
 
 // from dasync.cc:
 TEventLoop & getSystemLoop();
 
 // Posix signal event
 template <typename T_Mutex>
-class PosixSignalWatcher : private BaseSignalWatcher
+class PosixSignalWatcher : private dprivate::BaseSignalWatcher
 {
     friend class EventLoop<T_Mutex>;
     
@@ -511,7 +585,21 @@ public:
         eloop->registerSignal(this, signo);
     }
     
-    //virtual void gotSignal(int signo, SigInfo info) = 0;
+    //virtual void gotSignal(int signo, SigInfo_p info) = 0;
+};
+
+template <typename T_Mutex>
+class PosixFdWatcher : private dprivate::BaseFdWatcher
+{
+public:
+    void registerWith(EventLoop<T_Mutex> *eloop, int fd, int flags)
+    {
+        this->watch_fd = fd;
+        this->watch_flags = flags;
+        eloop->registerFd(this, fd, flags);
+    }
+    
+    // virtual void gotEvent(int fd, int flags) = 0;
 };
 
 }  // namespace dasync
