@@ -20,7 +20,6 @@
 
 
 
-// TODO put all private API in nested namespace / class private members
 // TODO consider using atomic variables instead of explicit locking where appropriate
 
 // Allow optimisation of empty classes by including this in the body:
@@ -257,16 +256,13 @@ namespace dprivate {
         
         void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
         {
-            // Put callback in queue:
-            PosixSignalWatcher<T_Mutex> * watcher = static_cast<PosixSignalWatcher<T_Mutex> *>(userdata);
-            BaseSignalWatcher * bwatcher = (BaseSignalWatcher *) watcher;
-            
-            if (bwatcher->deleteme) {
-                return;
-            }
+            BaseSignalWatcher * bwatcher = static_cast<BaseSignalWatcher *>(userdata);
             
             bwatcher->siginfo = siginfo;
-            // TODO for now, I'll set it active; but this prevents it being deleted until we can next
+            
+            // TODO 
+            // We can't allow a queued entry to be deleted (due to the single-linked-list used for the queue)
+            // so for now, I'll set it active; but this prevents it being deleted until we can next
             // process events, so once we have a proper linked list or better structure should probably
             // remove this:
             bwatcher->active = true;
@@ -279,14 +275,11 @@ namespace dprivate {
         
         void receiveFdEvent(typename Traits::FD_r fd_r, void * userdata, int flags)
         {
-            PosixFdWatcher<T_Mutex> * watcher = static_cast<PosixFdWatcher<T_Mutex> *>(userdata);
-            BaseFdWatcher * bwatcher = (BaseFdWatcher *) watcher;
-            
-            if (bwatcher->deleteme) {
-                return;
-            }
+            BaseFdWatcher * bwatcher = static_cast<BaseFdWatcher *>(userdata);
             
             bwatcher->event_flags = flags;
+            
+            // TODO see receieveSignal notes.
             bwatcher->active = true;
             
             // Put in queue:
@@ -297,7 +290,17 @@ namespace dprivate {
         
         void receiveChildStat(pid_t child, int status, void * userdata)
         {
-        
+            BaseChildWatcher * watcher = static_cast<BaseChildWatcher *>(userdata);
+            
+            watcher->child_status = status;
+            
+            // TODO see receiveSignal notes.
+            watcher->active = true;
+            
+            // Put in queue:
+            BaseWatcher * prev_first = first;
+            first = watcher;
+            watcher->next = prev_first;
         }
         
         // TODO is this needed?:
@@ -543,6 +546,12 @@ template <typename T_Mutex> class EventLoop
         while (pqueue != nullptr) {
             Rearm rearmType;
             
+            // Note that we select actions based on the type of the watch, as determined by the watchType
+            // member. In some ways this screams out for polmorphism; a virtual function could be overridden
+            // by each of the watcher types. I've instead used switch/case because I think it will perform
+            // slightly better without the overhead of a virtual function dispatch, but it's got to be a
+            // close call; I might be guilty of premature optimisation here.
+            
             switch (pqueue->watchType) {
             case WatchType::SIGNAL: {
                 BaseSignalWatcher *bsw = static_cast<BaseSignalWatcher *>(pqueue);
@@ -642,7 +651,7 @@ public:
         eloop->deregisterSignal(this, siginfo.get_signo());
     }
     
-    // virtual Ream gotSignal(int signo, SigInfo_p info) = 0;
+    // virtual Rearm gotSignal(int signo, SigInfo_p info) = 0;
 };
 
 // Posix file descriptor event watcher
