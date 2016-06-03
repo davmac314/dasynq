@@ -664,7 +664,16 @@ public:
 template <typename T_Mutex>
 class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
 {
-public:
+    protected:
+    
+    // Set the types of event to watch. May not be supported for all mechanisms.
+    void setWatchFlags(int newFlags)
+    {
+        this->watch_flags = newFlags;
+    }
+    
+    public:
+    
     void registerWith(EventLoop<T_Mutex> *eloop, int fd, int flags)
     {
         this->watch_fd = fd;
@@ -679,13 +688,6 @@ public:
 template <typename T_Mutex>
 class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
 {
-    protected:
-    // Set the types of event to watch. May not be supported for all mechanisms.
-    void setWatchFlags(int newFlags)
-    {
-        this->watch_flags = newFlags;
-    }
-
     public:
     void reserveWith(EventLoop<T_Mutex> *eloop)
     {
