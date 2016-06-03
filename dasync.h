@@ -447,11 +447,13 @@ template <typename T_Mutex> class EventLoop
     
     void reserveChildWatch(BaseChildWatcher *callBack)
     {
+        loop_mech.addSignalWatch(SIGCHLD, nullptr); // TODO remove this kludge
         loop_mech.reserveChildWatch();
     }
     
     void registerChild(BaseChildWatcher *callBack, pid_t child)
     {
+        loop_mech.addSignalWatch(SIGCHLD, nullptr); // TODO remove this kludge
         loop_mech.addChildWatch(child, callBack);
     }
     
@@ -712,6 +714,7 @@ class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
     
     void registerWith(EventLoop<T_Mutex> *eloop, pid_t child)
     {
+        this->watch_pid = child;
         eloop->registerChild(this, child);
     }
     

@@ -101,7 +101,10 @@ template <class Base> class EpollLoop : public Base
                 while (true) {
                     int r = read(sigfd, &siginfo.info, sizeof(siginfo.info));
                     if (r == -1) break;
-                    sigdelset(&sigmask, siginfo.get_signo());
+                    if (siginfo.get_signo() != SIGCHLD) {
+                        // TODO remove the special exception for SIGCHLD?
+                        sigdelset(&sigmask, siginfo.get_signo());
+                    }
                     auto iter = sigdataMap.find(siginfo.get_signo());
                     if (iter != sigdataMap.end()) {
                         void *userdata = (*iter).second;
