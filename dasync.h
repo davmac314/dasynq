@@ -414,7 +414,7 @@ template <typename T_Mutex> class EventLoop
         loop_mech.addSignalWatch(signo, callBack);
     }
     
-    void deregisterSignal(BaseSignalWatcher *callBack, int signo) noexcept
+    void deregister(BaseSignalWatcher *callBack, int signo) noexcept
     {
         loop_mech.removeSignalWatch(signo);
         
@@ -430,6 +430,19 @@ template <typename T_Mutex> class EventLoop
     void registerFd(BaseFdWatcher *callback, int fd, int eventmask)
     {
         loop_mech.addFdWatch(fd, callback, eventmask);
+    }
+    
+    void deregister(BaseFdWatcher *callback, int fd)
+    {
+        loop_mech.removeFdWatch(fd);
+        
+        waitqueue_node<T_Mutex> qnode;
+        getAttnLock(qnode);        
+        
+        EventDispatch<T_Mutex, EpollTraits> & ed = (EventDispatch<T_Mutex, EpollTraits> &) loop_mech;
+        ed.issueDelete(callback);
+        
+        releaseLock(qnode);        
     }
     
     void reserveChildWatch(BaseChildWatcher *callBack)
@@ -638,10 +651,8 @@ TEventLoop & getSystemLoop();
 template <typename T_Mutex>
 class PosixSignalWatcher : private dprivate::BaseSignalWatcher<T_Mutex>
 {
-    using BSW = dprivate::BaseSignalWatcher<T_Mutex>;
-    
 public:
-    using SigInfo_p = typename BSW::SigInfo_p;
+    using SigInfo_p = typename dprivate::BaseSignalWatcher<T_Mutex>::SigInfo_p;
 
     // Register this watcher to watch the specified signal.
     // If an attempt is made to register with more than one event loop at
@@ -654,7 +665,7 @@ public:
     
     inline void deregisterWatch(EventLoop<T_Mutex> *eloop) noexcept
     {
-        eloop->deregisterSignal(this, BSW::siginfo.get_signo());
+        eloop->deregister(this, this->siginfo.get_signo());
     }
     
     // virtual Rearm gotSignal(EventLoop<T_Mutex> *, int signo, SigInfo_p info) = 0;
@@ -679,6 +690,11 @@ class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
         this->watch_fd = fd;
         this->watch_flags = flags;
         eloop->registerFd(this, fd, flags);
+    }
+    
+    void deregisterWatch(EventLoop<T_Mutex> *eloop) noexcept
+    {
+        eloop->deregister(this, this->watch_fd);
     }
     
     // virtual Rearm gotEvent(EventLoop<T_Mutex> *, int fd, int flags) = 0;
