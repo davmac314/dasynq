@@ -51,7 +51,10 @@ enum class Rearm
     /** Disarm the event watcher so that it receives no further events, until it is re-armed explicitly */
     DISARM,
     /** Remove the event watcher (and call "removed" callback) */
-    REMOVE
+    REMOVE,
+    /** Leave in current state */
+    NOOP
+// TODO: add a REMOVED option, which means, "I removed myself, DON'T TOUCH ME"
 };
 
 
@@ -598,7 +601,11 @@ template <typename T_Mutex> class EventLoop
             
             pqueue->active = false;
             if (pqueue->deleteme) {
-                rearmType = Rearm::REMOVE;
+                // We don't want a watch that is marked "deleteme" to re-arm itself.
+                // NOOP flags that the state is managed externally, so we don't adjust that.
+                if (rearmType != Rearm::NOOP) {
+                    rearmType = Rearm::REMOVE;
+                }
             }
             switch (pqueue->watchType) {
             case WatchType::SIGNAL:
@@ -610,11 +617,13 @@ template <typename T_Mutex> class EventLoop
             default: ;
             }
             
+            if (pqueue->deleteme) rearmType = Rearm::REMOVE; // makes the watchRemoved() callback get called.
+            
+            ed.lock.unlock();
+            
             if (rearmType == Rearm::REMOVE) {
                 pqueue->watchRemoved();
             }
-            
-            ed.lock.unlock();
             
             pqueue = pqueue->next;
         }
