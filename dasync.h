@@ -670,6 +670,7 @@ public:
     // a time, behaviour is undefined.
     inline void registerWatch(EventLoop<T_Mutex> *eloop, int signo)
     {
+        this->deleteme = false;
         this->siginfo.set_signo(signo);
         eloop->registerSignal(this, signo);
     }
@@ -698,6 +699,7 @@ class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
     
     void registerWith(EventLoop<T_Mutex> *eloop, int fd, int flags)
     {
+        this->deleteme = false;
         this->watch_fd = fd;
         this->watch_flags = flags;
         eloop->registerFd(this, fd, flags);
@@ -723,6 +725,7 @@ class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
     
     void registerWith(EventLoop<T_Mutex> *eloop, pid_t child)
     {
+        this->deleteme = false;
         this->watch_pid = child;
         eloop->registerChild(this, child);
     }
