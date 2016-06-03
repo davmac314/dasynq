@@ -17,8 +17,9 @@ namespace dasync {
 // Event type bits
 constexpr unsigned int in_events = 1;
 constexpr unsigned int out_events = 2;
+constexpr unsigned int err_events = 4;
 
-constexpr unsigned int one_shot = 4;
+constexpr unsigned int one_shot = 8;
 
 
 template <class Base> class EpollLoop;
@@ -116,7 +117,9 @@ template <class Base> class EpollLoop : public Base
             else {
                 int flags = 0;
                 (events[i].events & EPOLLIN) && (flags |= in_events);
+                (events[i].events & EPOLLHUP) && (flags |= in_events);
                 (events[i].events & EPOLLOUT) && (flags |= out_events);
+                (events[i].events & EPOLLERR) && (flags |= err_events);
                 Base::receiveFdEvent(FD_r(), ptr, flags);
             }            
         }
