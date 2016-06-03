@@ -345,9 +345,9 @@ namespace dprivate {
 
 template <typename T_Mutex> class EventLoop
 {
-    //friend class PosixFdWatcher<T_Mutex>;
+    friend class PosixFdWatcher<T_Mutex>;
     friend class PosixSignalWatcher<T_Mutex>;
-    //friend class SignalFdWatcher<T_Mutex>;
+    friend class PosixChildWatcher<T_Mutex>;
     
     template <typename T, typename U> using EventDispatch = dprivate::EventDispatch<T,U>;
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
