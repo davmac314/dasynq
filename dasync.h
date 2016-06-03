@@ -106,13 +106,13 @@ namespace dprivate {
             // delete this;
         }
     };
-
-
-    // (Non-template) Base signal event - not part of public API
+    
+    // Base signal event - not part of public API
+    template <typename T_Mutex>
     class BaseSignalWatcher : public BaseWatcher
     {
-        template <typename T_Mutex, typename Traits> friend class EventDispatch;
-        template <typename T_Mutex> friend class dasync::EventLoop;
+        template <typename M, typename Traits> friend class EventDispatch;
+        friend class dasync::EventLoop<T_Mutex>;
 
         protected:
         SigInfo siginfo;
@@ -121,13 +121,14 @@ namespace dprivate {
         public:
         typedef SigInfo &SigInfo_p;
         
-        virtual Rearm gotSignal(int signo, SigInfo_p siginfo) = 0;
+        virtual Rearm gotSignal(EventLoop<T_Mutex> * eloop, int signo, SigInfo_p siginfo) = 0;
     };
     
+    template <typename T_Mutex>
     class BaseFdWatcher : public BaseWatcher
     {
-        template <typename T_Mutex, typename Traits> friend class EventDispatch;
-        template <typename T_Mutex> friend class dasync::EventLoop;
+        template <typename, typename Traits> friend class EventDispatch;
+        friend class dasync::EventLoop<T_Mutex>;
         
         protected:
         int watch_fd;
@@ -137,13 +138,14 @@ namespace dprivate {
         BaseFdWatcher() : BaseWatcher(WatchType::FD) { }
         
         public:
-        virtual Rearm gotEvent(int fd, int flags) = 0;
+        virtual Rearm gotEvent(EventLoop<T_Mutex> * eloop, int fd, int flags) = 0;
     };
     
+    template <typename T_Mutex>
     class BaseChildWatcher : public BaseWatcher
     {
-        template <typename T_Mutex, typename Traits> friend class EventDispatch;
-        template <typename T_Mutex> friend class dasync::EventLoop;
+        template <typename, typename Traits> friend class EventDispatch;
+        friend class dasync::EventLoop<T_Mutex>;
         
         protected:
         pid_t watch_pid;
@@ -152,7 +154,7 @@ namespace dprivate {
         BaseChildWatcher() : BaseWatcher(WatchType::CHILD) { }
         
         public:
-        virtual void gotTermStat(pid_t child, int status) = 0;
+        virtual void gotTermStat(EventLoop<T_Mutex> * eloop, pid_t child, int status) = 0;
     };
 
     // Classes for implementing a fair(ish) wait queue.
@@ -250,6 +252,10 @@ namespace dprivate {
 
         // queue data structure/pointer
         BaseWatcher * first;
+        
+        using BaseSignalWatcher = dasync::dprivate::BaseSignalWatcher<T_Mutex>;
+        using BaseFdWatcher = dasync::dprivate::BaseFdWatcher<T_Mutex>;
+        using BaseChildWatcher = dasync::dprivate::BaseChildWatcher<T_Mutex>;
 
         protected:
         T_Mutex lock;
@@ -347,9 +353,9 @@ template <typename T_Mutex> class EventLoop
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
     using BaseWatcher = dprivate::BaseWatcher;
-    using BaseSignalWatcher = dprivate::BaseSignalWatcher;
-    using BaseFdWatcher = dprivate::BaseFdWatcher;
-    using BaseChildWatcher = dprivate::BaseChildWatcher;
+    using BaseSignalWatcher = dprivate::BaseSignalWatcher<T_Mutex>;
+    using BaseFdWatcher = dprivate::BaseFdWatcher<T_Mutex>;
+    using BaseChildWatcher = dprivate::BaseChildWatcher<T_Mutex>;
     using WatchType = dprivate::WatchType;
     
     EpollLoop<ChildProcEvents<EventDispatch<T_Mutex, EpollTraits>>> loop_mech;
@@ -555,17 +561,17 @@ template <typename T_Mutex> class EventLoop
             switch (pqueue->watchType) {
             case WatchType::SIGNAL: {
                 BaseSignalWatcher *bsw = static_cast<BaseSignalWatcher *>(pqueue);
-                rearmType = bsw->gotSignal(bsw->siginfo.get_signo(), bsw->siginfo);
+                rearmType = bsw->gotSignal(this, bsw->siginfo.get_signo(), bsw->siginfo);
                 break;
             }
             case WatchType::FD: {
                 BaseFdWatcher *bfw = static_cast<BaseFdWatcher *>(pqueue);
-                rearmType = bfw->gotEvent(bfw->watch_fd, bfw->event_flags);
+                rearmType = bfw->gotEvent(this, bfw->watch_fd, bfw->event_flags);
                 break;
             }
             case WatchType::CHILD: {
                 BaseChildWatcher *bcw = static_cast<BaseChildWatcher *>(pqueue);
-                bcw->gotTermStat(bcw->watch_pid, bcw->child_status);
+                bcw->gotTermStat(this, bcw->watch_pid, bcw->child_status);
                 // Child watches automatically remove:
                 rearmType = Rearm::REMOVE;
                 break;
@@ -630,33 +636,33 @@ TEventLoop & getSystemLoop();
 
 // Posix signal event watcher
 template <typename T_Mutex>
-class PosixSignalWatcher : private dprivate::BaseSignalWatcher
+class PosixSignalWatcher : private dprivate::BaseSignalWatcher<T_Mutex>
 {
-    // friend class EventLoop<T_Mutex>;
+    using BSW = dprivate::BaseSignalWatcher<T_Mutex>;
     
 public:
-    using SigInfo_p = BaseSignalWatcher::SigInfo_p;
+    using SigInfo_p = typename BSW::SigInfo_p;
 
     // Register this watcher to watch the specified signal.
     // If an attempt is made to register with more than one event loop at
     // a time, behaviour is undefined.
     inline void registerWatch(EventLoop<T_Mutex> *eloop, int signo)
     {
-        siginfo.set_signo(signo);
+        this->siginfo.set_signo(signo);
         eloop->registerSignal(this, signo);
     }
     
     inline void deregisterWatch(EventLoop<T_Mutex> *eloop) noexcept
     {
-        eloop->deregisterSignal(this, siginfo.get_signo());
+        eloop->deregisterSignal(this, BSW::siginfo.get_signo());
     }
     
-    // virtual Rearm gotSignal(int signo, SigInfo_p info) = 0;
+    // virtual Rearm gotSignal(EventLoop<T_Mutex> *, int signo, SigInfo_p info) = 0;
 };
 
 // Posix file descriptor event watcher
 template <typename T_Mutex>
-class PosixFdWatcher : private dprivate::BaseFdWatcher
+class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
 {
 public:
     void registerWith(EventLoop<T_Mutex> *eloop, int fd, int flags)
@@ -666,13 +672,20 @@ public:
         eloop->registerFd(this, fd, flags);
     }
     
-    // virtual Rearm gotEvent(int fd, int flags) = 0;
+    // virtual Rearm gotEvent(EventLoop<T_Mutex> *, int fd, int flags) = 0;
 };
 
 // Posix child process event watcher
 template <typename T_Mutex>
-class PosixChildWatcher : private dprivate::BaseChildWatcher
+class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
 {
+    protected:
+    // Set the types of event to watch. May not be supported for all mechanisms.
+    void setWatchFlags(int newFlags)
+    {
+        this->watch_flags = newFlags;
+    }
+
     public:
     void reserveWith(EventLoop<T_Mutex> *eloop)
     {
@@ -689,7 +702,7 @@ class PosixChildWatcher : private dprivate::BaseChildWatcher
         eloop->registerReservedChild(this, child);
     }
     
-    // virtual void gotTermStat(pid_t child, int status) = 0;
+    // virtual void gotTermStat(EventLoop<T_Mutex> *, pid_t child, int status) = 0;
 };
 
 }  // namespace dasync
