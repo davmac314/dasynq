@@ -8,10 +8,11 @@ using namespace dasync;
 
 class MySignalWatcher : public PosixSignalWatcher<std::mutex>
 {
-    void gotSignal(int signo, SigInfo siginfo)
+    Rearm gotSignal(EventLoop<std::mutex> * eloop, int signo, SigInfo_p siginfo) override
     {
         using namespace std;
         cout << "Got signal: " << signo << endl;
+        return Rearm::REARM;
     }
 };
 
@@ -21,8 +22,8 @@ int main(int argc, char **argv)
     EventLoop<std::mutex> * eloop = new EventLoop<std::mutex>();
     
     MySignalWatcher mse1, mse2;
-    mse1.registerWith(eloop, SIGUSR1);
-    mse2.registerWith(eloop, SIGUSR2);
+    mse1.registerWatch(eloop, SIGUSR1);
+    mse2.registerWatch(eloop, SIGUSR2);
 
     // block USR1 / USR2 reception    
     sigset_t set;
@@ -36,6 +37,11 @@ int main(int argc, char **argv)
     
     sleep(1);
     
+    std::cout << "Running eloop..." << std::endl;
+    eloop->run();
+    //std::cout << "Running eloop..." << std::endl;
+    eloop->run();
+    //std::cout << "Running eloop..." << std::endl;
     eloop->run();
     
     return 0;
