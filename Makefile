@@ -1,7 +1,7 @@
 # -include ../mconfig
 #CXX = g++
 CXX = clang++
-CXXOPTS = -std=c++11 -Wall
+CXXOPTS = -std=c++11 -Wall -Wno-invalid-offsetof
 
 objects = dasync.o testme.o
 

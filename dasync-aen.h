@@ -68,7 +68,6 @@ class EpollTraits
             return ss.fd;
         }
     };
-
 };
 
 
@@ -120,7 +119,7 @@ template <class Base> class EpollLoop : public Base
                 (events[i].events & EPOLLHUP) && (flags |= in_events);
                 (events[i].events & EPOLLOUT) && (flags |= out_events);
                 (events[i].events & EPOLLERR) && (flags |= err_events);
-                Base::receiveFdEvent(FD_r(), ptr, flags);
+                Base::receiveFdEvent(*this, FD_r(), ptr, flags);
             }            
         }
     }
@@ -182,6 +181,8 @@ template <class Base> class EpollLoop : public Base
         removeFdWatch(fd);
     }
     
+    // Note this will *replace* the old flags with the new, that is,
+    // it can enable *or disable* read/write events.
     void enableFdWatch(int fd, void *userdata, int flags)
     {
         struct epoll_event epevent;
