@@ -399,7 +399,6 @@ template <class Base> class ChildProcEvents : public Base
     private:
     pid_map child_waiters;
 
-    // public:
     using SigInfo = typename Base::SigInfo;
     
     protected:
@@ -408,7 +407,7 @@ template <class Base> class ChildProcEvents : public Base
         if (siginfo.get_signo() == SIGCHLD) {
             int status;
             pid_t child;
-            while ((child = waitpid(-1, &status, WNOHANG)) != -1) {
+            while ((child = waitpid(-1, &status, WNOHANG)) > 0) {
                 pid_map::entry ent = child_waiters.erase(child);
                 if (ent.first) {
                     Base::receiveChildStat(child, status, ent.second);
