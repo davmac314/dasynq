@@ -283,16 +283,9 @@ namespace dprivate {
         using BaseFdWatcher = dasync::dprivate::BaseFdWatcher<T_Mutex>;
         using BaseBidiFdWatcher = dasync::dprivate::BaseBidiFdWatcher<T_Mutex>;
         using BaseChildWatcher = dasync::dprivate::BaseChildWatcher<T_Mutex>;
-
-        protected:
-        T_Mutex lock;
         
-        void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
+        void queueWatcher(BaseWatcher *bwatcher)
         {
-            BaseSignalWatcher * bwatcher = static_cast<BaseSignalWatcher *>(userdata);
-            
-            bwatcher->siginfo = siginfo;
-            
             // TODO 
             // We can't allow a queued entry to be deleted (due to the single-linked-list used for the queue)
             // so for now, I'll set it active; but this prevents it being deleted until we can next
@@ -304,6 +297,16 @@ namespace dprivate {
             BaseWatcher * prev_first = first;
             first = bwatcher;
             bwatcher->next = prev_first;
+        }
+
+        protected:
+        T_Mutex lock;
+        
+        void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
+        {
+            BaseSignalWatcher * bwatcher = static_cast<BaseSignalWatcher *>(userdata);
+            bwatcher->siginfo = siginfo;
+            queueWatcher(bwatcher);
         }
         
         template <typename T>
@@ -320,11 +323,7 @@ namespace dprivate {
                 BaseBidiFdWatcher *bbdw = static_cast<BaseBidiFdWatcher *>(bwatcher);
                 if (flags & in_events && flags & out_events) {
                     // Queue the secondary watcher first:
-                    bbdw->outWatcher.active = true;
-                    
-                    BaseWatcher * prev_first = first;
-                    first = &bbdw->outWatcher;
-                    bbdw->outWatcher.next = prev_first;
+                    queueWatcher(&bbdw->outWatcher);
                 }
                 else if (flags & out_events) {                
                     // Use the secondary watcher for queueing:
@@ -332,13 +331,7 @@ namespace dprivate {
                 }
             }
 
-            // TODO see receieveSignal notes.
-            bwatcher->active = true;
-            
-            // Put in queue:
-            BaseWatcher * prev_first = first;
-            first = bwatcher;
-            bwatcher->next = prev_first;
+            queueWatcher(bwatcher);
             
             if (is_multi_watch && bfdw->event_flags != bfdw->watch_flags) {
                 // We need to re-enable the other channel now:
@@ -350,16 +343,8 @@ namespace dprivate {
         void receiveChildStat(pid_t child, int status, void * userdata)
         {
             BaseChildWatcher * watcher = static_cast<BaseChildWatcher *>(userdata);
-            
             watcher->child_status = status;
-            
-            // TODO see receiveSignal notes.
-            watcher->active = true;
-            
-            // Put in queue:
-            BaseWatcher * prev_first = first;
-            first = watcher;
-            watcher->next = prev_first;
+            queueWatcher(watcher);
         }
         
         // TODO is this needed?:
