@@ -831,6 +831,11 @@ class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
     
     public:
     
+    // Register a file descriptor watcher with an event loop. Flags
+    // can be any combination of dasync::in_events / dasync::out_events.
+    // Only one of in_events/out_events can be specified if the event
+    // loop does not support bi-directional fd watchers.
+    // Can fail with std::bad_alloc or std::system_error.
     void registerWith(EventLoop<T_Mutex> *eloop, int fd, int flags)
     {
         this->deleteme = false;
@@ -852,11 +857,15 @@ template <typename T_Mutex>
 class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
 {
     public:
+    // Reserve resources for a child watcher with the given event loop.
+    // Reservation can fail with std::bad_alloc.
     void reserveWith(EventLoop<T_Mutex> *eloop)
     {
         eloop->reserveChildWatch();
     }
     
+    // Register a watcher for the given child process with an event loop.
+    // Registration can fail with std::bad_alloc.
     void registerWith(EventLoop<T_Mutex> *eloop, pid_t child)
     {
         this->deleteme = false;
@@ -864,6 +873,9 @@ class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
         eloop->registerChild(this, child);
     }
     
+    // Register a watcher for the given child process with an event loop,
+    // after having reserved resources previously (using reserveWith).
+    // Registration cannot fail.
     void registerReserved(EventLoop<T_Mutex> *eloop, pid_t child) noexcept
     {
         eloop->registerReservedChild(this, child);
