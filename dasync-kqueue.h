@@ -103,7 +103,7 @@ template <class Base> class KqueueLoop : public Base
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
         for (int i = 0; i < r; i++) {
-            if (events[i].filter = EVFILT_SIGNAL) {
+            if (events[i].filter == EVFILT_SIGNAL) {
                 SigInfo siginfo;
                 //siginfo_t siginfo;
                 sigset_t sset;
@@ -247,36 +247,27 @@ template <class Base> class KqueueLoop : public Base
     void addSignalWatch(int signo, void *userdata)
     {
         //std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-
-        //sigdataMap[signo] = userdata;
-
-        // Modify the signal fd to watch the new signal
-        //bool was_no_sigfd = (sigfd == -1);
-        //sigaddset(&sigmask, signo);
-        //sigfd = signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
-        //if (sigfd == -1) {
-        //    throw new std::system_error(errno, std::system_category());
-        //}
         
-        //if (was_no_sigfd) {
-            // Add the signalfd to the epoll set.
-        //    struct epoll_event epevent;
-        //    epevent.data.ptr = &sigfd;
-        //    epevent.events = EPOLLIN;
-            // No need for EPOLLONESHOT - we can pull the signals out
-            // as we see them.
-        //    if (epoll_ctl(epfd, EPOLL_CTL_ADD, sigfd, &epevent) == -1) {
-        //        close(sigfd);
-        //        throw new std::system_error(errno, std::system_category());        
-        //    }
-        //}
+        struct kevent evt;
+        EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ADD, 0, 0, userdata);
+        // TODO use EV_DISPATCH if available (not on OpenBSD)
+        
+        if (kevent(kqfd, &evt, 1, nullptr, 0, nullptr) == -1) {
+            throw new std::system_error(errno, std::system_category());
+        }
     }
     
     // Note, called with lock held:
     void rearmSignalWatch_nolock(int signo) noexcept
     {
-        //sigaddset(&sigmask, signo);
-        //signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
+        struct kevent evt;
+        EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ENABLE, 0, 0, 0);
+        // TODO do we need to set valid userdata (last param) in above?
+        // TODO use EV_DISPATCH if available (not on OpenBSD)
+        
+        if (kevent(kqfd, &evt, 1, nullptr, 0, nullptr) == -1) {
+            throw new std::system_error(errno, std::system_category());
+        }
     }
     
     void removeSignalWatch_nolock(int signo) noexcept
@@ -303,14 +294,22 @@ template <class Base> class KqueueLoop : public Base
     //            pending.
     void pullEvents(bool do_wait)
     {
-        //epoll_event events[16];
-        //int r = epoll_wait(epfd, events, 16, do_wait ? -1 : 0);
-        //if (r == -1 || r == 0) {
+        // TODO we actually need to check pending signals, I think, since
+        // kqueue can count signals as they are delivered but the count is
+        // cleared when we poll the kqueue, meaning that signals might still
+        // be pending if they were queued multiple times at the last poll.
+        
+        struct kevent events[16];
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 0;
+        int r = kevent(kqfd, nullptr, 0, events, 16, do_wait ? nullptr : &ts);
+        if (r == -1 || r == 0) {
             // signal or no events
-        //    return;
-        //}
+            return;
+        }
     
-        //processEvents(events, r);
+        processEvents(events, r);
     }
 
     // If events are pending, process one of them.
@@ -321,14 +320,17 @@ template <class Base> class KqueueLoop : public Base
     //            pending.    
     void pullOneEvent(bool do_wait)
     {
-        //epoll_event events[1];
-        //int r = epoll_wait(epfd, events, 1, do_wait ? -1 : 0);
-        //if (r == -1 || r == 0) {
+        struct kevent events[1];
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = 0;
+        int r = kevent(kqfd, nullptr, 0, events, 1, do_wait ? nullptr : &ts);
+        if (r == -1 || r == 0) {
             // signal or no events
-        //    return;
-        //}
+            return;
+        }
     
-        //processEvents(events, r);    
+        processEvents(events, r);
     }
     
     // Interrupt any current poll operation (pullEvents/pullOneEvent), causing
