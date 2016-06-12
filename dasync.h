@@ -113,10 +113,21 @@ namespace dprivate {
         int active : 1;
         int deleteme : 1;
         
+        BaseWatcher * prev;
         BaseWatcher * next;
         
         public:
-        BaseWatcher(WatchType wt) noexcept : watchType(wt), active(0), deleteme(0), next(nullptr) { }
+        
+        // Perform initialisation necessary before registration with an event loop
+        void init()
+        {
+            active = false;
+            deleteme = false;
+            prev = nullptr;
+            next = nullptr;
+        }
+        
+        BaseWatcher(WatchType wt) noexcept : watchType(wt) { }
         
         virtual ~BaseWatcher() noexcept { }
         
@@ -310,17 +321,39 @@ namespace dprivate {
         
         void queueWatcher(BaseWatcher *bwatcher)
         {
-            // TODO 
-            // We can't allow a queued entry to be deleted (due to the single-linked-list used for the queue)
-            // so for now, I'll set it active; but this prevents it being deleted until we can next
-            // process events, so once we have a proper linked list or better structure should probably
-            // remove this:
-            bwatcher->active = true;
-            
             // Put in queue:
-            BaseWatcher * prev_first = first;
-            first = bwatcher;
-            bwatcher->next = prev_first;
+            if (first == nullptr) {
+                bwatcher->prev = bwatcher;
+                bwatcher->next = bwatcher;
+                first = bwatcher;
+            }
+            else {
+                first->prev->next = bwatcher;
+                bwatcher->prev = first->prev;
+                first->prev = bwatcher;
+                bwatcher->next = first;
+            }
+        }
+        
+        void dequeueWatcher(BaseWatcher *bwatcher)
+        {
+            if (bwatcher->prev == bwatcher) {
+                // Only item in queue
+                first = nullptr;
+            }
+            else {
+                if (first == bwatcher) first = first->next;
+                bwatcher->prev->next = bwatcher->next;
+                bwatcher->next->prev = bwatcher->prev;
+            }
+            
+            bwatcher->prev = nullptr;
+            bwatcher->next = nullptr;
+        }
+        
+        bool isQueued(BaseWatcher *bwatcher)
+        {
+            return bwatcher->prev != nullptr;
         }
 
         protected:
@@ -377,21 +410,21 @@ namespace dprivate {
             queueWatcher(watcher);
         }
         
-        // TODO is this needed?:
+        // Pull a single event from the queue
         BaseWatcher * pullEvent()
         {
-            if (first) {
-                BaseWatcher * r = first;
-                first = first->next;
-                return r;
+            BaseWatcher * r = first;
+            if (r != nullptr) {
+                dequeueWatcher(r);
             }
-            return nullptr;
+            return r;
         }
         
         void issueDelete(BaseWatcher *watcher) noexcept
         {
             // This is only called when the attention lock is held, so if the watcher is not
-            // active/queued now, it cannot become active during execution of this function.
+            // active/queued now, it cannot become active (and will not be reported with an event)
+            // during execution of this function.
             
             lock.lock();
             
@@ -402,6 +435,11 @@ namespace dprivate {
             }
             else {
                 // Actually do the delete.
+                if (isQueued(watcher)) {
+                    dequeueWatcher(watcher);
+                }
+                
+                // TODO call this without lock?
                 watcher->watchRemoved();
             }
             
@@ -503,7 +541,7 @@ template <typename T_Mutex> class EventLoop
 
     void registerFd(BaseFdWatcher *callback, int fd, int eventmask)
     {
-        loop_mech.addFdWatch(fd, callback, eventmask);
+        loop_mech.addFdWatch(fd, callback, eventmask | one_shot);
     }
     
     void registerFd(BaseBidiFdWatcher *callback, int fd, int eventmask)
@@ -512,7 +550,7 @@ template <typename T_Mutex> class EventLoop
             // TODO
         }
         else {
-            loop_mech.addFdWatch(fd, callback, eventmask);
+            loop_mech.addFdWatch(fd, callback, eventmask | one_shot);
         }
     }
     
@@ -749,32 +787,16 @@ template <typename T_Mutex> class EventLoop
         // So this pulls *all* currently pending events and processes them in the current thread.
         // That's probably good for throughput, but maybe the behavior should be configurable.
         
-        BaseWatcher * pqueue = ed.first;
-        ed.first = nullptr;
+        BaseWatcher * pqueue = ed.pullEvent();
         bool active = false;
         
-        BaseWatcher * prev = nullptr;
-        for (BaseWatcher * q = pqueue; q != nullptr; q = q->next) {
-            if (q->deleteme) {
-                // TODO should this really be called with lock held?:
-                q->watchRemoved();
-                if (prev) {
-                    prev->next = q->next;
-                }
-                else {
-                    pqueue = q->next;
-                }
-            }
-            else {
-                q->active = true;
-                active = true;
-                prev = q;
-            }
-        }
-        
-        ed.lock.unlock();
-        
         while (pqueue != nullptr) {
+        
+            pqueue->active = true;
+            active = true;
+            
+            ed.lock.unlock();
+        
             Rearm rearmType = Rearm::NOOP;
             bool is_multi_watch = false;
             BaseBidiFdWatcher *bbfw = nullptr;
@@ -856,7 +878,9 @@ template <typename T_Mutex> class EventLoop
                 (is_multi_watch ? bbfw : pqueue)->watchRemoved();
             }
             
-            pqueue = pqueue->next;
+            ed.lock.lock();
+            
+            pqueue = ed.pullEvent();
         }
         
         return active;
@@ -893,6 +917,8 @@ TEventLoop & getSystemLoop();
 template <typename T_Mutex>
 class PosixSignalWatcher : private dprivate::BaseSignalWatcher<T_Mutex>
 {
+    using BaseWatcher = dprivate::BaseWatcher;
+    
 public:
     using SigInfo_p = typename dprivate::BaseSignalWatcher<T_Mutex>::SigInfo_p;
 
@@ -901,7 +927,7 @@ public:
     // a time, behaviour is undefined.
     inline void registerWatch(EventLoop<T_Mutex> *eloop, int signo)
     {
-        this->deleteme = false;
+        BaseWatcher::init();
         this->siginfo.set_signo(signo);
         eloop->registerSignal(this, signo);
     }
@@ -918,6 +944,8 @@ public:
 template <typename T_Mutex>
 class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
 {
+    using BaseWatcher = dprivate::BaseWatcher;
+
     protected:
     
     // Set the types of event to watch. Only supported if LoopTraits::has_bidi_fd_watch
@@ -945,7 +973,7 @@ class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
     // Can fail with std::bad_alloc or std::system_error.
     void registerWith(EventLoop<T_Mutex> *eloop, int fd, int flags)
     {
-        this->deleteme = false;
+        BaseWatcher::init();
         this->watch_fd = fd;
         this->watch_flags = flags;
         eloop->registerFd(this, fd, flags);
@@ -976,7 +1004,8 @@ class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
 template <typename T_Mutex>
 class PosixBidiFdWatcher : private dprivate::BaseBidiFdWatcher<T_Mutex>
 {
-    private:
+    using BaseWatcher = dprivate::BaseWatcher;
+    
     void setWatchEnabled(EventLoop<T_Mutex> *eloop, bool in, bool b)
     {
         int events = in ? in_events : out_events;
@@ -1039,7 +1068,8 @@ class PosixBidiFdWatcher : private dprivate::BaseBidiFdWatcher<T_Mutex>
     // Can fail with std::bad_alloc or std::system_error.
     void registerWith(EventLoop<T_Mutex> *eloop, int fd, int flags)
     {
-        this->deleteme = false;
+        BaseWatcher::init();
+        this->outWatcher.BaseWatcher::init();
         this->watch_fd = fd;
         this->watch_flags = flags | dprivate::multi_watch;
         eloop->registerFd(this, fd, flags);
@@ -1067,6 +1097,8 @@ class PosixBidiFdWatcher : private dprivate::BaseBidiFdWatcher<T_Mutex>
 template <typename T_Mutex>
 class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
 {
+    using BaseWatcher = dprivate::BaseWatcher;
+
     public:
     // Reserve resources for a child watcher with the given event loop.
     // Reservation can fail with std::bad_alloc.
@@ -1079,7 +1111,7 @@ class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
     // Registration can fail with std::bad_alloc.
     void registerWith(EventLoop<T_Mutex> *eloop, pid_t child)
     {
-        this->deleteme = false;
+        BaseWatcher::init();
         this->watch_pid = child;
         eloop->registerChild(this, child);
     }
@@ -1089,6 +1121,7 @@ class PosixChildWatcher : private dprivate::BaseChildWatcher<T_Mutex>
     // Registration cannot fail.
     void registerReserved(EventLoop<T_Mutex> *eloop, pid_t child) noexcept
     {
+        BaseWatcher::init();
         eloop->registerReservedChild(this, child);
     }
     
