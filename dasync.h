@@ -179,6 +179,8 @@ namespace dprivate {
     template <typename T_Mutex>
     class BaseBidiFdWatcher : public BaseFdWatcher<T_Mutex>
     {
+        // TODO use of watch_flags is not thread-safe at the moment
+        
         template <typename, typename Traits> friend class EventDispatch;
         friend class dasync::EventLoop<T_Mutex>;
         
@@ -427,6 +429,8 @@ namespace dprivate {
             // during execution of this function.
             
             lock.lock();
+            
+            // TODO this needs to handle multi-watch (BidiFdWatcher) properly
             
             if (watcher->active) {
                 // If the watcher is active, set deleteme true; the watcher will be removed
@@ -849,6 +853,7 @@ template <typename T_Mutex> class EventLoop
             
             ed.lock.lock();
             
+            // TODO if REMOVED, we must NOT TOUCH pqueue
             pqueue->active = false;
             if (pqueue->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
