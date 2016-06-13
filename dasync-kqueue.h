@@ -22,14 +22,6 @@ extern "C" {
 
 namespace dasync {
 
-// Event type bits
-constexpr unsigned int in_events = 1;
-constexpr unsigned int out_events = 2;
-constexpr unsigned int err_events = 4;
-
-constexpr unsigned int one_shot = 8;
-
-
 template <class Base> class KqueueLoop;
 
 class KqueueTraits
@@ -73,6 +65,8 @@ class KqueueTraits
             return fd;
         }
     };
+    
+    const static bool has_separate_rw_fd_watches = true;
 };
 
 #if defined(__OpenBSD__)
@@ -264,6 +258,11 @@ template <class Base> class KqueueLoop : public Base
         //if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &epevent) == -1) {
         //    throw new std::system_error(errno, std::system_category());        
         //}
+    }
+    
+    void disableFdWatch_nolock(int fd)
+    {
+        // TODO
     }
     
     // Note signal should be masked before call.

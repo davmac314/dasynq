@@ -9,6 +9,8 @@
 #define HAVE_EPOLL 1
 #endif
 
+#include "dasync-flags.h"
+
 #if defined(HAVE_KQUEUE)
 #include "dasync-kqueue.h"
 #include "dasync-childproc.h"
@@ -888,6 +890,7 @@ template <typename T_Mutex> class EventLoop
             pqueue = ed.pullEvent();
         }
         
+        ed.lock.unlock();
         return active;
     }
 
