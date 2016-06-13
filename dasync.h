@@ -338,6 +338,11 @@ namespace dprivate {
             }
         }
         
+        bool isQueued(BaseWatcher *bwatcher)
+        {
+            return bwatcher->prev != nullptr;
+        }
+
         void dequeueWatcher(BaseWatcher *bwatcher)
         {
             if (bwatcher->prev == bwatcher) {
@@ -354,11 +359,6 @@ namespace dprivate {
             bwatcher->next = nullptr;
         }
         
-        bool isQueued(BaseWatcher *bwatcher)
-        {
-            return bwatcher->prev != nullptr;
-        }
-
         protected:
         T_Mutex lock;
         
@@ -437,6 +437,7 @@ namespace dprivate {
                 // If the watcher is active, set deleteme true; the watcher will be removed
                 // at the end of current processing (i.e. when active is set false).
                 watcher->deleteme = true;
+                lock.unlock();
             }
             else {
                 // Actually do the delete.
@@ -444,11 +445,45 @@ namespace dprivate {
                     dequeueWatcher(watcher);
                 }
                 
-                // TODO call this without lock?
+                lock.unlock();
                 watcher->watchRemoved();
             }
+        }
+        
+        void issueDelete(BaseBidiFdWatcher *watcher) noexcept
+        {
+            lock.lock();
             
-            lock.unlock();
+            if (watcher->active) {
+                watcher->deleteme = true;
+            }
+            else {
+                if (isQueued(watcher)) {
+                    dequeueWatcher(watcher);
+                }
+                
+                watcher->read_removed = true;
+            }
+            
+            BaseWatcher *secondary = &(watcher->outWatcher);
+            if (secondary->active) {
+                secondary->deleteme = true;
+            }
+            else {
+                if (isQueued(secondary)) {
+                    dequeueWatcher(secondary);
+                }
+                
+                watcher->write_removed = true;
+            }
+            
+            if (watcher->read_removed && watcher->write_removed) {
+                lock.unlock();
+                watcher->watchRemoved();
+            }
+            else {
+                lock.unlock();
+            }
         }
     };
 }
@@ -536,7 +571,7 @@ template <typename T_Mutex> class EventLoop
         loop_mech.removeSignalWatch(signo);
         
         waitqueue_node<T_Mutex> qnode;
-        getAttnLock(qnode);        
+        getAttnLock(qnode);
         
         EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.issueDelete(callBack);
@@ -584,7 +619,7 @@ template <typename T_Mutex> class EventLoop
         loop_mech.removeFdWatch(fd);
         
         waitqueue_node<T_Mutex> qnode;
-        getAttnLock(qnode);        
+        getAttnLock(qnode);
         
         EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.issueDelete(callback);
@@ -599,15 +634,15 @@ template <typename T_Mutex> class EventLoop
         }
         else {
             loop_mech.removeFdWatch(fd);
-            
-            waitqueue_node<T_Mutex> qnode;
-            getAttnLock(qnode);        
-            
-            EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
-            ed.issueDelete(callback);
-            
-            releaseLock(qnode);
         }
+        
+        waitqueue_node<T_Mutex> qnode;
+        getAttnLock(qnode);
+        
+        EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        ed.issueDelete(callback);
+        
+        releaseLock(qnode);
     }
     
     void reserveChildWatch(BaseChildWatcher *callBack)
@@ -623,6 +658,13 @@ template <typename T_Mutex> class EventLoop
     void registerReservedChild(BaseChildWatcher *callBack, pid_t child) noexcept
     {
         loop_mech.addReservedChildWatch(child, callBack);
+    }
+    
+    void dequeueWatcher(BaseWatcher *watcher) noexcept
+    {
+        if (loop_mech.isQueued(watcher)) {
+            loop_mech.dequeueWatcher(watcher);
+        }
     }
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
@@ -1016,12 +1058,19 @@ class PosixFdWatcher : private dprivate::BaseFdWatcher<T_Mutex>
     
     void setEnabled(EventLoop<T_Mutex> *eloop, bool enable) noexcept
     {
-        eloop->setFdEnabled(this, this->watch_fd, this->watch_flags, enable);
+        std::lock_guard<T_Mutex> guard(eloop->getBaseLock());
+        eloop->setFdEnabled_nolock(this, this->watch_fd, this->watch_flags, enable);
+        if (! enable) {
+            eloop->dequeueWatcher(this);
+        }
     }
     
     // virtual Rearm gotEvent(EventLoop<T_Mutex> *, int fd, int flags) = 0;
 };
 
+// A Bi-directional file descriptor watcher with independent read- and write- channels.
+// This watcher type has two event notification methods which can both potentially be
+// active at the same time.
 template <typename T_Mutex>
 class PosixBidiFdWatcher : private dprivate::BaseBidiFdWatcher<T_Mutex>
 {
@@ -1040,11 +1089,18 @@ class PosixBidiFdWatcher : private dprivate::BaseBidiFdWatcher<T_Mutex>
         if (LoopTraits::has_separate_rw_fd_watches) {
             dprivate::BaseWatcher * watcher = in ? this : &this->outWatcher;
             eloop->setFdEnabled_nolock(watcher, this->watch_fd, events | one_shot, b);
+            if (! b) {
+                eloop->dequeueWatcher(watcher);
+            }
         }
         else {
             eloop->setFdEnabled_nolock(this, this->watch_fd,
                     (this->watch_flags & (in_events | out_events)) | one_shot,
                     (this->watch_flags & (in_events | out_events)) != 0);
+            if (! b) {
+                dprivate::BaseWatcher * watcher = in ? this : &this->outWatcher;
+                eloop->dequeueWatcher(watcher);
+            }
         }
     }
     
