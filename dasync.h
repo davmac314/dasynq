@@ -846,6 +846,8 @@ template <typename T_Mutex> class EventLoop
             bool is_multi_watch = false;
             BaseBidiFdWatcher *bbfw = nullptr;
             
+            // (Above variables are initialised only to silence compiler warnings).
+            
             // Read/manipulate watch_flags (if necessary) *before* we release the lock:
             if (pqueue->watchType == WatchType::FD) {
                 BaseFdWatcher *bfw = static_cast<BaseFdWatcher *>(pqueue);
@@ -867,8 +869,6 @@ template <typename T_Mutex> class EventLoop
             }
             
             ed.lock.unlock();
-            
-            // (Above variables are initialised only to silence compiler warnings).
             
             // Note that we select actions based on the type of the watch, as determined by the watchType
             // member. In some ways this screams out for polmorphism; a virtual function could be overridden
@@ -933,9 +933,7 @@ template <typename T_Mutex> class EventLoop
                 default: ;
                 }
                 
-                if (pqueue->deleteme) rearmType = Rearm::REMOVE; // makes the watchRemoved() callback get called.
-                
-                if (rearmType == Rearm::REMOVE) {
+                if (pqueue->deleteme || rearmType == Rearm::REMOVE) {
                     ed.lock.unlock();
                     (is_multi_watch ? bbfw : pqueue)->watchRemoved();
                     ed.lock.lock();
