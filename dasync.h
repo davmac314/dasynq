@@ -566,7 +566,7 @@ template <typename T_Mutex> class EventLoop
             loop_mech.enableFdWatch(fd, watcher, watch_flags | one_shot);
         }
         else {
-            loop_mech.disableFdWatch(fd);
+            loop_mech.disableFdWatch(fd, watch_flags);
         }
     }
 
@@ -576,13 +576,13 @@ template <typename T_Mutex> class EventLoop
             loop_mech.enableFdWatch_nolock(fd, watcher, watch_flags | one_shot);
         }
         else {
-            loop_mech.disableFdWatch_nolock(fd);
+            loop_mech.disableFdWatch_nolock(fd, watch_flags);
         }
     }
     
     void deregister(BaseFdWatcher *callback, int fd)
     {
-        loop_mech.removeFdWatch(fd);
+        loop_mech.removeFdWatch(fd, callback->watch_flags);
         
         waitqueue_node<T_Mutex> qnode;
         getAttnLock(qnode);        
@@ -599,7 +599,7 @@ template <typename T_Mutex> class EventLoop
             // TODO
         }
         else {
-            loop_mech.removeFdWatch(fd);
+            loop_mech.removeFdWatch(fd, callback->watch_flags);
             
             waitqueue_node<T_Mutex> qnode;
             getAttnLock(qnode);        
@@ -702,14 +702,14 @@ template <typename T_Mutex> class EventLoop
                     }
                     else {
                         // both removed: actually remove
-                        loop_mech.removeFdWatch_nolock(bdfw->watch_fd);
+                        loop_mech.removeFdWatch_nolock(bdfw->watch_fd, 0 /* not used */);
                         return Rearm::REMOVE;
                     }
                 }
                 else {
                     // TODO this will need flags for such a loop, since it can't
                     // otherwise distinguish which channel watch to remove
-                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd);
+                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd, bdfw->watch_flags);
                 }
             }
             else if (rearmType == Rearm::DISARM) {
@@ -736,7 +736,7 @@ template <typename T_Mutex> class EventLoop
                         (bfw->watch_flags & (in_events | out_events)) | one_shot);
             }
             else if (rearmType == Rearm::REMOVE) {
-                loop_mech.removeFdWatch_nolock(bfw->watch_fd);
+                loop_mech.removeFdWatch_nolock(bfw->watch_fd, bfw->watch_flags);
             }
             return rearmType;
         }
@@ -752,7 +752,7 @@ template <typename T_Mutex> class EventLoop
             if (LoopTraits::has_separate_rw_fd_watches) {
                 // TODO this will need flags for such a loop, since it can't
                 // otherwise distinguish which channel watch to remove
-                loop_mech.removeFdWatch_nolock(bdfw->watch_fd);
+                loop_mech.removeFdWatch_nolock(bdfw->watch_fd, bdfw->watch_flags);
                 return bdfw->read_removed ? Rearm::REMOVE : Rearm::NOOP;
             }
             else {
@@ -761,7 +761,7 @@ template <typename T_Mutex> class EventLoop
                 }
                 else {
                     // both removed: actually remove
-                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd);
+                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd, 0 /* not used */);
                     return Rearm::REMOVE;
                 }
             }
