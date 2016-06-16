@@ -1,7 +1,7 @@
-#include "dasync.h"
+#include "dasynq.h"
 
 
-namespace dasync {
+namespace dasynq {
 
 static TEventLoop sysEventLoop;
 

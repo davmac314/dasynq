@@ -1,17 +1,17 @@
 # -include ../mconfig
-#CXX = g++
-CXX = clang++
+CXX = g++
+#CXX = clang++
 CXXOPTS = -std=c++11 -Wall -Wno-invalid-offsetof
 
-objects = dasync.o testme.o
+objects = dasynq.o testme.o
 
-all: dasync-test
+all: dasynq-test
 
-$(objects): %.o: %.cc   dasync.h
+$(objects): %.o: %.cc   dasynq.h
 	$(CXX) $(CXXOPTS) -c $< -o $@
 
-dasync-test: dasync.o testme.o
-	$(CXX) dasync.o testme.o -o dasync-test
+dasynq-test: dasynq.o testme.o
+	$(CXX) dasynq.o testme.o -o dasynq-test
 
 #install: all
 

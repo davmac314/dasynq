@@ -12,7 +12,7 @@
 #include <unistd.h>
 #include <signal.h>
 
-namespace dasync {
+namespace dasynq {
 
 template <class Base> class EpollLoop;
 

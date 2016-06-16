@@ -1,4 +1,4 @@
-namespace dasync {
+namespace dasynq {
 
 // Event type bits
 constexpr unsigned int in_events = 1;

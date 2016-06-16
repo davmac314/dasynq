@@ -1,12 +1,12 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
-#include "dasync.h"
+#include "dasynq.h"
 #include "dmutex.h"
 
-using namespace dasync;
+using namespace dasynq;
 
-class MySignalWatcher : public PosixSignalWatcher<std::mutex>
+class MySignalWatcher : public SignalWatcher<std::mutex>
 {
     Rearm gotSignal(EventLoop<std::mutex> * eloop, int signo, SigInfo_p siginfo) override
     {
