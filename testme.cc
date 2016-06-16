@@ -6,7 +6,7 @@
 
 using namespace dasynq;
 
-class MySignalWatcher : public SignalWatcher<std::mutex>
+class MySignalWatcher : public EventLoop<std::mutex>::SignalWatcher
 {
     Rearm gotSignal(EventLoop<std::mutex> * eloop, int signo, SigInfo_p siginfo) override
     {
