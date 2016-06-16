@@ -1,13 +1,13 @@
 namespace dasynq {
 
 // Event type bits
-constexpr unsigned int in_events = 1;
-constexpr unsigned int out_events = 2;
-constexpr unsigned int err_events = 4;
+constexpr unsigned int IN_EVENTS = 1;
+constexpr unsigned int OUT_EVENTS = 2;
+constexpr unsigned int ERR_EVENTS = 4;
 
-constexpr unsigned int one_shot = 8;
+constexpr unsigned int ONE_SHOT = 8;
 
 // Masks:
-constexpr unsigned int IO_EVENTS = in_events | out_events;
+constexpr unsigned int IO_EVENTS = IN_EVENTS | OUT_EVENTS;
 
 }
