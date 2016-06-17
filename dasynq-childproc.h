@@ -126,6 +126,11 @@ template <class Base> class ChildProcEvents : public Base
         child_waiters.add_from_reserve(child, val);
     }
     
+    void removeChildWatch(pid_t child) noexcept
+    {
+        child_waiters.erase(child);
+    }
+    
     template <typename T> void init(T *loop_mech)
     {
         loop_mech->addSignalWatch(SIGCHLD, nullptr);

@@ -1,14 +1,16 @@
 #include <iostream>
 #include <unistd.h>
 #include <mutex>
+
 #include "dasynq.h"
-// #include "dmutex.h"
 
 using namespace dasynq;
 
-class MySignalWatcher : public EventLoop<std::mutex>::SignalWatcher
+using Loop_t = EventLoop<std::mutex>;
+
+class MySignalWatcher : public Loop_t::SignalWatcher
 {
-    Rearm gotSignal(EventLoop<std::mutex> * eloop, int signo, SigInfo_p siginfo) override
+    Rearm received(Loop_t & eloop, int signo, SigInfo_p siginfo) override
     {
         using namespace std;
         cout << "Got signal: " << signo << endl;
@@ -18,12 +20,7 @@ class MySignalWatcher : public EventLoop<std::mutex>::SignalWatcher
 
 int main(int argc, char **argv)
 {
-    // NEventLoop * eloop = &getSystemLoop();
-    EventLoop<std::mutex> * eloop = new EventLoop<std::mutex>();
-    
-    MySignalWatcher mse1, mse2;
-    mse1.registerWatch(eloop, SIGUSR1);
-    mse2.registerWatch(eloop, SIGUSR2);
+    Loop_t eloop();
 
     // block USR1 / USR2 reception    
     sigset_t set;
@@ -31,10 +28,11 @@ int main(int argc, char **argv)
     sigaddset(&set, SIGUSR1);
     sigaddset(&set, SIGUSR2);    
     sigprocmask(SIG_BLOCK, &set, NULL);
-
-    //raise(SIGUSR1);
-    //raise(SIGUSR2);
     
+    MySignalWatcher mse1, mse2;
+    mse1.addWatch(eloop, SIGUSR1);
+    mse2.addWatch(eloop, SIGUSR2);
+
     sleep(1);
     
     std::cout << "Running eloop..." << std::endl;
