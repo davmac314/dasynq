@@ -12,7 +12,7 @@ in a single-threaded client. You can instantiate an event loop of your chosen ty
     using Loop_t = dasynq::EventLoop<dasynq::NullMutex>();  // single-threaded
     using Loop_t = dasynq::EventLoop<std::mutex>();         // multi-threaded
 
-    auto my_loop = Loop_t();
+    Loop_t my_loop();
 
 There are essentially three ways of using an event loop:
 
@@ -43,7 +43,7 @@ create an FdWatcher:
 
     class MyFdWatcher : public Loop_t::FdWatcher
     {
-        Rearm gotEvent(Loop_t *, int fd, int flags) override
+        Rearm fdEvent(Loop_t *, int fd, int flags) override
         {
             // Process I/O here
     
@@ -52,7 +52,7 @@ create an FdWatcher:
     };
 
     MyFdWatcher my_fd_watcher;
-    my_fd_watcher.registerWith(&my_loop, fd, IN_EVENTS);
+    my_fd_watcher.addWatch(my_loop, fd, IN_EVENTS);
 
 As shown above, you should extend the appropriate watcher class and override the callback method.
 The watcher is normally disabled during the processing of the callback method (and must not be
@@ -76,7 +76,7 @@ values correctly.
 
 To remove a watcher, call deregister:
 
-    my_fd_watch.deregisterWatch(&my_loop);
+    my_fd_watch.deregister(my_loop);
 
 The 'watchRemoved' callback gets called when the watch has been successfully de-registered. If the
 event callback is currently executing in another thread, the `watchRemoved` will _not_ be called
@@ -86,46 +86,113 @@ called.
 
 ## 2.1 File descriptor watches
 
-See example above.
+See example above. Not shown there is the `setEnabled` method:
+
+    setEnabled(Loop_t &, bool b);
+
+This enables or disables the watcher. You should not enable a watcher that might currently have
+its callback running (unless the event loop is polled by only single thread).
 
 Some backends support watching IN_EVENTS | OUT_EVENTS at the same time, but some don't. Use a
 BidiFdWatcher if you need to do that:
 
     class MyBidiFdWatcher : public Loop_t::BidiFdWatcher
     {
-        Rearm readReady(Loop_t *, int fd) override
+        Rearm readReady(Loop_t &, int fd) override
         {
             return Rearm::REARM;
         }
         
-        Rearm writeReady(Loop_t *, int fd) override
+        Rearm writeReady(Loop_t &, int fd) override
         {
             return Rearm::REARM;
         }
     };
 
     MyBidiFdWatcher my_bidi_watcher;
-    my_bidi_watcher.registerWith(my_loop, fd, IN_EVENTS | OUT_EVENTS);
+    my_bidi_watcher.addWatch(my_loop, fd, IN_EVENTS | OUT_EVENTS);
     // use the IN_EVENTS/OUT_EVENTS flags to specify which events you want enabled.
 
 Beware! If the loop is being polled by multiple threads then the "readReady" and "writeReady"
-callbacks may be called simultaneously!
+callbacks may be called simultaneously! BidiFdWatcher has (protected) methods to enable the input
+and output channels separately. As usual, you should make certain not to enable a watcher that
+is currently active, unless there is only a single thread running callbacks:
+
+    setInWatchEnabled(Loop_t &, bool);
+
+    setOutWatchEnabled(Loop_t &, bool);
+
+    setWatches(Loop_t &, int flags);
+
+   
 
 ## 2.2 Signal watchers
 
     class MySignalWatcher : public Loop_t::SignalWatcher
     {
 	// SignalWatcher defines type "SigInfo_p"
-        Rearm gotSignal(Loop_t *, int signo, SigInfo_p siginfo)
+        Rearm received(Loop_t &, int signo, SigInfo_p siginfo)
         {
             return Rearm::REARM;
         }
-    }
+    };
+
+    MySignalWatcher msw;
+    msw.addWatch(my_loop, SIGINT);
 
 Methods available in SigInfo_p may vary from platform to platform, but are intended to mirror the
 `siginfo_t` structure of the platform. One standard method is "int get_signo()".
 
+
 ## 2.3 Child process watchers
+
+    class MyChildProcWatcher : public Loop_t::ChildProcWatcher
+    {
+        Rearm childStatus(Loop_t &, pid_t child, int status)
+        {
+            return Rearm::REARM;
+        }
+    };
+
+    MyChildProcWatcher my_child_watcher;
+    my_child_watcher.addWatch(my_loop, my_child_pid);
+
+Since adding a watcher can fail, but you can't try to add a watcher before the child is actually
+spawned, you might get into the awkward position of having a child that you can't watch. To avoid
+that, ChildProcWatcher has a special method to reserve a watch before actually registering it with
+the event loop. Use:
+
+    my_child_watcher.reserveWatch(my_loop);
+
+... to reserve the watch (this can fail!), and then, after spawning a child process:
+
+    my_child_watcher.addReserved(my_loop, my_child_pid);
+
+... to claim the reserved watch. This cannot fail.
 
 
 ## 3. Error handling
+
+In general, the only operations that can fail (other than due to program error) are the watch
+registration methods (addWatch). If they fail, they will throw an exception; either a
+`std::bad_alloc` or a `std::system_error`.
+
+
+## 4. Restrictions and limitations
+
+Most of the following limitations carry through from the underlying backend, rather than being
+inherent in the design of Dasynq itself.
+
+You cannot generally add two watchers for the same identity (file descriptor, signal, child
+process). (Exception: when using kqueue backend, you can add one fd read watcher and one fd write
+watche; however, it's better to use a `BidiFdWatcher` to abstract away platform differences).
+
+You should remove the watcher(s) for a file descriptor *before* you close the file descriptor,
+and especially before adding a new watcher for the same file descriptor number (due to having
+opened in the meantime another file/pipe/socket which was assigned the same fd). (This might
+not cause an issue with the current design/backends, but might be a problem in the future).
+
+Creating two event loop instances in a single application is not likely to work well, or at all.
+(This limitation may be lifted in a future release).
+
+You must not register a watcher with an event loop while it is currently registered.
