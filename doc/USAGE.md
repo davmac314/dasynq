@@ -143,6 +143,9 @@ is currently active, unless there is only a single thread running callbacks:
 Methods available in SigInfo_p may vary from platform to platform, but are intended to mirror the
 `siginfo_t` structure of the platform. One standard method is "int get_signo()".
 
+You should mask the signal (with sigprocmask/pthread_sigmask) in all threads before adding a
+watcher for that signal to an event loop.
+
 
 ## 2.3 Child process watchers
 
@@ -168,7 +171,15 @@ the event loop. Use:
 
     my_child_watcher.addReserved(my_loop, my_child_pid);
 
-... to claim the reserved watch. This cannot fail.
+... to claim the reserved watch. This cannot fail. However, if done while another thread may be
+polling the event loop, it is potentially racy; the other thread may reap the child before the
+watcher is added. So, you should fork using the ChildProcWatcher::fork method:
+
+    pid_t child_pid = my_child_watcher.fork(my_loop);
+
+This "atomically" creates the child process and registers the watcher. (If registration fails the
+child will terminate, or will never be forked). A `std::bad_alloc` or `std::system_error` exception
+is thrown on failure.
 
 
 ## 3. Error handling
@@ -185,12 +196,18 @@ inherent in the design of Dasynq itself.
 
 You cannot generally add two watchers for the same identity (file descriptor, signal, child
 process). (Exception: when using kqueue backend, you can add one fd read watcher and one fd write
-watche; however, it's better to use a `BidiFdWatcher` to abstract away platform differences).
+watcher; however, it's better to use a `BidiFdWatcher` to abstract away platform differences).
 
 You should remove the watcher(s) for a file descriptor *before* you close the file descriptor,
 and especially before adding a new watcher for the same file descriptor number (due to having
 opened in the meantime another file/pipe/socket which was assigned the same fd). (This might
 not cause an issue with the current design/backends, but might be a problem in the future).
+
+The event loop may not function correctly after a fork() operation (including a call to
+ChildProcWatcher::fork).
+
+The implementation may use SIGCHLD to detect child process termination. Therefore you should not
+try to watch SIGCHLD independently.
 
 Creating two event loop instances in a single application is not likely to work well, or at all.
 (This limitation may be lifted in a future release).
