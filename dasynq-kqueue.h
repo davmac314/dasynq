@@ -71,6 +71,7 @@ class KqueueTraits
     
     const static bool has_bidi_fd_watch = false;
     const static bool has_separate_rw_fd_watches = true;
+    const static bool supports_childwatch_reservation = true;
 };
 
 #if defined(__OpenBSD__)

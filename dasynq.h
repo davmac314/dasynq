@@ -30,6 +30,10 @@ namespace dasynq {
 #include <condition_variable>
 #include <cstdint>
 #include <cstddef>
+#include <system_error>
+
+#include <unistd.h>
+#include <fcntl.h>
 
 #include "dasynq-mutex.h"
 
@@ -496,6 +500,10 @@ template <typename T_Mutex> class EventLoop
     friend class dprivate::SignalWatcher<EventLoop<T_Mutex>>;
     friend class dprivate::ChildProcWatcher<EventLoop<T_Mutex>>;
     
+    public:
+    using LoopTraits = dasynq::LoopTraits;
+    
+    private:
     template <typename T, typename U> using EventDispatch = dprivate::EventDispatch<T,U>;
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
@@ -650,6 +658,11 @@ template <typename T_Mutex> class EventLoop
         loop_mech.reserveChildWatch();
     }
     
+    void unreserve(BaseChildWatcher *callBack)
+    {
+        loop_mech.unreserveChildWatch();
+    }
+    
     void registerChild(BaseChildWatcher *callBack, pid_t child)
     {
         loop_mech.addChildWatch(child, callBack);
@@ -658,6 +671,11 @@ template <typename T_Mutex> class EventLoop
     void registerReservedChild(BaseChildWatcher *callBack, pid_t child) noexcept
     {
         loop_mech.addReservedChildWatch(child, callBack);
+    }
+
+    void registerReservedChild_nolock(BaseChildWatcher *callBack, pid_t child) noexcept
+    {
+        loop_mech.addReservedChildWatch_nolock(child, callBack);
     }
     
     void deregister(BaseChildWatcher *callback, pid_t child)
@@ -966,6 +984,8 @@ template <typename T_Mutex> class EventLoop
     using SignalWatcher = dprivate::SignalWatcher<EventLoop<T_Mutex>>;
     using ChildProcWatcher = dprivate::ChildProcWatcher<EventLoop<T_Mutex>>;
     
+    // using LoopTraits = dasynq::LoopTraits;
+    
     void run() noexcept
     {
         while (! processEvents()) {
@@ -1205,14 +1225,22 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
 
     public:
     // Reserve resources for a child watcher with the given event loop.
-    // Reservation can fail with std::bad_alloc.
+    // Reservation can fail with std::bad_alloc. Some backends do not support
+    // reservation (it will always fail) - check LoopTraits::supports_childwatch_reservation.
     void reserveWatch(EventLoop &eloop)
     {
-        eloop.reserveChildWatch();
+        eloop.reserveChildWatch(this);
+    }
+    
+    void unreserve(EventLoop &eloop)
+    {
+        eloop.unreserve(this);
     }
     
     // Register a watcher for the given child process with an event loop.
     // Registration can fail with std::bad_alloc.
+    // Note that in multi-threaded programs, use of this function may be prone to a
+    // race condition such that the child terminates before the watcher is registered.
     void addWatch(EventLoop &eloop, pid_t child)
     {
         BaseWatcher::init();
@@ -1223,6 +1251,8 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     // Register a watcher for the given child process with an event loop,
     // after having reserved resources previously (using reserveWith).
     // Registration cannot fail.
+    // Note that in multi-threaded programs, use of this function may be prone to a
+    // race condition such that the child terminates before the watcher is registered.
     void addReserved(EventLoop &eloop, pid_t child) noexcept
     {
         BaseWatcher::init();
@@ -1232,6 +1262,89 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     void deregister(EventLoop &eloop, pid_t child) noexcept
     {
         eloop.deregister(this, child);
+    }
+    
+    // Fork and watch the child with this watcher on the given event loop.
+    // If resource limitations prevent the child process from being watched, it is
+    // terminated immediately (or if the implementation allows, never started),
+    // and a suitable std::system_error or std::bad_alloc exception is thrown.
+    // Returns:
+    // - the child pid in the parent
+    // - 0 in the child
+    pid_t fork(EventLoop &eloop)
+    {
+        if (EventLoop::LoopTraits::supports_childwatch_reservation) {
+            // Reserve a watch, fork, then claim reservation
+            reserveWatch(eloop);
+            
+            auto &lock = eloop.getBaseLock();
+            lock.lock();
+            
+            pid_t child = ::fork();
+            if (child == -1) {
+                // Unreserve watch.
+                lock.unlock();
+                unreserve(eloop);
+                throw std::system_error(errno, std::system_category());
+            }
+            
+            if (child == 0) {
+                // I am the child
+                lock.unlock(); // may not really be necessary
+                return 0;
+            }
+            
+            // Register this watcher.
+            eloop.registerReservedChild_nolock(this, child);
+            lock.unlock();
+            return child;
+        }
+        else {
+            int pipefds[2];
+            if (pipe2(pipefds, O_CLOEXEC) == -1) {
+                throw std::system_error(errno, std::system_category());
+            }
+            
+            std::lock_guard<T_Mutex> guard(eloop.getBaseLock());
+            
+            pid_t child = ::fork();
+            if (child == -1) {
+                throw std::system_error(errno, std::system_category());
+            }
+            
+            if (child == 0) {
+                // I am the child
+                
+                // Wait for message from parent before continuing:
+                int rr;
+                int r = read(pipefds[0], &rr, sizeof(rr));
+                while (r == -1 && errno == EINTR) {
+                    read(pipefds[0], &rr, sizeof(rr));
+                }
+                
+                if (r == -1) _exit(0);
+                
+                close(pipefds[0]);
+                return 0;
+            }
+            
+            close(pipefds[0]); // close read end
+            
+            // Register this watcher.
+            try {
+                eloop.registerChild(this, child);
+                
+                // Continue in child (it doesn't matter what is written):
+                write(pipefds[1], &pipefds, sizeof(int));
+                close(pipefds[1]);
+                
+                return child;
+            }
+            catch (...) {
+                close(pipefds[1]);
+                throw;
+            }
+        }
     }
     
     // virtual Rearm childStatus(EventLoop &, pid_t child, int status) = 0;
