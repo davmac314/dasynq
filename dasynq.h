@@ -435,8 +435,6 @@ namespace dprivate {
             
             lock.lock();
             
-            // TODO this needs to handle multi-watch (BidiFdWatcher) properly
-            
             if (watcher->active) {
                 // If the watcher is active, set deleteme true; the watcher will be removed
                 // at the end of current processing (i.e. when active is set false).
@@ -595,7 +593,7 @@ template <typename T_Mutex> class EventLoop
     void registerFd(BaseBidiFdWatcher *callback, int fd, int eventmask)
     {
         if (LoopTraits::has_separate_rw_fd_watches) {
-            // TODO
+            loop_mech.addBidiFdWatch(fd, callback, eventmask | ONE_SHOT);
         }
         else {
             loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT);
@@ -638,7 +636,7 @@ template <typename T_Mutex> class EventLoop
     void deregister(BaseBidiFdWatcher *callback, int fd)
     {
         if (LoopTraits::has_separate_rw_fd_watches) {
-            // TODO
+            loop_mech.removeBidiFdWatch(fd);
         }
         else {
             loop_mech.removeFdWatch(fd, callback->watch_flags);
