@@ -811,8 +811,6 @@ template <typename T_Mutex> class EventLoop
             bdfw->watch_flags &= ~OUT_EVENTS;
             
             if (LoopTraits::has_separate_rw_fd_watches) {
-                // TODO this will need flags for such a loop, since it can't
-                // otherwise distinguish which channel watch to remove
                 loop_mech.removeFdWatch_nolock(bdfw->watch_fd, OUT_EVENTS);
                 return bdfw->read_removed ? Rearm::REMOVE : Rearm::NOOP;
             }
@@ -1084,7 +1082,6 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
     // In a single threaded environment, it is safe to delete the watcher after
     // calling this method as long as the handler (if it is active) accesses no
     // internal state and returns Rearm::REMOVED.
-    //   TODO: implement REMOVED, or correct above statement.
     void deregister(EventLoop &eloop) noexcept
     {
         eloop.deregister(this, this->watch_fd);
@@ -1204,7 +1201,6 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     // In a single threaded environment, it is safe to delete the watcher after
     // calling this method as long as the handler (if it is active) accesses no
     // internal state and returns Rearm::REMOVED.
-    //   TODO: implement REMOVED, or correct above statement.
     void deregister(EventLoop &eloop) noexcept
     {
         eloop.deregister(this, this->watch_fd);
