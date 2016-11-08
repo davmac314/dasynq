@@ -115,8 +115,8 @@ BidiFdWatcher if you need to do that:
 
 Beware! If the loop is being polled by multiple threads then the "readReady" and "writeReady"
 callbacks may be called simultaneously! BidiFdWatcher has (protected) methods to enable the input
-and output channels separately. As usual, you should make certain not to enable a watcher that
-is currently active, unless there is only a single thread running callbacks:
+and output channels separately. A BidiFdWatcher acts as two separate watchers, which can be
+enabled and disabled separately:
 
     setInWatchEnabled(Loop_t &, bool);
 
@@ -124,7 +124,15 @@ is currently active, unless there is only a single thread running callbacks:
 
     setWatches(Loop_t &, int flags);
 
-   
+It is possible to disarm either the in or out watch if the corresponding handler is active, but
+it is not safe to arm them in that case. This is the same rule as for enabling/disabling watchers
+generally, except that the BidiFdWatcher itself actually constitutes two separate watchers.
+
+Note also that the BidiFdWatcher channels can be separately removed (by returning Rearm::REMOVE
+from the handler). The watchRemoved() callback is only called when both channels have been
+removed. You cannot register channels with the event loop separately, and you must remove both
+channels before you register the BidiFdWatcher with another (or the same) loop.
+
 
 ## 2.2 Signal watchers
 
@@ -203,8 +211,8 @@ and especially before adding a new watcher for the same file descriptor number (
 opened in the meantime another file/pipe/socket which was assigned the same fd). (This might
 not cause an issue with the current design/backends, but might be a problem in the future).
 
-The event loop may not function correctly after a fork() operation (including a call to
-ChildProcWatcher::fork).
+The event loop may not function correctly in the child process after a fork() operation
+(including a call to ChildProcWatcher::fork).
 
 The implementation may use SIGCHLD to detect child process termination. Therefore you should not
 try to watch SIGCHLD independently.
