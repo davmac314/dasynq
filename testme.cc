@@ -20,7 +20,7 @@ class MySignalWatcher : public Loop_t::SignalWatcher
 
 int main(int argc, char **argv)
 {
-    Loop_t eloop();
+    Loop_t eloop;
 
     // block USR1 / USR2 reception    
     sigset_t set;
@@ -36,11 +36,11 @@ int main(int argc, char **argv)
     sleep(1);
     
     std::cout << "Running eloop..." << std::endl;
-    eloop->run();
+    eloop.run();
     //std::cout << "Running eloop..." << std::endl;
-    eloop->run();
+    eloop.run();
     //std::cout << "Running eloop..." << std::endl;
-    eloop->run();
+    eloop.run();
     
     return 0;
 }
