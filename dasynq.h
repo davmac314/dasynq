@@ -104,7 +104,7 @@ namespace dprivate {
     // that is, watcher should not be disabled until all watched event types are queued.
     constexpr static int multi_watch = 4;
     
-    // Represents a queued event notification
+    // Represents a queued event notification. Various event watchers derive from this type.
     class BaseWatcher
     {
         template <typename T_Mutex, typename Traits> friend class EventDispatch;
@@ -303,9 +303,6 @@ namespace dprivate {
     };
 
     // This class serves as the base class (mixin) for the AEN mechanism class.
-    // Note that EventDispatch, here, and EventLoop (below) are really two sides of one coin;
-    // they do not work independently. The mixin pattern that we use to avoid dynamic dispatch
-    // forces them to be two seperate classes, however.
     //
     // The EventDispatch class maintains the queued event data structures. It inserts watchers
     // into the queue when eventes are received (receiveXXX methods).
