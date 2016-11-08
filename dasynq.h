@@ -907,9 +907,11 @@ template <typename T_Mutex> class EventLoop
                     // The primary watcher for a multi-watch watcher is queued for
                     // read events.
                     rearmType = bbfw->readReady(*this, bfw->watch_fd);
+                    bbfw->event_flags &= ~IN_EVENTS;
                 }
                 else {
                     rearmType = bfw->fdEvent(*this, bfw->watch_fd, bfw->event_flags);
+                    bfw->event_flags = 0;
                 }
                 break;
             }
@@ -920,6 +922,7 @@ template <typename T_Mutex> class EventLoop
             }
             case WatchType::SECONDARYFD: {
                 rearmType = bbfw->writeReady(*this, bbfw->watch_fd);
+                bbfw->event_flags &= ~OUT_EVENTS;
                 break;
             }
             default: ;
@@ -1185,6 +1188,8 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         this->outWatcher.BaseWatcher::init();
         this->watch_fd = fd;
         this->watch_flags = flags | dprivate::multi_watch;
+        this->read_removed = false;
+        this->write_removed = false;
         eloop.registerFd(this, fd, flags);
     }
     
