@@ -769,9 +769,7 @@ template <typename T_Mutex> class EventLoop
                     }
                 }
                 else {
-                    // TODO this will need flags for such a loop, since it can't
-                    // otherwise distinguish which channel watch to remove
-                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd, bdfw->watch_flags);
+                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd, IN_EVENTS);
                 }
             }
             else if (rearmType == Rearm::DISARM) {
@@ -804,6 +802,7 @@ template <typename T_Mutex> class EventLoop
         }
     }
 
+    // Process re-arm for the secondary (output) watcher in a Bi-direction Fd watcher.
     Rearm processSecondaryRearm(BaseBidiFdWatcher * bdfw, Rearm rearmType)
     {
         // Called with lock held
@@ -814,7 +813,7 @@ template <typename T_Mutex> class EventLoop
             if (LoopTraits::has_separate_rw_fd_watches) {
                 // TODO this will need flags for such a loop, since it can't
                 // otherwise distinguish which channel watch to remove
-                loop_mech.removeFdWatch_nolock(bdfw->watch_fd, bdfw->watch_flags);
+                loop_mech.removeFdWatch_nolock(bdfw->watch_fd, OUT_EVENTS);
                 return bdfw->read_removed ? Rearm::REMOVE : Rearm::NOOP;
             }
             else {
