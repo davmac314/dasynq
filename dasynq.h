@@ -311,7 +311,7 @@ namespace dprivate {
         friend class EventLoop<T_Mutex>;
 
         // queue data structure/pointer
-        BaseWatcher * first;
+        BaseWatcher * first = nullptr;
         
         using BaseSignalWatcher = dasynq::dprivate::BaseSignalWatcher<T_Mutex>;
         using BaseFdWatcher = dasynq::dprivate::BaseFdWatcher<T_Mutex>;
