@@ -169,8 +169,10 @@ namespace dprivate {
         
         protected:
         int watch_fd;
-        int watch_flags;
-        int event_flags;
+        
+        // These flags are protected by the loop's internal lock:
+        int watch_flags;  // events being watched
+        int event_flags;  // events pending (queued)
         
         BaseFdWatcher() noexcept : BaseWatcher(WatchType::FD) { }
         
@@ -750,7 +752,9 @@ template <typename T_Mutex> class EventLoop
 
     Rearm processFdRearm(BaseFdWatcher * bfw, Rearm rearmType, bool is_multi_watch)
     {
-        // Called with lock held
+        // Called with lock held;
+        //   bdfw->event_flags contains only with pending (queued) events
+        
         if (is_multi_watch) {
             BaseBidiFdWatcher * bdfw = static_cast<BaseBidiFdWatcher *>(bfw);
             
@@ -777,10 +781,15 @@ template <typename T_Mutex> class EventLoop
             }
             else if (rearmType == Rearm::REARM) {
                 bdfw->watch_flags |= IN_EVENTS;
+                
                 if (! LoopTraits::has_separate_rw_fd_watches) {
+                    int watch_flags = bdfw->watch_flags;
+                    // If this is a BidiFdWatch (multiwatch) then we do not want to re-enable a
+                    // channel that has an event pending (is already queued):
+                    watch_flags &= ~(bdfw->event_flags);
                     loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
                             static_cast<BaseWatcher *>(bdfw),
-                            (bdfw->watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                            (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
                 }
                 else {
                     loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
@@ -830,10 +839,15 @@ template <typename T_Mutex> class EventLoop
         }
         else if (rearmType == Rearm::REARM) {
             bdfw->watch_flags |= OUT_EVENTS;
+            
             if (! LoopTraits::has_separate_rw_fd_watches) {
+                int watch_flags = bdfw->watch_flags;
+                // If this is a BidiFdWatch (multiwatch) then we do not want to re-enable a
+                // channel that has an event pending (is already queued):
+                watch_flags &= ~(bdfw->event_flags);
                 loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
                         static_cast<BaseWatcher *>(bdfw),
-                        (bdfw->watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                        (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
             }
             else {
                 loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
