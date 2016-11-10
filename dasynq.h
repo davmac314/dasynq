@@ -15,14 +15,14 @@
 #include "dasynq-kqueue.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = KqueueLoop<T>;
+    template <typename T> using Loop = KqueueLoop<ChildProcEvents<T>>;
     using LoopTraits = KqueueTraits;
 }
 #elif defined(HAVE_EPOLL)
 #include "dasynq-epoll.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = EpollLoop<T>;
+    template <typename T> using Loop = EpollLoop<ChildProcEvents<T>>;
     using LoopTraits = EpollTraits;
 }
 #endif
@@ -73,6 +73,13 @@ enum class Rearm
 // TODO: add a REQUEUE option, which means, "I didn't complete input/output, run me again soon"
 };
 
+// Different timer clock types
+enum class ClockType
+{
+    WALLTIME,
+    MONOTONIC
+};
+
 // Information about a received signal.
 // This is essentially a wrapper for the POSIX siginfo_t; its existence allows for mechanisms that receive
 // equivalent signal information in a different format (eg signalfd on Linux).
@@ -94,7 +101,8 @@ namespace dprivate {
         SIGNAL,
         FD,
         CHILD,
-        SECONDARYFD
+        SECONDARYFD,
+        TIMER
     };
     
     template <typename T_Mutex, typename Traits> class EventDispatch;
@@ -221,6 +229,26 @@ namespace dprivate {
         public:
         virtual Rearm childStatus(EventLoop<T_Mutex> &eloop, pid_t child, int status) = 0;
     };
+    
+
+    template <typename T_Mutex>
+    class BaseTimerWatcher : public BaseWatcher
+    {
+        template <typename, typename Traits> friend class EventDispatch;
+        friend class dasynq::EventLoop<T_Mutex>;
+        
+        protected:
+        ClockType clock_type;
+        int intervals;
+
+        BaseTimerWatcher() : BaseWatcher(WatchType::TIMER) { }
+        
+        public:
+        // Timer expired, and the given number of intervals have elapsed before
+        // expiry evenet was queued. Normally intervals == 1 to indicate no
+        // overrun.
+        virtual Rearm timerExpiry(EventLoop<T_Mutex> &eloop, int intervals) = 0;
+    };
 
     // Classes for implementing a fair(ish) wait queue.
     // A queue node can be signalled when it reaches the head of
@@ -319,6 +347,7 @@ namespace dprivate {
         using BaseFdWatcher = dasynq::dprivate::BaseFdWatcher<T_Mutex>;
         using BaseBidiFdWatcher = dasynq::dprivate::BaseBidiFdWatcher<T_Mutex>;
         using BaseChildWatcher = dasynq::dprivate::BaseChildWatcher<T_Mutex>;
+        using BaseTimerWatcher = dasynq::dprivate::BaseTimerWatcher<T_Mutex>;
         
         void queueWatcher(BaseWatcher *bwatcher)
         {
@@ -408,6 +437,13 @@ namespace dprivate {
         {
             BaseChildWatcher * watcher = static_cast<BaseChildWatcher *>(userdata);
             watcher->child_status = status;
+            queueWatcher(watcher);
+        }
+        
+        void receiveTimerExpiry(void * userdata, int intervals)
+        {
+            BaseTimerWatcher * watcher = static_cast<BaseTimerWatcher *>(userdata);
+            watcher->intervals = intervals;
             queueWatcher(watcher);
         }
         
@@ -504,9 +540,10 @@ template <typename T_Mutex> class EventLoop
     using BaseFdWatcher = dprivate::BaseFdWatcher<T_Mutex>;
     using BaseBidiFdWatcher = dprivate::BaseBidiFdWatcher<T_Mutex>;
     using BaseChildWatcher = dprivate::BaseChildWatcher<T_Mutex>;
+    using BaseTimerWatcher = dprivate::BaseTimerWatcher<T_Mutex>;
     using WatchType = dprivate::WatchType;
     
-    Loop<ChildProcEvents<EventDispatch<T_Mutex, LoopTraits>>> loop_mech;
+    Loop<EventDispatch<T_Mutex, LoopTraits>> loop_mech;
 
     // There is a complex problem with most asynchronous event notification mechanisms
     // when used in a multi-threaded environment. Generally, a file descriptor or other
@@ -857,6 +894,11 @@ template <typename T_Mutex> class EventLoop
         }
         return rearmType;
     }
+    
+    void processTimerRearm(BaseTimerWatcher *btw, Rearm rearmType)
+    {
+        // TODO
+    }
 
     bool processEvents() noexcept
     {
@@ -939,6 +981,11 @@ template <typename T_Mutex> class EventLoop
                 bbfw->event_flags &= ~OUT_EVENTS;
                 break;
             }
+            case WatchType::TIMER: {
+                BaseTimerWatcher *btw = static_cast<BaseTimerWatcher *>(pqueue);
+                rearmType = btw->timerExpiry(*this, btw->intervals);
+                break;
+            }
             default: ;
             }
 
@@ -961,6 +1008,9 @@ template <typename T_Mutex> class EventLoop
                     break;
                 case WatchType::SECONDARYFD:
                     rearmType = processSecondaryRearm(bbfw, rearmType);
+                    break;
+                case WatchType::TIMER:
+                    processTimerRearm(static_cast<BaseTimerWatcher *>(pqueue), rearmType);
                     break;
                 default: ;
                 }
