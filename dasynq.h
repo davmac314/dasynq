@@ -91,10 +91,11 @@ template <typename T_Mutex> class EventLoop;
 namespace dprivate {
     // (non-public API)
     
-    template <typename T_Mutex> class FdWatcher;
-    template <typename T_Mutex> class BidiFdWatcher;
-    template <typename T_Mutex> class SignalWatcher;
-    template <typename T_Mutex> class ChildProcWatcher;
+    template <typename T_Loop> class FdWatcher;
+    template <typename T_Loop> class BidiFdWatcher;
+    template <typename T_Loop> class SignalWatcher;
+    template <typename T_Loop> class ChildProcWatcher;
+    template <typename T_Loop> class Timer;
     
     enum class WatchType
     {
@@ -238,7 +239,7 @@ namespace dprivate {
         friend class dasynq::EventLoop<T_Mutex>;
         
         protected:
-        ClockType clock_type;
+        int timer_handle;
         int intervals;
 
         BaseTimerWatcher() : BaseWatcher(WatchType::TIMER) { }
@@ -440,7 +441,7 @@ namespace dprivate {
             queueWatcher(watcher);
         }
         
-        void receiveTimerExpiry(void * userdata, int intervals)
+        void receiveTimerExpiry(int timer_handle, void * userdata, int intervals)
         {
             BaseTimerWatcher * watcher = static_cast<BaseTimerWatcher *>(userdata);
             watcher->intervals = intervals;
@@ -527,6 +528,7 @@ template <typename T_Mutex> class EventLoop
     friend class dprivate::BidiFdWatcher<EventLoop<T_Mutex>>;
     friend class dprivate::SignalWatcher<EventLoop<T_Mutex>>;
     friend class dprivate::ChildProcWatcher<EventLoop<T_Mutex>>;
+    friend class dprivate::Timer<EventLoop<T_Mutex>>;
     
     public:
     using LoopTraits = dasynq::LoopTraits;
@@ -720,6 +722,24 @@ template <typename T_Mutex> class EventLoop
         releaseLock(qnode);
     }
     
+    void registerTimer(BaseTimerWatcher *callBack)
+    {
+        int handle = loop_mech.addTimer(callBack);
+        callBack->timer_handle = handle;
+    }
+    
+    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout)
+    {
+        struct timespec interval {0, 0};
+        loop_mech.setTimer(callBack->timer_handle, timeout, interval, true);
+    }
+    
+    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout)
+    {
+        struct timespec interval {0, 0};
+        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true);
+    }
+    
     void dequeueWatcher(BaseWatcher *watcher) noexcept
     {
         if (loop_mech.isQueued(watcher)) {
@@ -897,7 +917,13 @@ template <typename T_Mutex> class EventLoop
     
     void processTimerRearm(BaseTimerWatcher *btw, Rearm rearmType)
     {
-        // TODO
+        // Called with lock held
+        if (rearmType == Rearm::REARM) {
+            loop_mech.enableTimer_nolock(btw->timer_handle, true);
+        }
+        else if (rearmType == Rearm::REMOVE) {
+            loop_mech.removeTimer_nolock(btw->timer_handle);
+        }
     }
 
     bool processEvents() noexcept
@@ -1037,6 +1063,7 @@ template <typename T_Mutex> class EventLoop
     using BidiFdWatcher = dprivate::BidiFdWatcher<EventLoop<T_Mutex>>;
     using SignalWatcher = dprivate::SignalWatcher<EventLoop<T_Mutex>>;
     using ChildProcWatcher = dprivate::ChildProcWatcher<EventLoop<T_Mutex>>;
+    using Timer = dprivate::Timer<EventLoop<T_Mutex>>;
     
     // using LoopTraits = dasynq::LoopTraits;
     
@@ -1411,6 +1438,29 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     }
     
     // virtual Rearm childStatus(EventLoop &, pid_t child, int status) = 0;
+};
+
+template <typename EventLoop>
+class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
+{
+    public:
+    
+    // Allocate a timer (using the MONOTONIC clock)
+    void addTimer(EventLoop &eloop)
+    {
+        eloop.registerTimer(this);
+    }
+    
+    void armTimer(EventLoop &eloop, struct timespec &timeout) noexcept
+    {
+        eloop.setTimer(this, timeout);
+    }
+    
+    // Arm timer, relative to now:
+    void armTimerRel(EventLoop &eloop, struct timespec &timeout) noexcept
+    {
+        eloop.setTimerRel(this, timeout);
+    }
 };
 
 }  // namespace dasynq::dprivate
