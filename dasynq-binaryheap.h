@@ -19,11 +19,12 @@ template <typename T, typename P, typename Compare = std::less<P>>
 class BinaryHeap
 {
     // The backing vector has a union element type, containing either a data item (P) or a
-    // free node. To simplify implementation we require that P is a POD type, otherwise
-    // we would need to add a boolean to track whether the node is free/ful. We static_assert
+    // free node. To simplify implementation we require that P trivally copyable, otherwise
+    // we would need to add a boolean to track whether the node is free/full. We static_assert
     // now to avoid a very confusing compilation bug later.
-    // (TODO: partial specialisation to support non-PODs).
-    static_assert(std::is_pod<T>::value, "P must be a POD (plain data type)");
+    // (TODO: partial specialisation to support non-trivially-copyables; we actually don't need
+    //  to add a boolean, can use heap_index == -2 or somesuch).
+    static_assert(std::is_trivially_copy_constructible<T>::value, "P must be trivially copy constructible");
     
     public:
     // Handle to an element on the heap in the node buffer.
@@ -65,7 +66,7 @@ class BinaryHeap
     
     int first_free = -1;
     int root_node = -1;
-    int num_nodes = 0;
+    typename std::vector<HeapNode>::size_type num_nodes = 0;
     
     bool bubble_down()
     {
@@ -119,7 +120,7 @@ class BinaryHeap
         }
     }
 
-    handle_t alloc_slot()
+    template <typename ...U> handle_t alloc_slot(U... u)
     {
         // Make sure the heap vector has suitable capacity
         if (hvec.capacity() <= num_nodes) {
@@ -135,7 +136,7 @@ class BinaryHeap
         }
         else {
             int r = bvec.size();
-            bvec.emplace_back();
+            bvec.emplace_back(u...);
             return r;
         }
     }
@@ -161,15 +162,14 @@ class BinaryHeap
     
     T & node_data(handle_t index) noexcept
     {
-        return bvec[index].hn.data;
+        return bvec[index].hd;
     }
     
     // Allocate a slot, but do not incorporate into the heap:
     //  u... : parameters for data constructor T::T(...)
     template <typename ...U> void allocate(handle_t & hnd, U... u)
     {
-        int r = alloc_slot();
-        new (& bvec[r].hd) T(u...);
+        int r = alloc_slot(u...);
         hnd = r;
     }
     
@@ -208,6 +208,11 @@ class BinaryHeap
         return hvec[0].data_index;
     }
     
+    P &get_root_priority()
+    {
+        return hvec[0].data;
+    }
+    
     void pull_root()
     {
         remove_h(0);
@@ -216,6 +221,11 @@ class BinaryHeap
     void remove(handle_t index)
     {
         remove_h(bvec[index].heap_index);
+    }
+    
+    bool empty()
+    {
+        return get_root() == -1;
     }
     
     /*

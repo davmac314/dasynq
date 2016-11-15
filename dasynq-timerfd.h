@@ -4,6 +4,8 @@
 #include <sys/timerfd.h>
 #include <time.h>
 
+#include "dasynq-binaryheap.h"
+
 namespace dasynq {
 
 // We could use one timerfd per timer, but then we need to differentiate timer
@@ -24,6 +26,7 @@ namespace dasynq {
 // entry in the main vector, not in the queue. A disabled timer, however, retains its
 // queue entry (and continues to count, but not report, interval expirations).
 
+
 class TimerData
 {
     public:
@@ -39,131 +42,20 @@ class TimerData
     }
 };
 
-// Free timer data node; links to next free node
-class TimerDataFree
+class CompareTimespec
 {
     public:
-    int next_free; // -1 if last in chain
-};
-
-union TimerDataU
-{
-    TimerData td;
-    TimerDataFree tf;
-    
-    TimerDataU(void *udata) : td(udata)
+    bool operator()(struct timespec &a, struct timespec &b)
     {
-    }
-};
-
-struct TimerHeapEntry
-{
-    // public:
-    struct timespec timeout;
-    int timer_handle;
-    
-    TimerHeapEntry(struct timespec &time, int hndl) : timeout(time), timer_handle(hndl)
-    {
-    }
-};
-
-
-
-// TODO implement pairing heap with non-moving elements for better performance
-// than the current binary heap.
-
-// We can't use std::priority_queue because it won't update TimerData heap_index pointers
-class TimerQueue
-{
-    // less-than comparison
-    static bool lt(TimerHeapEntry &a, TimerHeapEntry &b)
-    {
-        if (a.timeout.tv_sec < b.timeout.tv_sec) return true;
-        if (a.timeout.tv_sec == b.timeout.tv_sec) {
-            return a.timeout.tv_nsec < b.timeout.tv_nsec;
+        if (a.tv_sec < b.tv_sec) {
+            return true;
         }
-        return false;
-    }
-    
-    
-    public:
-    static bool lt(struct timespec &a, struct timespec &b)
-    {
-        if (a.tv_sec < b.tv_sec) return true;
+        
         if (a.tv_sec == b.tv_sec) {
             return a.tv_nsec < b.tv_nsec;
         }
-        return false;
-    }
-
-    // Remove from the queue: used if the timer has expired and is not periodic
-    static void pull(std::vector<TimerHeapEntry> &v, std::vector<TimerDataU> &d)
-    {
-        if (v.size() > 1) {
-            // replace the first element with the last:
-            d[v[0].timer_handle].td.heap_index = -1;
-            d[v.back().timer_handle].td.heap_index = 0;
-            v[0] = v.back();
-            v.pop_back();
-            
-            // Now bubble up:
-            bubble_up(v, d);
-        }
-        else {
-            v.pop_back();
-        }
-    }
-
-    // Bubble an adjusted timer up to the correct position
-    static void bubble_up(std::vector<TimerHeapEntry> &v, std::vector<TimerDataU> &d, int pos = 0)
-    {
-        int rmax = v.size();
-        int max = (rmax - 1) / 2;
-
-        while (pos <= max) {
-            int selchild;
-            int lchild = pos * 2 + 1;
-            int rchild = lchild + 1;
-            if (rchild >= rmax) {
-                selchild = lchild;
-            }
-            else {
-                // select the sooner of lchild and rchild
-                selchild = lt(v[lchild], v[rchild]) ? lchild : rchild;
-            }
-            
-            if (! lt(v[selchild], v[pos])) {
-                break;
-            }
-            
-            std::swap(d[v[selchild].timer_handle].td.heap_index, d[v[pos].timer_handle].td.heap_index);
-            std::swap(v[selchild], v[pos]);
-            pos = selchild;
-        }
-    
-    }
-    
-    static bool bubble_down(std::vector<TimerHeapEntry> &v, std::vector<TimerDataU> &d)
-    {
-        return bubble_down(v, d, v.size() - 1);
-    }
-    
-    // Bubble a newly added timer down to the correct position
-    static bool bubble_down(std::vector<TimerHeapEntry> &v, std::vector<TimerDataU> &d, int pos)
-    {
-        // int pos = v.size() - 1;
-        while (pos > 0) {
-            int parent = (pos - 1) / 2;
-            if (! lt(v[pos], v[parent])) {
-                break;
-            }
-            
-            std::swap(v[pos], v[parent]);
-            std::swap(d[v[pos].timer_handle].td.heap_index, d[v[parent].timer_handle].td.heap_index);
-            pos = parent;
-        }
         
-        return pos == 0;
+        return false;
     }
 };
 
@@ -172,11 +64,9 @@ template <class Base> class TimerFdEvents : public Base
 {
     private:
     int timerfd_fd = -1;
-    int first_free_td = -1; // index of first free timerdata slot in vector
-    int num_timers = 0;
-    
-    std::vector<TimerDataU> timer_vec;
-    std::vector<TimerHeapEntry> timer_queue;
+
+    BinaryHeap<TimerData, struct timespec, CompareTimespec> timer_queue;
+
     
     static int divide_timespec(const struct timespec &num, const struct timespec &den)
     {
@@ -192,7 +82,7 @@ template <class Base> class TimerFdEvents : public Base
             newtime.it_interval = {0, 0};
         }
         else {
-            newtime.it_value = timer_queue[0].timeout;
+            newtime.it_value = timer_queue.get_root_priority();
             newtime.it_interval = {0, 0};
         }
         timerfd_settime(timerfd_fd, TFD_TIMER_ABSTIME, &newtime, nullptr);
@@ -207,21 +97,21 @@ template <class Base> class TimerFdEvents : public Base
             clock_gettime(CLOCK_MONOTONIC, &curtime); // in theory, can't fail on Linux
             
             // Peek timer queue; calculate difference between current time and timeout
-            struct timespec * timeout = &timer_queue[0].timeout;
+            struct timespec * timeout = &timer_queue.get_root_priority();
             while (timeout->tv_sec < curtime.tv_sec || (timeout->tv_sec == curtime.tv_sec &&
                     timeout->tv_nsec <= curtime.tv_nsec)) {
                 // Increment expiry count
-                int thandle = timer_queue[0].timer_handle;
-                timer_vec[thandle].td.expiry_count++;
+                timer_queue.node_data(timer_queue.get_root()).expiry_count++;
                 // (a periodic timer may have overrun; calculated below).
                 
-                timespec &interval = timer_vec[thandle].td.interval_time;
+                timespec &interval = timer_queue.node_data(timer_queue.get_root()).interval_time;
                 if (interval.tv_sec == 0 && interval.tv_nsec == 0) {
                     // Non periodic timer
-                    TimerQueue::pull(timer_queue, timer_vec);
-                    int expiry_count = timer_vec[thandle].td.expiry_count;
-                    timer_vec[thandle].td.expiry_count = 0;
-                    Base::receiveTimerExpiry(thandle, timer_vec[thandle].td.userdata, expiry_count);
+                    int thandle = timer_queue.get_root();
+                    timer_queue.pull_root();
+                    int expiry_count = timer_queue.node_data(thandle).expiry_count;
+                    timer_queue.node_data(thandle).expiry_count = 0;
+                    Base::receiveTimerExpiry(thandle, timer_queue.node_data(thandle).userdata, expiry_count);
                     if (timer_queue.empty()) {
                         break;
                     }
@@ -274,19 +164,7 @@ template <class Base> class TimerFdEvents : public Base
     int addTimer(void *userdata)
     {
         int h;
-        if (first_free_td == -1) {
-            h = timer_vec.size();
-            timer_vec.emplace_back(userdata);
-        }
-        else {
-            h = first_free_td;
-            first_free_td = timer_vec[h].tf.next_free;
-            new (&timer_vec[h].td) TimerData(userdata);
-        }
-        
-        num_timers++;
-        timer_queue.reserve(num_timers);
-        
+        timer_queue.allocate(h, userdata);
         return h;
     }
     
@@ -304,35 +182,17 @@ template <class Base> class TimerFdEvents : public Base
     //   enable: specifies whether to enable reporting of timeouts/intervals
     void setTimer(int timer_id, struct timespec &timeout, struct timespec &interval, bool enable) noexcept
     {
-        timer_vec[timer_id].td.interval_time = interval;
-        timer_vec[timer_id].td.expiry_count = 0;
-    
+        auto &ts = timer_queue.node_data(timer_id);
+        ts.interval_time = interval;
+        ts.expiry_count = 0;
+        
+        // TODO check if timer already active, deal with appropriately
+        
+        if (timer_queue.insert(timer_id, timeout)) {
+            set_timer_from_queue();
+        }
+        
         // TODO locking (here and everywhere)
-        if (timer_vec[timer_id].td.heap_index == -1) {
-            timer_vec[timer_id].td.heap_index = timer_queue.size();
-            timer_queue.emplace_back(timeout, timer_vec[timer_id].td.heap_index);
-            if (TimerQueue::bubble_down(timer_queue, timer_vec)) {
-                set_timer_from_queue();
-            }
-        }
-        else {
-            int heap_index = timer_vec[timer_id].td.heap_index;
-            if (TimerQueue::lt(timeout, timer_queue[heap_index].timeout)) {
-                timer_queue[timer_vec[timer_id].td.heap_index].timeout = timeout;
-                if (TimerQueue::bubble_down(timer_queue, timer_vec, heap_index)) {
-                    set_timer_from_queue();            
-                }
-            }
-            else {
-                auto heap_index = timer_vec[timer_id].td.heap_index;
-                timer_queue[heap_index].timeout = timeout;
-                TimerQueue::bubble_up(timer_queue, timer_vec, heap_index);
-                if (heap_index == 0) {
-                    // We moved the next expiring timer back, adjust the timerfd:
-                    set_timer_from_queue();
-                }
-            }
-        }
     }
 
     // Set timer relative to current time:    
