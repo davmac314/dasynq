@@ -14,17 +14,8 @@ namespace dasynq {
 
 // With a file descriptor or signal, we can use the item itself as the identifier for
 // adding/removing watches. For timers, it's more complicated. When we add a timer,
-// we are given a handle; we need to use this to modify the watch.
-
-// We maintain two vectors;
-//   - One with timerdata; a timer handle is an index into this vector. The timer data
-//     includes the current index of this timer in the heap vector (heap_index).
-//   - heap vector; times, and timer handles. When the position on the heap changes,
-//     the timer data heap_index value must be updated accordingly.
-//
-// So each running timer has one entry in each vector. A stopped timer only has an
-// entry in the main vector, not in the queue. A disabled timer, however, retains its
-// queue entry (and continues to count, but not report, interval expirations).
+// we are given a handle; we need to use this to modify the watch. We delegate the
+// process of allocating a handle to a priority heap implementation (BinaryHeap).
 
 
 class TimerData
@@ -32,11 +23,12 @@ class TimerData
     public:
     // initial time?
     struct timespec interval_time; // interval (if 0, one-off timer)
-    int heap_index; // current heap index, -1 if inactive
+    int heap_index; // current heap index, -1 if not queued
     int expiry_count;  // number of times expired
+    bool enabled;   // whether timer reports events  
     void *userdata;
     
-    TimerData(void *udata) : interval_time({0,0}), heap_index(-1), expiry_count(0), userdata(udata)
+    TimerData(void *udata) : interval_time({0,0}), heap_index(-1), expiry_count(0), enabled(true), userdata(udata)
     {
         // constructor
     }
@@ -104,14 +96,17 @@ template <class Base> class TimerFdEvents : public Base
                 timer_queue.node_data(timer_queue.get_root()).expiry_count++;
                 // (a periodic timer may have overrun; calculated below).
                 
-                timespec &interval = timer_queue.node_data(timer_queue.get_root()).interval_time;
+                int thandle = timer_queue.get_root();
+                TimerData &data = timer_queue.node_data(thandle);
+                timespec &interval = data.interval_time;
                 if (interval.tv_sec == 0 && interval.tv_nsec == 0) {
                     // Non periodic timer
-                    int thandle = timer_queue.get_root();
                     timer_queue.pull_root();
-                    int expiry_count = timer_queue.node_data(thandle).expiry_count;
-                    timer_queue.node_data(thandle).expiry_count = 0;
-                    Base::receiveTimerExpiry(thandle, timer_queue.node_data(thandle).userdata, expiry_count);
+                    if (data.enabled) {
+                        int expiry_count = data.expiry_count;
+                        data.expiry_count = 0;
+                        Base::receiveTimerExpiry(thandle, timer_queue.node_data(thandle).userdata, expiry_count);
+                    }
                     if (timer_queue.empty()) {
                         break;
                     }
@@ -170,12 +165,12 @@ template <class Base> class TimerFdEvents : public Base
     
     void removeTimer(int timer_id) noexcept
     {
-        // TODO
+        removeTimer_nolock(timer_id);
     }
     
     void removeTimer_nolock(int timer_id) noexcept
     {
-        // TODO
+        timer_queue.remove(timer_id);
     }
     
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
@@ -185,11 +180,19 @@ template <class Base> class TimerFdEvents : public Base
         auto &ts = timer_queue.node_data(timer_id);
         ts.interval_time = interval;
         ts.expiry_count = 0;
+
+        // TODO also update interval / enabled
         
-        // TODO check if timer already active, deal with appropriately
-        
-        if (timer_queue.insert(timer_id, timeout)) {
-            set_timer_from_queue();
+        if (timer_queue.is_queued(timer_id)) {
+            // Already queued; alter timeout
+            if (timer_queue.set_priority(timer_id, timeout)) {
+                set_timer_from_queue();
+            }
+        }
+        else {
+            if (timer_queue.insert(timer_id, timeout)) {
+                set_timer_from_queue();
+            }
         }
         
         // TODO locking (here and everywhere)
@@ -213,12 +216,12 @@ template <class Base> class TimerFdEvents : public Base
     // Enables or disabling report of timeouts (does not stop timer)
     void enableTimer(int timer_id, bool enable) noexcept
     {
-        // TODO
+        enableTimer_nolock(timer_id, enable);
     }
     
     void enableTimer_nolock(int timer_id, bool enable) noexcept
     {
-        // TODO
+        timer_queue.get_data(timer_id).enabled = enable;
     }
 };
 

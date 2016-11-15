@@ -228,6 +228,30 @@ class BinaryHeap
         return get_root() == -1;
     }
     
+    bool is_queued(handle_t index)
+    {
+        return bvec[index].heap_index != -1;
+    }
+    
+    // Set a node priority. Returns true iff the node becomes the root node (and wasn't before).
+    bool set_priority(handle_t index, P& p)
+    {
+        handle_t heap_index = bvec[index].heap_index;
+        
+        Compare lt;
+        if (lt(hvec[heap_index].data, p)) {
+            // Increase key
+            hvec[heap_index].data = p;
+            bubble_up(heap_index);
+            return false;
+        }
+        else {
+            // Decrease key
+            hvec[heap_index].data = p;
+            return bubble_down(heap_index);
+        }
+    }
+    
     /*
     void dump()
     {
