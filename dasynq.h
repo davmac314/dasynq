@@ -10,6 +10,7 @@
 #endif
 
 #include "dasynq-flags.h"
+#include "dasynq-binaryheap.h"
 
 #if defined(HAVE_KQUEUE)
 #include "dasynq-kqueue.h"
@@ -123,11 +124,10 @@ namespace dprivate {
         
         protected:
         WatchType watchType;
-        int active : 1;
-        int deleteme : 1;
+        int active : 1;    // currently executing handler?
+        int deleteme : 1;  // delete when handler finished?
         
-        BaseWatcher * prev;
-        BaseWatcher * next;
+        int heap_handle;
         
         public:
         
@@ -136,8 +136,7 @@ namespace dprivate {
         {
             active = false;
             deleteme = false;
-            prev = nullptr;
-            next = nullptr;
+            heap_handle = -1;
         }
         
         BaseWatcher(WatchType wt) noexcept : watchType(wt) { }
@@ -382,7 +381,7 @@ namespace dprivate {
         friend class EventLoop<T_Mutex>;
 
         // queue data structure/pointer
-        BaseWatcher * first = nullptr;
+        BinaryHeap<BaseWatcher *, int> event_queue;
         
         using BaseSignalWatcher = dasynq::dprivate::BaseSignalWatcher<T_Mutex>;
         using BaseFdWatcher = dasynq::dprivate::BaseFdWatcher<T_Mutex>;
@@ -390,41 +389,31 @@ namespace dprivate {
         using BaseChildWatcher = dasynq::dprivate::BaseChildWatcher<T_Mutex>;
         using BaseTimerWatcher = dasynq::dprivate::BaseTimerWatcher<T_Mutex>;
         
-        void queueWatcher(BaseWatcher *bwatcher)
+        // Add a watcher into the queuing system (but don't queue it)
+        void prepare_watcher(BaseWatcher *bwatcher)
         {
-            // Put in queue:
-            if (first == nullptr) {
-                bwatcher->prev = bwatcher;
-                bwatcher->next = bwatcher;
-                first = bwatcher;
-            }
-            else {
-                first->prev->next = bwatcher;
-                bwatcher->prev = first->prev;
-                first->prev = bwatcher;
-                bwatcher->next = first;
-            }
+            event_queue.allocate(bwatcher->heap_handle, bwatcher);
+        }
+        
+        void queueWatcher(BaseWatcher *bwatcher) noexcept
+        {
+            event_queue.insert(bwatcher->heap_handle);
         }
         
         bool isQueued(BaseWatcher *bwatcher)
         {
-            return bwatcher->prev != nullptr;
+            return event_queue.is_queued(bwatcher->heap_handle);
         }
 
         void dequeueWatcher(BaseWatcher *bwatcher)
         {
-            if (bwatcher->prev == bwatcher) {
-                // Only item in queue
-                first = nullptr;
-            }
-            else {
-                if (first == bwatcher) first = first->next;
-                bwatcher->prev->next = bwatcher->next;
-                bwatcher->next->prev = bwatcher->prev;
-            }
-            
-            bwatcher->prev = nullptr;
-            bwatcher->next = nullptr;
+            event_queue.remove(bwatcher->heap_handle);
+        }
+        
+        // Remove watcher from the queueing system
+        void releaseWatcher(BaseWatcher *bwatcher)
+        {
+            event_queue.deallocate(bwatcher->heap_handle);
         }
         
         protected:
@@ -494,10 +483,13 @@ namespace dprivate {
         // Pull a single event from the queue
         BaseWatcher * pullEvent()
         {
-            BaseWatcher * r = first;
-            if (r != nullptr) {
-                dequeueWatcher(r);
+            if (event_queue.empty()) {
+                return nullptr;
             }
+            
+            auto rhndl = event_queue.get_root();
+            BaseWatcher *r = event_queue.node_data(rhndl);
+            event_queue.pull_root();
             return r;
         }
         
@@ -645,6 +637,7 @@ template <typename T_Mutex> class EventLoop
     
     void registerSignal(BaseSignalWatcher *callBack, int signo)
     {
+        loop_mech.prepare_watcher(callBack);
         loop_mech.addSignalWatch(signo, callBack);
     }
     
@@ -663,11 +656,15 @@ template <typename T_Mutex> class EventLoop
 
     void registerFd(BaseFdWatcher *callback, int fd, int eventmask, bool enabled)
     {
+        loop_mech.prepare_watcher(callback);
         loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT, enabled);
     }
     
     void registerFd(BaseBidiFdWatcher *callback, int fd, int eventmask)
     {
+        // TODO if 2nd prepare_watcher fails we should undo the first
+        loop_mech.prepare_watcher(callback);
+        loop_mech.prepare_watcher(&callback->outWatcher);
         if (LoopTraits::has_separate_rw_fd_watches) {
             loop_mech.addBidiFdWatch(fd, callback, eventmask | ONE_SHOT);
         }
@@ -729,16 +726,19 @@ template <typename T_Mutex> class EventLoop
     
     void reserveChildWatch(BaseChildWatcher *callBack)
     {
+        loop_mech.prepare_watcher(callBack);
         loop_mech.reserveChildWatch();
     }
     
     void unreserve(BaseChildWatcher *callBack)
     {
+        // TODO ??? remove from heap mgmt ie undo prepareWatcher
         loop_mech.unreserveChildWatch();
     }
     
     void registerChild(BaseChildWatcher *callBack, pid_t child)
     {
+        loop_mech.prepare_watcher(callBack);
         loop_mech.addChildWatch(child, callBack);
     }
     
@@ -767,6 +767,8 @@ template <typename T_Mutex> class EventLoop
     
     void registerTimer(BaseTimerWatcher *callBack)
     {
+        // TODO exception safety: if second line fails first should be undone
+        loop_mech.prepare_watcher(callBack);
         int handle = loop_mech.addTimer(callBack);
         callBack->timer_handle = handle;
     }
@@ -781,6 +783,19 @@ template <typename T_Mutex> class EventLoop
     {
         struct timespec interval {0, 0};
         loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true);
+    }
+    
+    void deregister(BaseTimerWatcher *callback)
+    {
+        loop_mech.removeTimer(callback->timer_handle);
+        
+        waitqueue_node<T_Mutex> qnode;
+        getAttnLock(qnode);
+        
+        EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        ed.issueDelete(callback);
+        
+        releaseLock(qnode);
     }
     
     void dequeueWatcher(BaseWatcher *watcher) noexcept
@@ -1503,6 +1518,11 @@ class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     void armTimerRel(EventLoop &eloop, struct timespec &timeout) noexcept
     {
         eloop.setTimerRel(this, timeout);
+    }
+    
+    void deregister(EventLoop &eloop) noexcept
+    {
+        eloop.deregister(this);
     }
 };
 

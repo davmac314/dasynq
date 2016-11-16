@@ -1,3 +1,6 @@
+#ifndef DASYNC_BINARYHEAP_H_INCLUDED
+#define DASYNC_BINARYHEAP_H_INCLUDED
+
 #include <vector>
 #include <type_traits>
 #include <functional>
@@ -266,3 +269,5 @@ class BinaryHeap
 };
 
 }
+
+#endif
