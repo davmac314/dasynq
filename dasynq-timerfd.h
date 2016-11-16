@@ -173,6 +173,7 @@ template <class Base> class TimerFdEvents : public Base
         if (timer_queue.is_queued(timer_id)) {
             timer_queue.remove(timer_id);
         }
+        timer_queue.deallocate(timer_id);
     }
     
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
