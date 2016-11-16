@@ -91,7 +91,7 @@ template <class Base> class ITimerEvents : public Base
     using SigInfo = typename Base::SigInfo;
 
     template <typename T>
-    void receiveSignal(T & loop_mech, SigInfo &siginfo, void *userdata)
+    bool receiveSignal(T & loop_mech, SigInfo &siginfo, void *userdata)
     {
         if (siginfo.get_signo() == SIGALRM) {
             struct timespec curtime;
