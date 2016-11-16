@@ -280,13 +280,13 @@ namespace dprivate {
     template <> class waitqueue_node<NullMutex>
     {
         // Specialised waitqueue_node for NullMutex.
-        // TODO can this be reduced to 0 data members?
         friend class waitqueue<NullMutex>;
-        waitqueue_node * next = nullptr;
         
         public:
         void wait(std::unique_lock<NullMutex> &ul) { }
         void signal() { }
+        
+        EMPTY_BODY;
     };
 
     template <typename T_Mutex> class waitqueue_node
@@ -307,6 +307,34 @@ namespace dprivate {
         }
     };
 
+    template <> class waitqueue<NullMutex>
+    {
+        public:
+        waitqueue_node<NullMutex> * unqueue()
+        {
+            return nullptr;
+        }
+        
+        waitqueue_node<NullMutex> * getHead()
+        {
+            return nullptr;
+        }
+        
+        bool checkHead(waitqueue_node<NullMutex> &node)
+        {
+            return true;
+        }
+        
+        bool isEmpty()
+        {
+            return true;
+        }
+        
+        void queue(waitqueue_node<NullMutex> *node)
+        {
+        }
+    };
+
     template <typename T_Mutex> class waitqueue
     {
         waitqueue_node<T_Mutex> * tail = nullptr;
@@ -324,6 +352,16 @@ namespace dprivate {
             return head;
         }
         
+        bool checkHead(waitqueue_node<T_Mutex> &node)
+        {
+            return head == &node;
+        }
+        
+        bool isEmpty()
+        {
+            return head == nullptr;
+        }
+        
         void queue(waitqueue_node<T_Mutex> *node)
         {
             if (tail) {
@@ -334,7 +372,7 @@ namespace dprivate {
             }
         }
     };
-
+    
     // This class serves as the base class (mixin) for the AEN mechanism class.
     //
     // The EventDispatch class maintains the queued event data structures. It inserts watchers
@@ -758,9 +796,9 @@ template <typename T_Mutex> class EventLoop
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
         attn_waitqueue.queue(&qnode);        
-        if (attn_waitqueue.getHead() != &qnode) {
+        if (! attn_waitqueue.checkHead(qnode)) {
             loop_mech.interruptWait();
-            while (attn_waitqueue.getHead() != &qnode) {
+            while (! attn_waitqueue.checkHead(qnode)) {
                 qnode.wait(ulock);
             }
         }
@@ -771,7 +809,7 @@ template <typename T_Mutex> class EventLoop
     void getPollwaitLock(waitqueue_node<T_Mutex> &qnode)
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
-        if (attn_waitqueue.getHead() == nullptr) {
+        if (attn_waitqueue.isEmpty()) {
             // Queue is completely empty:
             attn_waitqueue.queue(&qnode);
         }
@@ -779,7 +817,7 @@ template <typename T_Mutex> class EventLoop
             wait_waitqueue.queue(&qnode);
         }
         
-        while (attn_waitqueue.getHead() != &qnode) {
+        while (! attn_waitqueue.checkHead(qnode)) {
             qnode.wait(ulock);
         }    
     }
