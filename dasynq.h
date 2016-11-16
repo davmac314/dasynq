@@ -390,7 +390,8 @@ namespace dprivate {
         protected:
         T_Mutex lock;
         
-        void receiveSignal(typename Traits::SigInfo & siginfo, void * userdata)
+        template <typename T>
+        void receiveSignal(T &loop_mech, typename Traits::SigInfo & siginfo, void * userdata)
         {
             BaseSignalWatcher * bwatcher = static_cast<BaseSignalWatcher *>(userdata);
             bwatcher->siginfo = siginfo;

@@ -132,7 +132,7 @@ template <class Base> class KqueueLoop : public Base
                 timeout.tv_sec = 0;
                 timeout.tv_nsec = 0;
                 if (sigtimedwait(&sset, &siginfo.info, &timeout) > 0) {
-                    Base::receiveSignal(siginfo, (void *)events[i].udata);
+                    Base::receiveSignal(*this, siginfo, (void *)events[i].udata);
                 }
                 
                 if (events[i].ident != SIGCHLD) {
@@ -348,7 +348,7 @@ template <class Base> class KqueueLoop : public Base
                     //      rather than disabling each individually
                     setFilterEnabled(EVFILT_SIGNAL, rsigno, false);
                 }
-                Base::receiveSignal(siginfo, sigdataMap[rsigno]);
+                Base::receiveSignal(*this, siginfo, sigdataMap[rsigno]);
                 rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             }
         }

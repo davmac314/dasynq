@@ -94,11 +94,12 @@ template <class Base> class ChildProcEvents : public Base
 {
     private:
     pid_map child_waiters;
-
-    using SigInfo = typename Base::SigInfo;
     
     protected:
-    void receiveSignal(SigInfo &siginfo, void *userdata)
+    using SigInfo = typename Base::SigInfo;
+    
+    template <typename T>
+    void receiveSignal(T & loop_mech, SigInfo &siginfo, void *userdata)
     {
         if (siginfo.get_signo() == SIGCHLD) {
             int status;
@@ -111,7 +112,7 @@ template <class Base> class ChildProcEvents : public Base
             }
         }
         else {
-            Base::receiveSignal(siginfo, userdata);
+            Base::receiveSignal(loop_mech, siginfo, userdata);
         }
     }
     
