@@ -89,7 +89,7 @@ template <class Base> class TimerFdEvents : public Base
             clock_gettime(CLOCK_MONOTONIC, &curtime); // in theory, can't fail on Linux
             
             // Peek timer queue; calculate difference between current time and timeout
-            struct timespec * timeout = &timer_queue.get_root_priority();
+            struct timespec * timeout = &timer_queue.get_root_priority();            
             while (timeout->tv_sec < curtime.tv_sec || (timeout->tv_sec == curtime.tv_sec &&
                     timeout->tv_nsec <= curtime.tv_nsec)) {
                 // Increment expiry count
@@ -105,7 +105,7 @@ template <class Base> class TimerFdEvents : public Base
                     if (data.enabled) {
                         int expiry_count = data.expiry_count;
                         data.expiry_count = 0;
-                        Base::receiveTimerExpiry(thandle, timer_queue.node_data(thandle).userdata, expiry_count);
+                        Base::receiveTimerExpiry(thandle, data.userdata, expiry_count);
                     }
                     if (timer_queue.empty()) {
                         break;
@@ -221,7 +221,7 @@ template <class Base> class TimerFdEvents : public Base
     
     void enableTimer_nolock(int timer_id, bool enable) noexcept
     {
-        timer_queue.get_data(timer_id).enabled = enable;
+        timer_queue.node_data(timer_id).enabled = enable;
     }
 };
 

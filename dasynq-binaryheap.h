@@ -225,7 +225,7 @@ class BinaryHeap
     
     bool empty()
     {
-        return get_root() == -1;
+        return hvec.empty();
     }
     
     bool is_queued(handle_t index)
