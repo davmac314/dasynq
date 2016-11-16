@@ -13,16 +13,18 @@
 
 #if defined(HAVE_KQUEUE)
 #include "dasynq-kqueue.h"
+#include "dasynq-itimer.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = KqueueLoop<ChildProcEvents<T>>;
+    template <typename T> using Loop = KqueueLoop<ITimerEvennts<ChildProcEvents<T>>>;
     using LoopTraits = KqueueTraits;
 }
 #elif defined(HAVE_EPOLL)
 #include "dasynq-epoll.h"
+#include "dasynq-timerfd.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = EpollLoop<ChildProcEvents<T>>;
+    template <typename T> using Loop = EpollLoop<TimerFdEvents<ChildProcEvents<T>>>;
     using LoopTraits = EpollTraits;
 }
 #endif
