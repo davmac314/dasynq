@@ -170,7 +170,9 @@ template <class Base> class TimerFdEvents : public Base
     
     void removeTimer_nolock(int timer_id) noexcept
     {
-        timer_queue.remove(timer_id);
+        if (timer_queue.is_queued(timer_id)) {
+            timer_queue.remove(timer_id);
+        }
     }
     
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
