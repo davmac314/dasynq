@@ -97,14 +97,12 @@ template <class Base> class EpollLoop : public Base
                 while (true) {
                     int r = read(sigfd, &siginfo.info, sizeof(siginfo.info));
                     if (r == -1) break;
-                    if (siginfo.get_signo() != SIGCHLD) {
-                        // TODO remove the special exception for SIGCHLD?
-                        sigdelset(&sigmask, siginfo.get_signo());
-                    }
                     auto iter = sigdataMap.find(siginfo.get_signo());
                     if (iter != sigdataMap.end()) {
                         void *userdata = (*iter).second;
-                        Base::receiveSignal(*this, siginfo, userdata);
+                        if (Base::receiveSignal(*this, siginfo, userdata)) {
+                            sigdelset(&sigmask, siginfo.get_signo());
+                        }
                     }
                 }
                 signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);

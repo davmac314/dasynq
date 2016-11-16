@@ -16,7 +16,7 @@
 #include "dasynq-itimer.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = KqueueLoop<ITimerEvennts<ChildProcEvents<T>>>;
+    template <typename T> using Loop = KqueueLoop<ITimerEvents<ChildProcEvents<T>>>;
     using LoopTraits = KqueueTraits;
 }
 #elif defined(HAVE_EPOLL)
@@ -392,12 +392,14 @@ namespace dprivate {
         protected:
         T_Mutex lock;
         
+        // Receive a signal; return true to disable signal watch or false to leave enabled
         template <typename T>
-        void receiveSignal(T &loop_mech, typename Traits::SigInfo & siginfo, void * userdata)
+        bool receiveSignal(T &loop_mech, typename Traits::SigInfo & siginfo, void * userdata)
         {
             BaseSignalWatcher * bwatcher = static_cast<BaseSignalWatcher *>(userdata);
             bwatcher->siginfo = siginfo;
             queueWatcher(bwatcher);
+            return true;
         }
         
         template <typename T>

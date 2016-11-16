@@ -132,16 +132,13 @@ template <class Base> class KqueueLoop : public Base
                 timeout.tv_sec = 0;
                 timeout.tv_nsec = 0;
                 if (sigtimedwait(&sset, &siginfo.info, &timeout) > 0) {
-                    Base::receiveSignal(*this, siginfo, (void *)events[i].udata);
-                }
-                
-                if (events[i].ident != SIGCHLD) {
-                    sigdelset(&sigmask, events[i].ident);
-                    events[i].flags = EV_DISABLE;
-                }
-                else {
-                    // TODO can we remove this SIGCHLD hack?
-                    events[i].flags = EV_ENABLE;
+                    if (Base::receiveSignal(*this, siginfo, (void *)events[i].udata)) {
+                        sigdelset(&sigmask, events[i].ident);
+                        events[i].flags = EV_DISABLE;
+                    }
+                    else {
+                        events[i].flags = EV_ENABLE;
+                    }
                 }
             }
             else if (events[i].filter == EVFILT_READ || events[i].filter == EVFILT_WRITE) {

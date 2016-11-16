@@ -150,9 +150,10 @@ template <class Base> class ITimerEvents : public Base
             // arm timerfd with timeout from head of queue
             set_timer_from_queue();
             loop_mech.rearmSignalWatch_nolock(SIGALRM);
+            return false; // don't disable signal watch
         }
         else {
-            Base::receiveSignal(loop_mech, siginfo, userdata);
+            return Base::receiveSignal(loop_mech, siginfo, userdata);
         }
     }
         
