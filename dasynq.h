@@ -407,7 +407,9 @@ namespace dprivate {
 
         void dequeueWatcher(BaseWatcher *bwatcher)
         {
-            event_queue.remove(bwatcher->heap_handle);
+            if (event_queue.is_queued(bwatcher->heap_handle)) {
+                event_queue.remove(bwatcher->heap_handle);
+            }
         }
         
         // Remove watcher from the queueing system
@@ -509,9 +511,7 @@ namespace dprivate {
             }
             else {
                 // Actually do the delete.
-                if (isQueued(watcher)) {
-                    dequeueWatcher(watcher);
-                }
+                dequeueWatcher(watcher);
                 
                 lock.unlock();
                 watcher->watchRemoved();
@@ -526,10 +526,7 @@ namespace dprivate {
                 watcher->deleteme = true;
             }
             else {
-                if (isQueued(watcher)) {
-                    dequeueWatcher(watcher);
-                }
-                
+                dequeueWatcher(watcher);
                 watcher->read_removed = true;
             }
             
@@ -538,10 +535,7 @@ namespace dprivate {
                 secondary->deleteme = true;
             }
             else {
-                if (isQueued(secondary)) {
-                    dequeueWatcher(secondary);
-                }
-                
+                dequeueWatcher(secondary);
                 watcher->write_removed = true;
             }
             
@@ -800,9 +794,7 @@ template <typename T_Mutex> class EventLoop
     
     void dequeueWatcher(BaseWatcher *watcher) noexcept
     {
-        if (loop_mech.isQueued(watcher)) {
-            loop_mech.dequeueWatcher(watcher);
-        }
+        loop_mech.dequeueWatcher(watcher);
     }
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
