@@ -147,7 +147,7 @@ class BinaryHeap
     void remove_h(int hidx)
     {
         bvec[hvec[hidx].data_index].heap_index = -1;
-        if (hvec.size() > 1) {
+        if (hvec.size() != hidx + 1) {
             // replace the first element with the last:
             bvec[hvec.back().data_index].heap_index = hidx;
             hvec[hidx] = hvec.back();
