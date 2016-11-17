@@ -1,15 +1,18 @@
-#include <vector>
+#ifndef DASYNQ_PAIRINGHEAP_H
+#define DASYNQ_PAIRINGHEAP_H
 
-#include <iostream> // DAV
+#include <vector>
+#include <functional>
 
 namespace dasynq {
 
-template <typename T, typename Compare>
+template <typename T, typename P, typename Compare = std::less<P>>
 class PairingHeap
 {
     struct HeapNode
     {
         T data;
+        P prio;
         int next_sibling;
         int prev_sibling; // (or parent)
         int first_child;
@@ -59,7 +62,7 @@ class PairingHeap
         }
         else {
             Compare is_less;
-            if (is_less(bvec[root_node].hn.data, bvec[index].hn.data)) {
+            if (is_less(bvec[root_node].hn.prio, bvec[index].hn.prio)) {
                 // inserted node becomes new subtree
                 int root_fc = bvec[root_node].hn.first_child;
                 bvec[index].hn.next_sibling = root_fc;
@@ -89,7 +92,7 @@ class PairingHeap
     int merge_pair(int i1, int i2)
     {
         Compare is_less;
-        if (is_less(bvec[i2].hn.data, bvec[i1].hn.data)) {
+        if (is_less(bvec[i2].hn.prio, bvec[i1].hn.prio)) {
             std::swap(i1, i2);
             int i2_prevsibling = bvec[i2].hn.prev_sibling; // may be parent ptr
             if (i2_prevsibling != -1) {
@@ -184,17 +187,16 @@ class PairingHeap
 
     public:
     
-    T & get_data(int index)
+    T & node_data(int index)
     {
         return bvec[index].hn.data;
     }
     
     // Allocate a slot, but do not incorporate into the heap:
-    template <typename ...U> int allocate(U... u)
+    template <typename ...U> void allocate(int &hndl, U... u)
     {
-        int r = alloc_slot();
-        new (& bvec[r].hn) HeapNode(u...);
-        return r;
+        hndl = alloc_slot();
+        new (& bvec[hndl].hn) HeapNode(u...);
     }
     
     void deallocate(int index)
@@ -208,10 +210,17 @@ class PairingHeap
             first_free = index;
         }
     }
+    
+    bool set_priority(int index, P pval)
+    {
+        remove(index);
+        return insert(index, pval);
+    }
 
     // Insert an allocated slot into the heap
-    bool insert(int index)
+    bool insert(int index, P pval = P())
     {
+        bvec[index].hn.prio = pval;
         return merge(index);
     }
     
@@ -264,6 +273,11 @@ class PairingHeap
         return root_node;
     }
     
+    P & get_root_priority()
+    {
+        return bvec[root_node].hn.prio;
+    }
+    
     int pull_root()
     {
         int nr = merge_pairs(bvec[root_node].hn.first_child);
@@ -272,6 +286,17 @@ class PairingHeap
         return nr;
     }
     
+    bool is_queued(int hndl)
+    {
+        return bvec[hndl].hn.prev_sibling != -1 || root_node == hndl;
+    }
+    
+    bool empty()
+    {
+        return root_node == -1;
+    }
+    
+    /*
     void dumpnode(int n, std::vector<int> &q)
     {
         using namespace std;
@@ -299,6 +324,9 @@ class PairingHeap
             }
         }
     }
+    */
 };
 
 }
+
+#endif

@@ -1,10 +1,40 @@
-#include <iostream> // DAV
+#ifndef DASYNC_BINARYHEAP_H_INCLUDED
+#define DASYNC_BINARYHEAP_H_INCLUDED
+
+#include <vector>
+#include <type_traits>
+#include <functional>
 
 namespace dasynq {
 
-template <typename T, typename Compare>
+/**
+ * Priority queue implementation based on a binary heap. In testing this turned out to be faster than
+ * using more advanced data structures with theoretically better bounds for operations.
+ *
+ * The queue works by maintaing two vectors: one is a backing vector which stores node data, the other
+ * is the heap vector which organises the nodes by priority.
+ *
+ * T : node data type
+ * P : priority type (eg int)
+ * Compare : functional object type to compare priorities
+ */
+template <typename T, typename P, typename Compare = std::less<P>>
 class BinaryHeap
 {
+    // The backing vector has a union element type, containing either a data item (P) or a
+    // free node. To simplify implementation we require that P trivally copyable, otherwise
+    // we would need to add a boolean to track whether the node is free/full. We static_assert
+    // now to avoid a very confusing compilation bug later.
+    // (TODO: partial specialisation to support non-trivially-copyables; we actually don't need
+    //  to add a boolean, can use heap_index == -2 or somesuch).
+    static_assert(std::is_trivially_copy_constructible<T>::value, "P must be trivially copy constructible");
+    
+    public:
+    // Handle to an element on the heap in the node buffer.
+    using handle_t = int;
+    
+    private:
+
     union DataNodeU
     {
         struct {
@@ -18,17 +48,19 @@ class BinaryHeap
         {
             heap_index = -1;
         }
+        
+        ~DataNodeU() { }
     };
 
     class HeapNode
     {
         public:
-        T data;
+        P data;
         int data_index;
         
-        HeapNode(int d_index, const T &odata) : data(odata), data_index(d_index)
+        HeapNode(int d_index, const P &odata) : data(odata), data_index(d_index)
         {
-        
+            // nothing to do
         }
     };
     
@@ -37,7 +69,7 @@ class BinaryHeap
     
     int first_free = -1;
     int root_node = -1;
-    int num_nodes = 0;
+    typename std::vector<HeapNode>::size_type num_nodes = 0;
     
     bool bubble_down()
     {
@@ -90,16 +122,15 @@ class BinaryHeap
             pos = selchild;
         }
     }
-    
 
-    public:
-    
-    int alloc_slot()
+    template <typename ...U> handle_t alloc_slot(U... u)
     {
-        num_nodes++;
-        if (hvec.capacity() < num_nodes) {
+        // Make sure the heap vector has suitable capacity
+        if (hvec.capacity() <= num_nodes) {
             hvec.reserve(num_nodes * 2);
         }
+        
+        num_nodes++;
         
         if (first_free != -1) {
             int r = first_free;
@@ -108,78 +139,15 @@ class BinaryHeap
         }
         else {
             int r = bvec.size();
-            bvec.emplace_back();
+            bvec.emplace_back(u...);
             return r;
         }
     }
-    
-    T & get_data(int index)
-    {
-        return bvec[index].hn.data;
-    }
-    
-    // Allocate a slot, but do not incorporate into the heap:
-    template <typename ...U> int allocate(U... u)
-    {
-        int r = alloc_slot();
-        new (& bvec[r].hd) HeapNode(r, u...);
-        return r;
-    }
-    
-    void deallocate(int index)
-    {
-        bvec[index].hd.T::~T();
-        if (index == bvec.size() - 1) {
-            bvec.pop_back();
-        }
-        else {
-            bvec[index].next_free = first_free;
-            first_free = index;
-        }
-        num_nodes--;
-    }
 
-    bool insert(int index)
-    {
-        bvec[index].heap_index = hvec.size();
-        hvec.emplace_back(index, bvec[index].hd);
-        return bubble_down();
-    }
-    
-    int get_root()
-    {
-        return hvec[0].data_index;
-    }
-    
-    void pull_root()
-    {
-        remove_h(0);
-        /*
-        if (hvec.size() > 1) {
-            // replace the first element with the last:
-            bvec[hvec[0].data_index].heap_index = -1;
-            bvec[hvec.back().data_index].heap_index = 0;
-            hvec[0] = hvec.back();
-            hvec.pop_back();
-            
-            // Now bubble up:
-            bubble_up();
-        }
-        else {
-            hvec.pop_back();
-        }
-        */
-    }
-    
-    void remove(int index)
-    {
-        remove_h(bvec[index].heap_index);
-    }
-    
     void remove_h(int hidx)
     {
         bvec[hvec[hidx].data_index].heap_index = -1;
-        if (hvec.size() > 1) {
+        if (hvec.size() != hidx + 1) {
             // replace the first element with the last:
             bvec[hvec.back().data_index].heap_index = hidx;
             hvec[hidx] = hvec.back();
@@ -193,6 +161,101 @@ class BinaryHeap
         }
     }
     
+    public:
+    
+    T & node_data(handle_t index) noexcept
+    {
+        return bvec[index].hd;
+    }
+    
+    // Allocate a slot, but do not incorporate into the heap:
+    //  u... : parameters for data constructor T::T(...)
+    template <typename ...U> void allocate(handle_t & hnd, U... u)
+    {
+        int r = alloc_slot(u...);
+        hnd = r;
+    }
+    
+    // Deallocate a slot
+    void deallocate(handle_t index)
+    {
+        bvec[index].hd.T::~T();
+        if (index == bvec.size() - 1) {
+            bvec.pop_back();
+            if (bvec.size() * 2 == bvec.capacity()) {
+                bvec.shrink_to_fit();
+            }
+        }
+        else {
+            bvec[index].next_free = first_free;
+            first_free = index;
+        }
+        num_nodes--;
+        
+        // TODO we should shrink the capacity of hvec if num_nodes is sufficiently
+        // less than its current capacity, however, there is no way with a standard
+        // vector to shrink capacity to an arbitrary amount. :/
+    }
+
+    bool insert(handle_t index, P pval = P())
+    {
+        bvec[index].heap_index = hvec.size();
+        hvec.emplace_back(index, pval);
+        return bubble_down();
+    }
+    
+    // Get the root node handle. (For interoperability, callers should assume that this may return a
+    // handle_t reference).
+    handle_t get_root()
+    {
+        return hvec[0].data_index;
+    }
+    
+    P &get_root_priority()
+    {
+        return hvec[0].data;
+    }
+    
+    void pull_root()
+    {
+        remove_h(0);
+    }
+    
+    void remove(handle_t index)
+    {
+        remove_h(bvec[index].heap_index);
+    }
+    
+    bool empty()
+    {
+        return hvec.empty();
+    }
+    
+    bool is_queued(handle_t index)
+    {
+        return bvec[index].heap_index != -1;
+    }
+    
+    // Set a node priority. Returns true iff the node becomes the root node (and wasn't before).
+    bool set_priority(handle_t index, P& p)
+    {
+        handle_t heap_index = bvec[index].heap_index;
+        
+        Compare lt;
+        if (lt(hvec[heap_index].data, p)) {
+            // Increase key
+            hvec[heap_index].data = p;
+            bubble_up(heap_index);
+            return false;
+        }
+        else {
+            // Decrease key
+            hvec[heap_index].data = p;
+            return bubble_down(heap_index);
+        }
+    }
+    
+    /*
     void dump()
     {
         using namespace std;
@@ -202,6 +265,9 @@ class BinaryHeap
         }
     
     }
+    */
 };
 
 }
+
+#endif
