@@ -564,7 +564,7 @@ class BTreeQueue
     
     bool is_queued(int hndl) noexcept
     {
-        return bvec[hndl].hn.prev_sibling != -1 || bvec[hndl].hn.parent != nullptr;
+        return bvec[hndl].hn.prev_sibling != -1;
     }
     
     bool empty() noexcept
