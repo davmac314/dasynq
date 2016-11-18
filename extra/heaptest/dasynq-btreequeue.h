@@ -81,7 +81,8 @@ class BTreeQueue
     int num_alloced = 0;
     int num_septs = 0;
     
-    SeptNode * root_sept = nullptr;
+    SeptNode * root_sept = nullptr; // root of the B=Tree
+    SeptNode * left_sept = nullptr; // leftmost child (cache)
     
     int alloc_slot()
     {
@@ -143,7 +144,10 @@ class BTreeQueue
     // Insert an allocated slot into the heap
     bool insert(int index, P pval = P()) noexcept
     {
-        if (root_sept == nullptr) root_sept = alloc_sept();
+        if (root_sept == nullptr) {
+            root_sept = alloc_sept();
+            left_sept = root_sept;
+        }
         
         SeptNode * srch_sept = root_sept;
         
@@ -371,6 +375,7 @@ class BTreeQueue
             // It's the root node, so don't worry about it, unless empty
             if (sept->hnidx[0] == -1) {
                 root_sept = nullptr;
+                left_sept = nullptr;
                 delete sept;
             }
             return;
@@ -537,24 +542,13 @@ class BTreeQueue
     
     int get_root() noexcept
     {
-        if (root_sept == nullptr) return -1;
-        
-        SeptNode * srch_sept = root_sept;
-        while (! srch_sept->is_leaf()) {
-            srch_sept = srch_sept->children[0];
-        }
-        
-        return srch_sept->hnidx[0];
+        if (left_sept == nullptr) return -1;
+        return left_sept->hnidx[0];
     }
     
     P & get_root_priority() noexcept
     {
-        SeptNode * srch_sept = root_sept;
-        while (! srch_sept->is_leaf()) {
-            srch_sept = srch_sept->children[0];
-        }
-        
-        return srch_sept->prio[0];
+        return left_sept->prio[0];
     }
     
     void pull_root() noexcept
