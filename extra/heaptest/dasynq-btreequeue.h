@@ -27,7 +27,7 @@ class BTreeQueue
             children[N] = nullptr;
         }
         
-        int num_vals()
+        int num_vals() noexcept
         {
             // We expect to be >50% full, so count backwards:
             for (int i = N - 1; i >= 0; i--) {
@@ -38,7 +38,7 @@ class BTreeQueue
             return 0;
         }
         
-        bool is_leaf()
+        bool is_leaf() noexcept
         {
             return children[0] == nullptr;
         }
@@ -109,7 +109,7 @@ class BTreeQueue
 
     public:
     
-    T & node_data(int index)
+    T & node_data(int index) noexcept
     {
         return bvec[index].hn.data;
     }
@@ -121,7 +121,7 @@ class BTreeQueue
         new (& bvec[hndl].hn) HeapNode(u...);
     }
     
-    void deallocate(int index)
+    void deallocate(int index) noexcept
     {
         bvec[index].hn.HeapNode::~HeapNode();
         if (index == bvec.size() - 1) {
@@ -141,19 +141,25 @@ class BTreeQueue
     }
 
     // Insert an allocated slot into the heap
-    bool insert(int index, P pval = P())
+    bool insert(int index, P pval = P()) noexcept
     {
         if (root_sept == nullptr) root_sept = alloc_sept();
         
         SeptNode * srch_sept = root_sept;
         
         bool leftmost = true;
-        
+
         while (! srch_sept->is_leaf()) {
-            int children = srch_sept->num_vals();
-            int i;
-            for (i = 0; i < children; i++) {
-                if (srch_sept->prio[i] == pval) {
+            // int children = srch_sept->num_vals();
+            int min = 0;
+            int max = N - 1;
+            while (min <= max) {
+                int i = (min + max) / 2;
+
+                if (srch_sept->hnidx[i] == -1 || pval < srch_sept->prio[i]) {
+                    max = i - 1;
+                }
+                else if (srch_sept->prio[i] == pval) {
                     // insert into linked list
                     int hnidx = srch_sept->hnidx[i];
                     bvec[index].hn.prev_sibling = bvec[hnidx].hn.prev_sibling;
@@ -163,36 +169,45 @@ class BTreeQueue
                     bvec[index].hn.parent = nullptr;
                     return false;
                 }
-                else if (srch_sept->prio[i] > pval) {
-                    // go up to the left
-                    break;
-                }
                 else {
-                    leftmost = false;
+                    min = i + 1;
                 }
             }
             
+            if (min != 0) {
+                leftmost = false;
+            }
+            
             // go up to the right:
-            srch_sept = srch_sept->children[i];
-            if (srch_sept == nullptr) abort(); // DAV
+            srch_sept = srch_sept->children[max + 1];
         }
-        
+                
         // We got to a leaf: does it have space?
         // First check if we can add to a linked list
         int children = srch_sept->num_vals();
-        for (int i = 0; i < children; i++) {
-            if (srch_sept->prio[i] == pval) {
-                // insert into linked list
-                int hnidx = srch_sept->hnidx[i];
-                bvec[index].hn.prev_sibling = bvec[hnidx].hn.prev_sibling;
-                bvec[bvec[index].hn.prev_sibling].hn.next_sibling = index;
-                bvec[index].hn.next_sibling = hnidx;
-                bvec[hnidx].hn.prev_sibling = index;
-                bvec[index].hn.parent = nullptr;
-                return false;
-            }
-            else if (pval < srch_sept->prio[i]) {
-                break;
+        
+        {
+            int min = 0;
+            int max = children - 1;
+            while (min <= max) {
+                int i = (min + max) / 2;
+
+                if (srch_sept->hnidx[i] == -1 || pval < srch_sept->prio[i]) {
+                    max = i - 1;
+                }
+                else if (srch_sept->prio[i] == pval) {
+                    // insert into linked list
+                    int hnidx = srch_sept->hnidx[i];
+                    bvec[index].hn.prev_sibling = bvec[hnidx].hn.prev_sibling;
+                    bvec[bvec[index].hn.prev_sibling].hn.next_sibling = index;
+                    bvec[index].hn.next_sibling = hnidx;
+                    bvec[hnidx].hn.prev_sibling = index;
+                    bvec[index].hn.parent = nullptr;
+                    return false;
+                }
+                else {
+                    min = i + 1;
+                }
             }
         }
         
@@ -308,7 +323,7 @@ class BTreeQueue
     
     // Merge rsibling, and one value from the parent, into lsibling.
     // Index is the index of the parent value.
-    void merge(SeptNode *lsibling, SeptNode *rsibling, int index)
+    void merge(SeptNode *lsibling, SeptNode *rsibling, int index) noexcept
     {
         int lchildren = lsibling->num_vals();
         lsibling->hnidx[lchildren] = lsibling->parent->hnidx[index];
@@ -348,7 +363,7 @@ class BTreeQueue
     
     // borrow values from, or merge with, a sibling node so that the node
     // is suitably (~>=50%) populated.
-    void repop_node(SeptNode *sept, int children)
+    void repop_node(SeptNode *sept, int children) noexcept
     {
         start:
         SeptNode *parent = sept->parent;
@@ -447,7 +462,7 @@ class BTreeQueue
     }
     
     // Remove a slot from the heap (but don't deallocate it)
-    void remove(int index)
+    void remove(int index) noexcept
     {
         if (bvec[index].hn.prev_sibling != index) {
             // we're lucky: it's part of a linked list
@@ -520,7 +535,7 @@ class BTreeQueue
         }
     }
     
-    int get_root()
+    int get_root() noexcept
     {
         if (root_sept == nullptr) return -1;
         
@@ -532,7 +547,7 @@ class BTreeQueue
         return srch_sept->hnidx[0];
     }
     
-    P & get_root_priority()
+    P & get_root_priority() noexcept
     {
         SeptNode * srch_sept = root_sept;
         while (! srch_sept->is_leaf()) {
@@ -542,19 +557,17 @@ class BTreeQueue
         return srch_sept->prio[0];
     }
     
-    int pull_root()
+    void pull_root() noexcept
     {
-        // TODO improve?
         remove(get_root());
-        return get_root();
     }
     
-    bool is_queued(int hndl)
+    bool is_queued(int hndl) noexcept
     {
         return bvec[hndl].hn.prev_sibling != -1 || bvec[hndl].hn.parent != nullptr;
     }
     
-    bool empty()
+    bool empty() noexcept
     {
         return root_sept == nullptr;
     }
