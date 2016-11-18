@@ -256,8 +256,6 @@ class BTreeQueue
                 bvec[index].hn.parent = srch_sept;
                 srch_sept->children[i] = left_down;
                 srch_sept->children[i+1] = right_down;
-                if (left_down) left_down->parent = srch_sept;
-                if (right_down) right_down->parent = srch_sept;
                 index = o_hidx;
                 pval = o_prio;
             }
