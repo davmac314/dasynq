@@ -42,6 +42,32 @@ class BTreeQueue
         {
             return children[0] == nullptr;
         }
+        
+        void shift_elems_left(int pos, int newpos, int num)
+        {
+            int diff = pos - newpos;
+            int end = pos + num;
+            
+            for (int i = pos; i < end; i++) {
+                prio[i - diff] = prio[i];
+                hnidx[i - diff] = hnidx[i];
+                children[i - diff] = children[i];
+            }
+            children[end - diff] = children[end];
+        }
+        
+        void shift_elems_right(int pos, int newpos, int num)
+        {
+            int diff = newpos - pos;
+            int end = pos + num;
+            
+            children[end + diff] = children[end];
+            for (int i = (end - 1); i >= pos; i--) {
+                prio[i + diff] = prio[i];
+                hnidx[i + diff] = hnidx[i];
+                children[i + diff] = children[i];
+            }
+        }
     };
     
     std::vector<SeptNode *> sn_reserve;
@@ -405,14 +431,8 @@ class BTreeQueue
                 parent->prio[0] = rsibling->prio[0];
                 bvec[parent->hnidx[0]].hn.parent = parent;
                 
-                rsibling->children[0] = rsibling->children[1];
-                for (int i = 0; i < (N-1); i++) {
-                    rsibling->children[i + 1] = rsibling->children[i + 2];
-                    rsibling->hnidx[i] = rsibling->hnidx[i + 1];
-                    rsibling->prio[i] = rsibling->prio[i + 1];
-                }
+                rsibling->shift_elems_left(1, 0, N-1);
                 rsibling->hnidx[N-1] = -1;
-
                 return;
             }
         }
@@ -439,13 +459,7 @@ class BTreeQueue
                 }
             }
             else {
-                // make space for the new value
-                for (int i = children; i > 0; i--) {
-                    sept->hnidx[i] = sept->hnidx[i - 1];
-                    sept->prio[i] = sept->prio[i - 1];
-                    sept->children[i + 1] = sept->children[i];
-                }
-                sept->children[1] = sept->children[0];
+                sept->shift_elems_right(0, 1, children);
                 
                 sept->hnidx[0] = parent->hnidx[i - 1];
                 sept->prio[0] = parent->prio[i - 1];
@@ -456,7 +470,6 @@ class BTreeQueue
                 parent->hnidx[i - 1] = lsibling->hnidx[lchildren - 1];
                 parent->prio[i - 1] = lsibling->prio[lchildren - 1];
                 bvec[parent->hnidx[i - 1]].hn.parent = parent;
-                
                 lsibling->hnidx[lchildren - 1] = -1;
                 
                 return;
@@ -581,7 +594,7 @@ class BTreeQueue
     }
     
     /*
-    void dumpnode(SeptNode * node, std::vector<SeptNode *> &q)
+    void dumpnode(SeptNode * node, std::vector<SeptNode *> &q = {})
     {
         using namespace std;
         cout << "Node @ " << (void *) node << endl;
