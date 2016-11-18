@@ -346,7 +346,7 @@ class BTreeQueue
         srch_sept->children[inspos] = left_down;
         srch_sept->children[inspos+1] = right_down;
         bvec[index].hn.parent = srch_sept;
-        return leftmost && inspos == 0;
+        return leftmost;
     }
     
     // Merge rsibling, and one value from the parent, into lsibling.
