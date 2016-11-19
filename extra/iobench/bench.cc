@@ -97,10 +97,12 @@ static vector<PTimer> evto;
 Rearm Pipeio::fdEvent(NEventLoop &eloop, int fd, int flags)
 {
     int widx = idx + 1;
-    struct timespec ts;
-    ts.tv_sec = 10;
-    ts.tv_nsec = drand48() * 1e9;
-    evto[idx].armTimerRel(eloop, ts);
+    if (timers) {
+        struct timespec ts;
+        ts.tv_sec = 10;
+        ts.tv_nsec = drand48() * 1e9;
+        evto[idx].armTimerRel(eloop, ts);
+    }
 
     unsigned char ch;
     count += read(fd, &ch, sizeof(ch));
@@ -124,13 +126,15 @@ run_once(void)
 
     gettimeofday(&ta, NULL);
     for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2) {
-        evio[i].addWatch(eloop, cp[0], IN_EVENTS);
-        evto[i].addTimer(eloop);
-        
-    	struct timespec tsv;
-    	tsv.tv_sec = 10;
-    	tsv.tv_nsec = drand48() * 1e9;
-    	evto[i].armTimerRel(eloop, tsv);
+        evio[i].addWatch(eloop, cp[0], IN_EVENTS, true, i /* prio */);
+        if (timers) {
+            evto[i].addTimer(eloop);
+            
+            struct timespec tsv;
+            tsv.tv_sec = 10;
+            tsv.tv_nsec = drand48() * 1e9;
+            evto[i].armTimerRel(eloop, tsv);
+        }
     }
     
     fired = 0;
@@ -234,7 +238,9 @@ main (int argc, char **argv)
         // deregister watchers now
         for (int j = 0; j < num_pipes; j++) {
             evio[j].deregister(eloop);
-            evto[j].deregister(eloop);
+            if (timers) {
+                evto[j].deregister(eloop);
+            }
         }
     }
 

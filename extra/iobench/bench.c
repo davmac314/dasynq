@@ -156,8 +156,10 @@ run_once(void)
 		//event_del(&events[i]);
 		event_set(&events[i], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) i);
 		// event_priority_set(&events[i], drand48() * 1000); // DAV
-                tv.tv_sec  = 10.;
-                tv.tv_usec = drand48() * 1e6;
+                if (timers) {
+                    tv.tv_sec  = 10.;
+                    tv.tv_usec = drand48() * 1e6;
+                }
 		event_add(&events[i], timers ? &tv : 0);
             }
 	}
