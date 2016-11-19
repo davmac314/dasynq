@@ -33,6 +33,11 @@ class BinaryHeap
     // Handle to an element on the heap in the node buffer.
     using handle_t = int;
     
+    static void init_handle(handle_t &h)
+    {
+        h = -1;
+    }
+    
     private:
 
     union DataNodeU
@@ -144,7 +149,7 @@ class BinaryHeap
         }
     }
 
-    void remove_h(int hidx)
+    void remove_h(handle_t hidx)
     {
         bvec[hvec[hidx].data_index].heap_index = -1;
         if (hvec.size() != hidx + 1) {

@@ -57,6 +57,11 @@ namespace dasynq {
 
 namespace dasynq {
 
+namespace dprivate {
+    class BaseWatcher;
+}
+
+using PrioQueue = BinaryHeap<dprivate::BaseWatcher *, int>;
 
 /**
  * Values for rearm/disarm return from event handlers
@@ -127,7 +132,7 @@ namespace dprivate {
         int active : 1;    // currently executing handler?
         int deleteme : 1;  // delete when handler finished?
         
-        int heap_handle;
+        PrioQueue::handle_t heap_handle;
         
         public:
         
@@ -136,7 +141,7 @@ namespace dprivate {
         {
             active = false;
             deleteme = false;
-            heap_handle = -1;
+            PrioQueue::init_handle(heap_handle);
         }
         
         BaseWatcher(WatchType wt) noexcept : watchType(wt) { }
@@ -381,7 +386,7 @@ namespace dprivate {
         friend class EventLoop<T_Mutex>;
 
         // queue data structure/pointer
-        BinaryHeap<BaseWatcher *, int> event_queue;
+        PrioQueue event_queue;
         
         using BaseSignalWatcher = dasynq::dprivate::BaseSignalWatcher<T_Mutex>;
         using BaseFdWatcher = dasynq::dprivate::BaseFdWatcher<T_Mutex>;
