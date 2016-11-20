@@ -106,6 +106,7 @@ class BTreeQueue
     
     int num_alloced = 0;
     int num_septs = 0;
+    int next_sept = 1;  // next num_allocd for which we need another SeptNode in reserve.
     
     SeptNode * root_sept = nullptr; // root of the B=Tree
     SeptNode * left_sept = nullptr; // leftmost child (cache)
@@ -114,7 +115,12 @@ class BTreeQueue
     {
         num_alloced++;
         
-        // TODO make sure we have enough sept nodes (num_septs)
+        if (__builtin_expect(num_alloced == next_sept, 0)) {
+            sn_reserve.push_back(new SeptNode());
+            // TODO properly handle allocation failure
+            num_septs++;
+            next_sept += N/2;
+        }
         
         if (first_free != -1) {
             int r = first_free;
@@ -130,8 +136,22 @@ class BTreeQueue
     
     SeptNode * alloc_sept()
     {
-        // TODO fix
-        return new SeptNode();
+        SeptNode * r = sn_reserve.back();
+        sn_reserve.pop_back();
+        new (r) SeptNode();
+        return r;
+    }
+    
+    void release_sept(SeptNode *s)
+    {
+        // delete if we have an overabundance of nodes
+        if (__builtin_expect(num_alloced <= next_sept / 2, 0)) {
+            delete s;
+            num_septs--;
+        }
+        else {
+            sn_reserve.push_back(s);
+        }
     }
 
     public:
@@ -374,7 +394,7 @@ class BTreeQueue
         }
         lsibling->children[lchildren] = rsibling->children[ri];
         if (lsibling->children[lchildren]) lsibling->children[lchildren]->parent = lsibling;
-        delete rsibling;
+        release_sept(rsibling);
         
         // Now delete in the parent:
         for (int i = index; i < (N-1); i++) {
@@ -402,7 +422,7 @@ class BTreeQueue
             if (sept->hnidx[0] == -1) {
                 root_sept = nullptr;
                 left_sept = nullptr;
-                delete sept;
+                release_sept(sept);
             }
             return;
         }
