@@ -1,7 +1,7 @@
 # Heaptest
 
 This directory contains a number of priority queue implementations (which
-are necessarily fully production-ready), and a program (heaptest.cc) that
+are not necessarily fully production-ready), and a program (heaptest.cc) that
 exercises them in various ways, which I have used for benchmarking.
 
 The queue implementations are:
