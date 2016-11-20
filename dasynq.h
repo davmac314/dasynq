@@ -245,10 +245,13 @@ namespace dprivate {
         friend class dasynq::EventLoop<T_Mutex>;
         
         protected:
-        int timer_handle;
+        timer_handle_t timer_handle;
         int intervals;
 
-        BaseTimerWatcher() : BaseWatcher(WatchType::TIMER) { }
+        BaseTimerWatcher() : BaseWatcher(WatchType::TIMER)
+        {
+            init_timer_handle(timer_handle);
+        }
         
         public:
         // Timer expired, and the given number of intervals have elapsed before
@@ -480,7 +483,7 @@ namespace dprivate {
             queueWatcher(watcher);
         }
         
-        void receiveTimerExpiry(int timer_handle, void * userdata, int intervals)
+        void receiveTimerExpiry(timer_handle_t & timer_handle, void * userdata, int intervals)
         {
             BaseTimerWatcher * watcher = static_cast<BaseTimerWatcher *>(userdata);
             watcher->intervals = intervals;
@@ -768,8 +771,7 @@ template <typename T_Mutex> class EventLoop
     {
         // TODO exception safety: if second line fails first should be undone
         loop_mech.prepare_watcher(callBack);
-        int handle = loop_mech.addTimer(callBack);
-        callBack->timer_handle = handle;
+        loop_mech.addTimer(callBack->timer_handle, callBack);
     }
     
     void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout)

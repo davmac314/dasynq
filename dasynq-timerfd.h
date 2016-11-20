@@ -23,12 +23,11 @@ class TimerData
     public:
     // initial time?
     struct timespec interval_time; // interval (if 0, one-off timer)
-    int heap_index; // current heap index, -1 if not queued
     int expiry_count;  // number of times expired
     bool enabled;   // whether timer reports events  
     void *userdata;
     
-    TimerData(void *udata) : interval_time({0,0}), heap_index(-1), expiry_count(0), enabled(true), userdata(udata)
+    TimerData(void *udata = nullptr) : interval_time({0,0}), expiry_count(0), enabled(true), userdata(udata)
     {
         // constructor
     }
@@ -37,7 +36,7 @@ class TimerData
 class CompareTimespec
 {
     public:
-    bool operator()(struct timespec &a, struct timespec &b)
+    bool operator()(const struct timespec &a, const struct timespec &b)
     {
         if (a.tv_sec < b.tv_sec) {
             return true;
@@ -50,6 +49,13 @@ class CompareTimespec
         return false;
     }
 };
+
+using timer_handle_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>::handle_t;
+
+static void init_timer_handle(timer_handle_t &hnd) noexcept
+{
+    BinaryHeap<TimerData, struct timespec, CompareTimespec>::init_handle(hnd);
+}
 
 
 template <class Base> class TimerFdEvents : public Base
@@ -96,7 +102,7 @@ template <class Base> class TimerFdEvents : public Base
                 timer_queue.node_data(timer_queue.get_root()).expiry_count++;
                 // (a periodic timer may have overrun; calculated below).
                 
-                int thandle = timer_queue.get_root();
+                auto thandle = timer_queue.get_root();
                 TimerData &data = timer_queue.node_data(thandle);
                 timespec &interval = data.interval_time;
                 if (interval.tv_sec == 0 && interval.tv_nsec == 0) {
@@ -156,19 +162,17 @@ template <class Base> class TimerFdEvents : public Base
     }
 
     // Add timer, return handle (TODO: clock id param?)
-    int addTimer(void *userdata)
+    void addTimer(timer_handle_t &h, void *userdata)
     {
-        int h;
         timer_queue.allocate(h, userdata);
-        return h;
     }
     
-    void removeTimer(int timer_id) noexcept
+    void removeTimer(timer_handle_t &timer_id) noexcept
     {
         removeTimer_nolock(timer_id);
     }
     
-    void removeTimer_nolock(int timer_id) noexcept
+    void removeTimer_nolock(timer_handle_t &timer_id) noexcept
     {
         if (timer_queue.is_queued(timer_id)) {
             timer_queue.remove(timer_id);
@@ -178,7 +182,7 @@ template <class Base> class TimerFdEvents : public Base
     
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
     //   enable: specifies whether to enable reporting of timeouts/intervals
-    void setTimer(int timer_id, struct timespec &timeout, struct timespec &interval, bool enable) noexcept
+    void setTimer(timer_handle_t & timer_id, struct timespec &timeout, struct timespec &interval, bool enable) noexcept
     {
         auto &ts = timer_queue.node_data(timer_id);
         ts.interval_time = interval;
@@ -202,7 +206,7 @@ template <class Base> class TimerFdEvents : public Base
     }
 
     // Set timer relative to current time:    
-    void setTimerRel(int timer_id, struct timespec &timeout, struct timespec &interval, bool enable) noexcept
+    void setTimerRel(timer_handle_t & timer_id, struct timespec &timeout, struct timespec &interval, bool enable) noexcept
     {
         // TODO consider caching current time somehow; need to decide then when to update cached value.
         struct timespec curtime;
@@ -217,12 +221,12 @@ template <class Base> class TimerFdEvents : public Base
     }
     
     // Enables or disabling report of timeouts (does not stop timer)
-    void enableTimer(int timer_id, bool enable) noexcept
+    void enableTimer(timer_handle_t & timer_id, bool enable) noexcept
     {
         enableTimer_nolock(timer_id, enable);
     }
     
-    void enableTimer_nolock(int timer_id, bool enable) noexcept
+    void enableTimer_nolock(timer_handle_t & timer_id, bool enable) noexcept
     {
         timer_queue.node_data(timer_id).enabled = enable;
     }
