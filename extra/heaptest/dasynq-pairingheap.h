@@ -187,6 +187,8 @@ class PairingHeap
 
     public:
     
+    using handle_t = int;
+    
     T & node_data(int index)
     {
         return bvec[index].hn.data;

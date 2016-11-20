@@ -136,6 +136,8 @@ class BTreeQueue
 
     public:
     
+    using handle_t = int;
+    
     T & node_data(int index) noexcept
     {
         return bvec[index].hn.data;
