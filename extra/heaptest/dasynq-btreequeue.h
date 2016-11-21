@@ -11,27 +11,44 @@ namespace dasynq {
 template <typename T, typename P, typename Compare = std::less<P>, int N = 8>
 class BTreeQueue
 {
+    struct HeapNode;
+    
+    public:
+    using handle_t = HeapNode;
+    
+    private:
+    
+    // used to inhibit SeptNode construction
+    class no_sept_cons
+    {
+    };
+    
     struct SeptNode
     {
         P prio[N];
-        int hnidx[N];  // index in the hn vector (linked list)
+        handle_t * hn_p[N];  // pointer to handle (linked list)
         SeptNode * children[N + 1];
         SeptNode * parent;
         
         SeptNode() : parent(nullptr)
         {
             for (int i = 0; i < N; i++) {
-                hnidx[i] = -1;
+                hn_p[i] = nullptr;
                 children[i] = nullptr;
             }
             children[N] = nullptr;
+        }
+        
+        SeptNode(no_sept_cons &&nsc)
+        {
+            // Do nothing; constructor will be run later
         }
         
         int num_vals() noexcept
         {
             // We expect to be >50% full, so count backwards:
             for (int i = N - 1; i >= 0; i--) {
-                if (hnidx[i] != -1) {
+                if (hn_p[i] != nullptr) {
                     return i + 1;
                 }
             }
@@ -50,7 +67,7 @@ class BTreeQueue
             
             for (int i = pos; i < end; i++) {
                 prio[i - diff] = prio[i];
-                hnidx[i - diff] = hnidx[i];
+                hn_p[i - diff] = hn_p[i];
                 children[i - diff] = children[i];
             }
             children[end - diff] = children[end];
@@ -64,7 +81,7 @@ class BTreeQueue
             children[end + diff] = children[end];
             for (int i = (end - 1); i >= pos; i--) {
                 prio[i + diff] = prio[i];
-                hnidx[i + diff] = hnidx[i];
+                hn_p[i + diff] = hn_p[i];
                 children[i + diff] = children[i];
             }
         }
@@ -76,21 +93,27 @@ class BTreeQueue
     {
         T data;
         
-        int next_sibling;
-        int prev_sibling;
+        HeapNode * next_sibling;
+        HeapNode * prev_sibling;
         
         SeptNode * parent; // only maintained for head of list
         
+        HeapNode()
+        {
+        
+        }
+        
         template <typename ...U> HeapNode(U... u) : data(u...)
         {
-            next_sibling = -1;
-            prev_sibling = -1;
+            next_sibling = nullptr;
+            prev_sibling = nullptr;
             parent = nullptr;
         }
     };
 
     // A slot in the backing vector can be free, or occupied. We use a union to cover
     // these cases; if the slot is free, it just contains a link to the next free slot.
+    /*
     union HeapNodeU
     {
         HeapNode hn;
@@ -98,11 +121,13 @@ class BTreeQueue
         
         HeapNodeU() { }
     };
+    */
     
-    std::vector<HeapNodeU> bvec;
+    // std::vector<HeapNodeU> bvec;
     
-    int first_free = -1;
-    int root_node = -1;
+    // int first_free = -1;
+    
+    // int root_node = -1;
     
     int num_alloced = 0;
     int num_septs = 0;
@@ -111,17 +136,18 @@ class BTreeQueue
     SeptNode * root_sept = nullptr; // root of the B=Tree
     SeptNode * left_sept = nullptr; // leftmost child (cache)
     
-    int alloc_slot()
+    void alloc_slot()
     {
         num_alloced++;
         
         if (__builtin_expect(num_alloced == next_sept, 0)) {
-            sn_reserve.push_back(new SeptNode());
+            sn_reserve.push_back(new SeptNode(no_sept_cons()));
             // TODO properly handle allocation failure
             num_septs++;
             next_sept += N/2;
         }
         
+        /*
         if (first_free != -1) {
             int r = first_free;
             first_free = bvec[r].next_free;
@@ -132,6 +158,7 @@ class BTreeQueue
             bvec.emplace_back();
             return r;
         }
+        */
     }
     
     SeptNode * alloc_sept()
@@ -145,9 +172,10 @@ class BTreeQueue
     void release_sept(SeptNode *s)
     {
         // delete if we have an overabundance of nodes
-        if (__builtin_expect(num_alloced <= next_sept / 2, 0)) {
+        if (__builtin_expect(num_alloced < next_sept - N/2, 0)) {
             delete s;
             num_septs--;
+            next_sept -= N/2;
         }
         else {
             sn_reserve.push_back(s);
@@ -156,23 +184,31 @@ class BTreeQueue
 
     public:
     
-    using handle_t = int;
+    //using handle_t = HeapNode;
     
-    T & node_data(int index) noexcept
+    T & node_data(handle_t & hn) noexcept
     {
-        return bvec[index].hn.data;
+        return hn.data;
+    }
+    
+    static void init_handle(handle_t &hn) noexcept
+    {
+        // nothing to do
     }
     
     // Allocate a slot, but do not incorporate into the heap:
-    template <typename ...U> void allocate(int &hndl, U... u)
+    template <typename ...U> void allocate(handle_t &hndl, U... u)
     {
-        hndl = alloc_slot();
-        new (& bvec[hndl].hn) HeapNode(u...);
+        alloc_slot();
+        new (& hndl) HeapNode(u...);
     }
     
-    void deallocate(int index) noexcept
+    void deallocate(handle_t & hn) noexcept
     {
-        bvec[index].hn.HeapNode::~HeapNode();
+        hn.HeapNode::~HeapNode();
+        num_alloced--;
+        
+        /*
         if (index == bvec.size() - 1) {
             bvec.pop_back();
         }
@@ -180,9 +216,10 @@ class BTreeQueue
             bvec[index].next_free = first_free;
             first_free = index;
         }
+        */
     }
     
-    bool set_priority(int index, P pval)
+    bool set_priority(handle_t & index, P & pval)
     {
         // TODO maybe rework this
         remove(index);
@@ -190,7 +227,7 @@ class BTreeQueue
     }
 
     // Insert an allocated slot into the heap
-    bool insert(int index, P pval = P()) noexcept
+    bool insert(handle_t & hndl, P pval = P()) noexcept
     {
         if (root_sept == nullptr) {
             root_sept = alloc_sept();
@@ -202,23 +239,22 @@ class BTreeQueue
         bool leftmost = true;
 
         while (! srch_sept->is_leaf()) {
-            // int children = srch_sept->num_vals();
             int min = 0;
             int max = N - 1;
             while (min <= max) {
                 int i = (min + max) / 2;
 
-                if (srch_sept->hnidx[i] == -1 || pval < srch_sept->prio[i]) {
+                if (srch_sept->hn_p[i] == nullptr || pval < srch_sept->prio[i]) {
                     max = i - 1;
                 }
                 else if (srch_sept->prio[i] == pval) {
                     // insert into linked list
-                    int hnidx = srch_sept->hnidx[i];
-                    bvec[index].hn.prev_sibling = bvec[hnidx].hn.prev_sibling;
-                    bvec[bvec[index].hn.prev_sibling].hn.next_sibling = index;
-                    bvec[index].hn.next_sibling = hnidx;
-                    bvec[hnidx].hn.prev_sibling = index;
-                    bvec[index].hn.parent = nullptr;
+                    handle_t * hn_p = srch_sept->hn_p[i];
+                    hndl.prev_sibling = hn_p->prev_sibling;
+                    hndl.next_sibling = hn_p;
+                    hn_p->prev_sibling->next_sibling = &hndl;
+                    hn_p->prev_sibling = &hndl;
+                    hndl.parent = nullptr;
                     return false;
                 }
                 else {
@@ -244,17 +280,17 @@ class BTreeQueue
             while (min <= max) {
                 int i = (min + max) / 2;
 
-                if (srch_sept->hnidx[i] == -1 || pval < srch_sept->prio[i]) {
+                if (srch_sept->hn_p[i] == nullptr || pval < srch_sept->prio[i]) {
                     max = i - 1;
                 }
                 else if (srch_sept->prio[i] == pval) {
                     // insert into linked list
-                    int hnidx = srch_sept->hnidx[i];
-                    bvec[index].hn.prev_sibling = bvec[hnidx].hn.prev_sibling;
-                    bvec[bvec[index].hn.prev_sibling].hn.next_sibling = index;
-                    bvec[index].hn.next_sibling = hnidx;
-                    bvec[hnidx].hn.prev_sibling = index;
-                    bvec[index].hn.parent = nullptr;
+                    handle_t * hn_p = srch_sept->hn_p[i];
+                    hndl.prev_sibling = hn_p->prev_sibling;
+                    hndl.next_sibling = hn_p;
+                    hn_p->prev_sibling->next_sibling = &hndl;
+                    hn_p->prev_sibling = &hndl;
+                    hndl.parent = nullptr;
                     return false;
                 }
                 else {
@@ -263,12 +299,14 @@ class BTreeQueue
             }
         }
         
-        bvec[index].hn.prev_sibling = index;
-        bvec[index].hn.next_sibling = index;
+        hndl.prev_sibling = &hndl;
+        hndl.next_sibling = &hndl;
         
         SeptNode * left_down = nullptr; // left node going down
         SeptNode * right_down = nullptr; // right node going down
         leftmost = leftmost && pval < srch_sept->prio[0];
+        
+        handle_t * hndl_p = &hndl;
         
         while (children == N) {
             // split and push value towards root
@@ -278,17 +316,17 @@ class BTreeQueue
             // create new sibling to the right:
             for (int i = N/2; i < N; i++) {
                 new_sibling->prio[i - N/2] = srch_sept->prio[i];  // new[0] = old[4]
-                new_sibling->hnidx[i - N/2] = srch_sept->hnidx[i];
+                new_sibling->hn_p[i - N/2] = srch_sept->hn_p[i];
                 new_sibling->children[i - N/2 + 1] = srch_sept->children[i + 1];
                 if (new_sibling->children[i - N/2 + 1]) new_sibling->children[i - N/2 + 1]->parent = new_sibling;
-                bvec[new_sibling->hnidx[i - N/2]].hn.parent = new_sibling;
-                srch_sept->hnidx[i] = -1;
+                new_sibling->hn_p[i - N/2]->parent = new_sibling;
+                srch_sept->hn_p[i] = nullptr;
             }
             // Note that new_sibling->children[0] has not yet been set.
             
             if (pval < srch_sept->prio[N/2 - 1])  {
                 auto o_prio = srch_sept->prio[N/2 - 1];
-                auto o_hidx = srch_sept->hnidx[N/2 - 1];
+                auto o_hidx = srch_sept->hn_p[N/2 - 1];
                 
                 new_sibling->children[0] = srch_sept->children[N/2];
                 if (new_sibling->children[0]) new_sibling->children[0]->parent = new_sibling;
@@ -297,14 +335,14 @@ class BTreeQueue
                 for ( ; i > 0 && pval < srch_sept->prio[i - 1]; i--) {
                     srch_sept->prio[i] = srch_sept->prio[i - 1];
                     srch_sept->children[i+1] = srch_sept->children[i];
-                    srch_sept->hnidx[i] = srch_sept->hnidx[i - 1];
+                    srch_sept->hn_p[i] = srch_sept->hn_p[i - 1];
                 }
                 srch_sept->prio[i] = pval;
-                srch_sept->hnidx[i] = index;
-                bvec[index].hn.parent = srch_sept;
+                srch_sept->hn_p[i] = hndl_p;
+                hndl_p->parent = srch_sept;
                 srch_sept->children[i] = left_down;
                 srch_sept->children[i+1] = right_down;
-                index = o_hidx;
+                hndl_p = o_hidx;
                 pval = o_prio;
             }
             else if (pval < new_sibling->prio[0]) {
@@ -316,21 +354,21 @@ class BTreeQueue
             }
             else {
                 auto o_prio = new_sibling->prio[0];
-                auto o_hidx = new_sibling->hnidx[0];
+                auto o_hidx = new_sibling->hn_p[0];
                 int i = 0;
                 for ( ; i < (N/2 - 1) && new_sibling->prio[i + 1] < pval; i++) {
                     new_sibling->prio[i] = new_sibling->prio[i + 1];
                     new_sibling->children[i] = new_sibling->children[i + 1];
-                    new_sibling->hnidx[i] = new_sibling->hnidx[i + 1];
+                    new_sibling->hn_p[i] = new_sibling->hn_p[i + 1];
                 }
                 new_sibling->prio[i] = pval;
-                new_sibling->hnidx[i] = index;
-                bvec[index].hn.parent = new_sibling;
+                new_sibling->hn_p[i] = hndl_p;
+                hndl_p->parent = new_sibling;
                 new_sibling->children[i] = left_down;
                 new_sibling->children[i+1] = right_down;
                 if (left_down) left_down->parent = new_sibling;
                 if (right_down) right_down->parent = new_sibling;                
-                index = o_hidx;
+                hndl_p = o_hidx;
                 pval = o_prio;
             }
             
@@ -359,15 +397,15 @@ class BTreeQueue
             }
             
             srch_sept->prio[inspos] = srch_sept->prio[inspos-1];
-            srch_sept->hnidx[inspos] = srch_sept->hnidx[inspos-1];
+            srch_sept->hn_p[inspos] = srch_sept->hn_p[inspos-1];
             srch_sept->children[inspos+1] = srch_sept->children[inspos];
         }
         
         srch_sept->prio[inspos] = pval;
-        srch_sept->hnidx[inspos] = index;
+        srch_sept->hn_p[inspos] = hndl_p;
         srch_sept->children[inspos] = left_down;
         srch_sept->children[inspos+1] = right_down;
-        bvec[index].hn.parent = srch_sept;
+        hndl_p->parent = srch_sept;
         return leftmost;
     }
     
@@ -376,20 +414,20 @@ class BTreeQueue
     void merge(SeptNode *lsibling, SeptNode *rsibling, int index) noexcept
     {
         int lchildren = lsibling->num_vals();
-        lsibling->hnidx[lchildren] = lsibling->parent->hnidx[index];
+        lsibling->hn_p[lchildren] = lsibling->parent->hn_p[index];
         lsibling->prio[lchildren] = lsibling->parent->prio[index];
-        bvec[lsibling->hnidx[lchildren]].hn.parent = lsibling;
+        lsibling->hn_p[lchildren]->parent = lsibling;
         lchildren++;
         
         // bool leaf = lsibling->is_leaf();
         
         int ri = 0;
-        for (ri = 0; rsibling->hnidx[ri] != -1; ri++) {
-            lsibling->hnidx[lchildren] = rsibling->hnidx[ri];
+        for (ri = 0; rsibling->hn_p[ri] != nullptr; ri++) {
+            lsibling->hn_p[lchildren] = rsibling->hn_p[ri];
             lsibling->prio[lchildren] = rsibling->prio[ri];
             lsibling->children[lchildren] = rsibling->children[ri];
             if (lsibling->children[lchildren]) lsibling->children[lchildren]->parent = lsibling;
-            bvec[lsibling->hnidx[lchildren]].hn.parent = lsibling;
+            lsibling->hn_p[lchildren]->parent = lsibling;
             lchildren++;
         }
         lsibling->children[lchildren] = rsibling->children[ri];
@@ -398,14 +436,15 @@ class BTreeQueue
         
         // Now delete in the parent:
         for (int i = index; i < (N-1); i++) {
-            lsibling->parent->hnidx[i] = lsibling->parent->hnidx[i + 1];
+            lsibling->parent->hn_p[i] = lsibling->parent->hn_p[i + 1];
             lsibling->parent->prio[i] = lsibling->parent->prio[i + 1];
             lsibling->parent->children[i + 1] = lsibling->parent->children[i + 2];
         }
-        lsibling->parent->hnidx[N-1] = -1;
+        lsibling->parent->hn_p[N-1] = nullptr;
         
-        if (lsibling->parent->hnidx[0] == -1) {
+        if (lsibling->parent->hn_p[0] == nullptr) {
             // parent is now empty; it must be root. Make us the new root.
+            release_sept(lsibling->parent);
             root_sept = lsibling;
             lsibling->parent = nullptr;
         }        
@@ -419,7 +458,7 @@ class BTreeQueue
         SeptNode *parent = sept->parent;
         if (parent == nullptr) {
             // It's the root node, so don't worry about it, unless empty
-            if (sept->hnidx[0] == -1) {
+            if (sept->hn_p[0] == nullptr) {
                 root_sept = nullptr;
                 left_sept = nullptr;
                 release_sept(sept);
@@ -443,18 +482,18 @@ class BTreeQueue
                 }
             }
             else {
-                sept->hnidx[children] = parent->hnidx[0];
+                sept->hn_p[children] = parent->hn_p[0];
                 sept->prio[children] = parent->prio[0];
-                bvec[sept->hnidx[children]].hn.parent = sept;
+                sept->hn_p[children]->parent = sept;
                 sept->children[children + 1] = rsibling->children[0];
                 if (sept->children[children + 1]) sept->children[children + 1]->parent = sept;
                 
-                parent->hnidx[0] = rsibling->hnidx[0];
+                parent->hn_p[0] = rsibling->hn_p[0];
                 parent->prio[0] = rsibling->prio[0];
-                bvec[parent->hnidx[0]].hn.parent = parent;
+                parent->hn_p[0]->parent = parent;
                 
                 rsibling->shift_elems_left(1, 0, N-1);
-                rsibling->hnidx[N-1] = -1;
+                rsibling->hn_p[N-1] = nullptr;
                 return;
             }
         }
@@ -483,38 +522,59 @@ class BTreeQueue
             else {
                 sept->shift_elems_right(0, 1, children);
                 
-                sept->hnidx[0] = parent->hnidx[i - 1];
+                sept->hn_p[0] = parent->hn_p[i - 1];
                 sept->prio[0] = parent->prio[i - 1];
-                bvec[sept->hnidx[0]].hn.parent = sept;
+                sept->hn_p[0]->parent = sept;
                 sept->children[0] = lsibling->children[lchildren];
                 if (sept->children[0]) sept->children[0]->parent = sept;
                 
-                parent->hnidx[i - 1] = lsibling->hnidx[lchildren - 1];
+                parent->hn_p[i - 1] = lsibling->hn_p[lchildren - 1];
                 parent->prio[i - 1] = lsibling->prio[lchildren - 1];
-                bvec[parent->hnidx[i - 1]].hn.parent = parent;
-                lsibling->hnidx[lchildren - 1] = -1;
+                parent->hn_p[i - 1]->parent = parent;
+                lsibling->hn_p[lchildren - 1] = nullptr;
                 
                 return;
             }
         }
     }
     
-    // Remove a slot from the heap (but don't deallocate it)
-    void remove(int index) noexcept
+    void remove_from_root()
     {
-        if (bvec[index].hn.prev_sibling != index) {
+        SeptNode *sept = left_sept;
+        int i;
+        for (i = 0; i < (N-1); i++) {
+            sept->hn_p[i] = sept->hn_p[i+1];
+            sept->prio[i] = sept->prio[i+1];
+            if (sept->hn_p[i] == nullptr) {
+                break;
+            }
+        }
+        
+        sept->hn_p[N-1] = nullptr;
+        
+        // Now if the node is underpopulated, we need to merge with or
+        // borrow from a sibling
+        if (i < N/2) {
+            repop_node(sept, i);
+        }
+    }
+    
+    // Remove a slot from the heap (but don't deallocate it)
+    void remove(handle_t & hndl) noexcept
+    {
+        if (hndl.prev_sibling != &hndl) {
             // we're lucky: it's part of a linked list
-            int prev = bvec[index].hn.prev_sibling;
-            int next = bvec[index].hn.next_sibling;
-            bvec[prev].hn.next_sibling = next;
-            bvec[next].hn.prev_sibling = prev;
-            bvec[index].hn.prev_sibling = -1; // mark as not in queue
-            if (bvec[index].hn.parent != nullptr) {
-                bvec[next].hn.parent = bvec[index].hn.parent;
-                SeptNode * sept = bvec[next].hn.parent;
+            auto prev = hndl.prev_sibling;
+            auto next = hndl.next_sibling;
+            prev->next_sibling = next;
+            next->prev_sibling = prev;
+            hndl.prev_sibling = nullptr; // mark as not in queue
+            if (hndl.parent != nullptr) {
+                next->parent = hndl.parent;
+                SeptNode * sept = next->parent;
                 for (int i = 0; i < N; i++) {
-                    if (sept->hnidx[i] == index) {
-                        sept->hnidx[i] = next;
+                    if (sept->hn_p[i] == & hndl) {
+                        sept->hn_p[i] = next;
                         break;
                     }
                 }
@@ -525,11 +585,11 @@ class BTreeQueue
             // Pull nodes from a child, all the way down
             // the tree. Then re-balance back up the tree,
             // merging nodes if necessary.
-            SeptNode * sept = bvec[index].hn.parent;
+            SeptNode * sept = hndl.parent;
             
             int i;
             for (i = 0; i < N; i++) {
-                if (sept->hnidx[i] == index) {
+                if (sept->hn_p[i] == &hndl) {
                     // Ok, go right, then as far as we can to the left:
                     SeptNode * lsrch = sept->children[i+1];
                     SeptNode * prev = sept;
@@ -539,10 +599,10 @@ class BTreeQueue
                     }
                     
                     if (prev != sept) {
-                        sept->hnidx[i] = prev->hnidx[0];
+                        sept->hn_p[i] = prev->hn_p[0];
                         sept->prio[i] = prev->prio[0];
-                        bvec[sept->hnidx[i]].hn.parent = sept;
-                        prev->hnidx[0] = index;
+                        sept->hn_p[i]->parent = sept;
+                        prev->hn_p[0] = &hndl;
                         sept = prev;
                         i = 0;
                     }
@@ -552,14 +612,14 @@ class BTreeQueue
                     // - i is the index of the child to remove from it
                     
                     for ( ; i < (N-1); i++) {
-                        sept->hnidx[i] = sept->hnidx[i+1];
+                        sept->hn_p[i] = sept->hn_p[i+1];
                         sept->prio[i] = sept->prio[i+1];
-                        if (sept->hnidx[i] == -1) {
+                        if (sept->hn_p[i] == nullptr) {
                             break;
                         }
                     }
                     
-                    sept->hnidx[N-1] = -1;
+                    sept->hn_p[N-1] = nullptr;
                     
                     // Now if the node is underpopulated, we need to merge with or
                     // borrow from a sibling
@@ -573,10 +633,10 @@ class BTreeQueue
         }
     }
     
-    int get_root() noexcept
+    handle_t & get_root() noexcept
     {
-        if (left_sept == nullptr) return -1;
-        return left_sept->hnidx[0];
+        //if (left_sept == nullptr) return nullptr;
+        return *left_sept->hn_p[0];
     }
     
     P & get_root_priority() noexcept
@@ -586,12 +646,22 @@ class BTreeQueue
     
     void pull_root() noexcept
     {
-        remove(get_root());
+        // Effect is:
+        //   remove(get_root());
+        // ... but we can optimise slightly.
+        
+        handle_t & r = get_root();
+        if (r.prev_sibling != &r) {
+            remove(r);
+        }
+        else {
+            remove_from_root();
+        }
     }
     
-    bool is_queued(int hndl) noexcept
+    bool is_queued(handle_t & hndl) noexcept
     {
-        return bvec[hndl].hn.prev_sibling != -1;
+        return hndl.prev_sibling != nullptr;
     }
     
     bool empty() noexcept
@@ -599,19 +669,68 @@ class BTreeQueue
         return root_sept == nullptr;
     }
     
-    void check_consistency(SeptNode *node)
+    void check_consistency()
     {
+        check_consistency(root_sept);
+    }
+    
+    void check_consistency(SeptNode *node, P * min = nullptr, P * max = nullptr)
+    {
+        if (node == nullptr) return;
+        
+        // count children
+        int ch_count = 0;
+        bool saw_last = false;
+        for (int i = 0; i < N; i++) {
+            if (node->hn_p[i] == nullptr) {
+                saw_last = true;
+            }
+            else if (saw_last) {
+                abort();
+            }
+            else {
+                ch_count++;
+            }
+        }
+        
+        if (node->parent != nullptr && ch_count < N/2) abort();
+        
         if (node->children[0] != nullptr) {
             // if the first child isn't a null pointer, no children should be:
-            for (int i = 0; i < N; i++) {
-                if (node->hnidx[i] == -1) break;
+            int i;
+            for (i = 0; i < N; i++) {
+                if (node->hn_p[i] == nullptr) break;
+                
+                // Priority checks
+                if (i != 0 && node->prio[i] < node->prio[i-1]) {
+                    abort();
+                }
+                if (min != nullptr && node->prio[i] < *min) {
+                    abort();
+                }
+                if (min != nullptr && node->prio[i] < *min) {
+                    abort();
+                }
+                
+                // Link checks
+                if (node->hn_p[i]->parent != node) {
+                    abort();
+                }
+                if (node->children[i]->parent != node) {
+                    abort();
+                }
                 if (node->children[i+1]->parent != node) {
                     abort();
                 }
                 if  (node->children[i] == node->children[i + 1]) {
                     abort();
                 }
+                
+                P * rmin = (i > 0) ? (& node->prio[i-1]) : min;
+                P * rmax = & node->prio[i];
+                check_consistency(node->children[i], min, max);
             }
+            check_consistency(node->children[i], & node->prio[i-1], max);
         }
     }
     
@@ -624,12 +743,12 @@ class BTreeQueue
 
         int i;
         for (i = 0; i < N; i++) {
-            if (node->hnidx[i] != -1) {
-                cout << "   child pri = " << node->prio[i] << "  first child data = " << node_data(node->hnidx[i]) <<  "  child tree = " << (void *)node->children[i];
-                if (bvec[node->hnidx[i]].hn.parent != node) cout << " (CHILD VALUE MISMATCH)";
+            if (node->hn_p[i] != nullptr) {
+                cout << "   child pri = " << node->prio[i] << "  first child data = " << node_data(* node->hn_p[i]) <<  "  child tree = " << (void *)node->children[i];
+                if (node->hn_p[i]->parent != node) cout << " (CHILD VALUE MISMATCH)";
                 if (node->children[i] && node->children[i]->parent != node) cout << " (CHILD TREE MISMATCH)";
                 // cout << "  child parent = " << (void *)bvec[node->hnidx[i]].hn.parent;
-                if (bvec[node->hnidx[i]].hn.prev_sibling != node->hnidx[i]) cout << " (*)";
+                if (node->hn_p[i]->prev_sibling != node->hn_p[i]) cout << " (*)";
                 cout << endl;
                 if (node->children[i]) q.push_back(node->children[i]);
             }
@@ -643,19 +762,12 @@ class BTreeQueue
             }
         }
         if (node->children[i]) q.push_back(node->children[i]);
-        
-        //int fc = bvec[n].hn.first_child;
-        //while (fc != -1) {
-        //    cout << "    child = " << fc << endl;
-        //    q.push_back(fc);
-        //    fc = bvec[fc].hn.next_sibling;
-        //}
     }
     
     void dump()
     {
         using namespace std;
-        cout << "root = " << (void *) root_sept << endl;
+        cout << "root = " << (void *) root_sept << " num_septs = " << num_septs << " sn_reserve.size() = " << sn_reserve.size() << endl;
         if (root_sept != nullptr) {
             vector<SeptNode *> q;
             q.push_back(root_sept);
