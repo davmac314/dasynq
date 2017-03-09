@@ -780,12 +780,22 @@ template <typename T_Mutex> class EventLoop
         loop_mech.setTimer(callBack->timer_handle, timeout, interval, true);
     }
     
+    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval)
+    {
+        loop_mech.setTimer(callBack->timer_handle, timeout, interval, true);
+    }
+
     void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout)
     {
         struct timespec interval {0, 0};
         loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true);
     }
     
+    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval)
+    {
+        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true);
+    }
+
     void deregister(BaseTimerWatcher *callback)
     {
         loop_mech.removeTimer(callback->timer_handle);
@@ -1513,10 +1523,20 @@ class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
         eloop.setTimer(this, timeout);
     }
     
+    void armTimer(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
+    {
+        eloop.setTimer(this, timeout, interval);
+    }
+
     // Arm timer, relative to now:
     void armTimerRel(EventLoop &eloop, struct timespec &timeout) noexcept
     {
         eloop.setTimerRel(this, timeout);
+    }
+    
+    void armTimerRel(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
+    {
+        eloop.setTimerRel(this, timeout, interval);
     }
     
     void deregister(EventLoop &eloop) noexcept
