@@ -72,6 +72,8 @@ template <class Base> class TimerFdEvents : public Base
         return 0;
     }
     
+    // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
+    // if there are no active timers).
     void set_timer_from_queue()
     {
         struct itimerspec newtime;
@@ -187,9 +189,8 @@ template <class Base> class TimerFdEvents : public Base
         auto &ts = timer_queue.node_data(timer_id);
         ts.interval_time = interval;
         ts.expiry_count = 0;
+        ts.enabled = enable;
 
-        // TODO also update interval / enabled
-        
         if (timer_queue.is_queued(timer_id)) {
             // Already queued; alter timeout
             if (timer_queue.set_priority(timer_id, timeout)) {
