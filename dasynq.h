@@ -140,6 +140,11 @@ namespace dprivate {
         PrioQueue::handle_t heap_handle;
         int priority;
         
+        static void set_priority(BaseWatcher &p, int prio)
+        {
+            p.priority = prio;
+        }
+        
         public:
         
         // Perform initialisation necessary before registration with an event loop
@@ -1406,8 +1411,8 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         this->watch_flags = flags | dprivate::multi_watch;
         this->read_removed = false;
         this->write_removed = false;
-        this->prio = inprio;
-        this->outWatcher.prio = outprio;
+        this->priority = inprio;
+        this->set_priority(this->outWatcher, outprio);
         eloop.registerFd(this, fd, flags);
     }
     
@@ -1462,7 +1467,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     {
         BaseWatcher::init();
         this->watch_pid = child;
-        this->prio = prio;
+        this->priority = prio;
         eloop.registerChild(this, child);
     }
     
@@ -1476,7 +1481,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     {
         BaseWatcher::init();
         this->watch_pid = child;
-        this->prio = prio;
+        this->priority = prio;
         eloop.registerReservedChild(this, child);
     }
     

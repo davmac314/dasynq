@@ -79,7 +79,7 @@ class pid_map
     }
 };
 
-namespace {
+inline namespace {
     void sigchld_handler(int signum)
     {
         // If SIGCHLD has no handler (is ignored), SIGCHLD signals will
