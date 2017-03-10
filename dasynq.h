@@ -1,18 +1,18 @@
-#ifndef DASYNC_H_INCLUDED
-#define DASYNC_H_INCLUDED
+#ifndef DASYNQ_H_INCLUDED
+#define DASYNQ_H_INCLUDED
 
 #if defined(__OpenBSD__)
-#define HAVE_KQUEUE 1
+#define DASYNQ_HAVE_KQUEUE 1
 #endif
 
 #if defined(__linux__)
-#define HAVE_EPOLL 1
+#define DASYNQ_HAVE_EPOLL 1
 #endif
 
 #include "dasynq-flags.h"
 #include "dasynq-binaryheap.h"
 
-#if defined(HAVE_KQUEUE)
+#if defined(DASYNQ_HAVE_KQUEUE)
 #include "dasynq-kqueue.h"
 #include "dasynq-itimer.h"
 #include "dasynq-childproc.h"
@@ -20,7 +20,7 @@ namespace dasynq {
     template <typename T> using Loop = KqueueLoop<ITimerEvents<ChildProcEvents<T>>>;
     using LoopTraits = KqueueTraits;
 }
-#elif defined(HAVE_EPOLL)
+#elif defined(DASYNQ_HAVE_EPOLL)
 #include "dasynq-epoll.h"
 #include "dasynq-timerfd.h"
 #include "dasynq-childproc.h"
@@ -29,6 +29,7 @@ namespace dasynq {
     using LoopTraits = EpollTraits;
 }
 #endif
+
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
@@ -47,9 +48,9 @@ namespace dasynq {
 
 #ifdef __GNUC__
 #ifndef __clang__
-#define EMPTY_BODY    char empty[0];  // Make class instances take up no space (gcc)    
+#define DASYNQ_EMPTY_BODY    char empty[0];  // Make class instances take up no space (gcc)    
 #else
-#define EMPTY_BODY    char empty[0] __attribute__((unused));  // Make class instances take up no space (clang)
+#define DASYNQ_EMPTY_BODY    char empty[0] __attribute__((unused));  // Make class instances take up no space (clang)
 #endif
 #endif
 
@@ -293,7 +294,7 @@ namespace dprivate {
         void wait(std::unique_lock<NullMutex> &ul) { }
         void signal() { }
         
-        EMPTY_BODY;
+        DASYNQ_EMPTY_BODY;
     };
 
     template <typename T_Mutex> class waitqueue_node
