@@ -399,6 +399,7 @@ namespace dprivate {
         using BaseTimerWatcher = dasynq::dprivate::BaseTimerWatcher<T_Mutex>;
         
         // Add a watcher into the queuing system (but don't queue it)
+        //   may throw: std::bad_alloc
         void prepare_watcher(BaseWatcher *bwatcher)
         {
             event_queue.allocate(bwatcher->heap_handle, bwatcher);
@@ -422,7 +423,7 @@ namespace dprivate {
         }
         
         // Remove watcher from the queueing system
-        void releaseWatcher(BaseWatcher *bwatcher)
+        void release_watcher(BaseWatcher *bwatcher)
         {
             event_queue.deallocate(bwatcher->heap_handle);
         }
@@ -516,11 +517,13 @@ namespace dprivate {
                 // If the watcher is active, set deleteme true; the watcher will be removed
                 // at the end of current processing (i.e. when active is set false).
                 watcher->deleteme = true;
+                release_watcher(watcher);
                 lock.unlock();
             }
             else {
                 // Actually do the delete.
                 dequeueWatcher(watcher);
+                release_watcher(watcher);
                 
                 lock.unlock();
                 watcher->watchRemoved();
@@ -533,18 +536,22 @@ namespace dprivate {
             
             if (watcher->active) {
                 watcher->deleteme = true;
+                release_watcher(watcher);
             }
             else {
                 dequeueWatcher(watcher);
+                release_watcher(watcher);
                 watcher->read_removed = true;
             }
             
             BaseWatcher *secondary = &(watcher->outWatcher);
             if (secondary->active) {
                 secondary->deleteme = true;
+                release_watcher(watcher);
             }
             else {
                 dequeueWatcher(secondary);
+                release_watcher(watcher);
                 watcher->write_removed = true;
             }
             
@@ -641,7 +648,13 @@ template <typename T_Mutex> class EventLoop
     void registerSignal(BaseSignalWatcher *callBack, int signo)
     {
         loop_mech.prepare_watcher(callBack);
-        loop_mech.addSignalWatch(signo, callBack);
+        try {
+            loop_mech.addSignalWatch(signo, callBack);
+        }
+        catch (...) {
+            loop_mech.release_watcher(callBack);
+            throw;
+        }
     }
     
     void deregister(BaseSignalWatcher *callBack, int signo) noexcept
@@ -660,19 +673,36 @@ template <typename T_Mutex> class EventLoop
     void registerFd(BaseFdWatcher *callback, int fd, int eventmask, bool enabled)
     {
         loop_mech.prepare_watcher(callback);
-        loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT, enabled);
+        try {
+            loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT, enabled);
+        }
+        catch (...) {
+            loop_mech.release_watcher(callback);
+            throw;
+        }
     }
     
     void registerFd(BaseBidiFdWatcher *callback, int fd, int eventmask)
     {
-        // TODO if 2nd prepare_watcher fails we should undo the first
         loop_mech.prepare_watcher(callback);
-        loop_mech.prepare_watcher(&callback->outWatcher);
-        if (LoopTraits::has_separate_rw_fd_watches) {
-            loop_mech.addBidiFdWatch(fd, callback, eventmask | ONE_SHOT);
+        try {
+            loop_mech.prepare_watcher(&callback->outWatcher);
+            try {
+                if (LoopTraits::has_separate_rw_fd_watches) {
+                    loop_mech.addBidiFdWatch(fd, callback, eventmask | ONE_SHOT);
+                }
+                else {
+                    loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT);
+                }
+            }
+            catch (...) {
+                loop_mech.release_watcher(&callback->outWatcher);
+                throw;
+            }
         }
-        else {
-            loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT);
+        catch (...) {
+            loop_mech.release_watcher(callback);
+            throw;
         }
     }
     
@@ -727,22 +757,34 @@ template <typename T_Mutex> class EventLoop
         releaseLock(qnode);
     }
     
-    void reserveChildWatch(BaseChildWatcher *callBack)
+    void reserveChildWatch(BaseChildWatcher *callback)
     {
-        loop_mech.prepare_watcher(callBack);
-        loop_mech.reserveChildWatch();
+        loop_mech.prepare_watcher(callback);
+        try {
+            loop_mech.reserveChildWatch();
+        }
+        catch (...) {
+            loop_mech.release_watcher(callback);
+            throw;
+        }
     }
     
-    void unreserve(BaseChildWatcher *callBack)
+    void unreserve(BaseChildWatcher *callback)
     {
-        // TODO ??? remove from heap mgmt ie undo prepareWatcher
         loop_mech.unreserveChildWatch();
+        loop_mech.release_watcher(callback);
     }
     
-    void registerChild(BaseChildWatcher *callBack, pid_t child)
+    void registerChild(BaseChildWatcher *callback, pid_t child)
     {
-        loop_mech.prepare_watcher(callBack);
-        loop_mech.addChildWatch(child, callBack);
+        loop_mech.prepare_watcher(callback);
+        try {
+            loop_mech.addChildWatch(child, callback);
+        }
+        catch (...) {
+            loop_mech.release_watcher(callback);
+            throw;
+        }
     }
     
     void registerReservedChild(BaseChildWatcher *callBack, pid_t child) noexcept
@@ -768,11 +810,15 @@ template <typename T_Mutex> class EventLoop
         releaseLock(qnode);
     }
     
-    void registerTimer(BaseTimerWatcher *callBack)
+    void registerTimer(BaseTimerWatcher *callback)
     {
-        // TODO exception safety: if second line fails first should be undone
-        loop_mech.prepare_watcher(callBack);
-        loop_mech.addTimer(callBack->timer_handle, callBack);
+        loop_mech.prepare_watcher(callback);
+        try {
+            loop_mech.addTimer(callback->timer_handle, callback);
+        }
+        catch (...) {
+            loop_mech.release_watcher(callback);
+        }
     }
     
     void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout)
@@ -924,7 +970,7 @@ template <typename T_Mutex> class EventLoop
             }
             return rearmType;
         }
-        else {
+        else { // Not multi-watch:
             if (rearmType == Rearm::REARM) {
                 loop_mech.enableFdWatch_nolock(bfw->watch_fd, bfw,
                         (bfw->watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
@@ -1109,8 +1155,11 @@ template <typename T_Mutex> class EventLoop
                 default: ;
                 }
                 
-                if (pqueue->deleteme || rearmType == Rearm::REMOVE) {
+                if (rearmType == Rearm::REMOVE) {
                     ed.lock.unlock();
+                    // Note that for BidiFd watches, watchRemoved is only called on the primary watch.
+                    // The process function called above only returns Rearm::REMOVE if both primary and
+                    // secondary watches have been removed.
                     (is_multi_watch ? bbfw : pqueue)->watchRemoved();
                     ed.lock.lock();
                 }
