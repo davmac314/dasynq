@@ -64,6 +64,10 @@ namespace dprivate {
 
 using PrioQueue = BinaryHeap<dprivate::BaseWatcher *, int>;
 
+inline namespace {
+    constexpr int DEFAULT_PRIORITY = 50;
+}
+
 /**
  * Values for rearm/disarm return from event handlers
  */
@@ -134,6 +138,7 @@ namespace dprivate {
         int deleteme : 1;  // delete when handler finished?
         
         PrioQueue::handle_t heap_handle;
+        int priority;
         
         public:
         
@@ -143,6 +148,7 @@ namespace dprivate {
             active = false;
             deleteme = false;
             PrioQueue::init_handle(heap_handle);
+            priority = DEFAULT_PRIORITY;
         }
         
         BaseWatcher(WatchType wt) noexcept : watchType(wt) { }
@@ -407,7 +413,7 @@ namespace dprivate {
         
         void queueWatcher(BaseWatcher *bwatcher) noexcept
         {
-            event_queue.insert(bwatcher->heap_handle);
+            event_queue.insert(bwatcher->heap_handle, bwatcher->priority);
         }
         
         bool isQueued(BaseWatcher *bwatcher)
@@ -1224,9 +1230,10 @@ public:
     // If an attempt is made to register with more than one event loop at
     // a time, behaviour is undefined. The signal should be masked before
     // call.
-    inline void addWatch(EventLoop &eloop, int signo)
+    inline void addWatch(EventLoop &eloop, int signo, int prio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
+        this->priority = prio;
         this->siginfo.set_signo(signo);
         eloop.registerSignal(this, signo);
     }
@@ -1272,9 +1279,10 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
     // causes undefined behavior.
     //
     // Can fail with std::bad_alloc or std::system_error.
-    void addWatch(EventLoop &eloop, int fd, int flags, bool enabled = true)
+    void addWatch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
+        this->priority = prio;
         this->watch_fd = fd;
         this->watch_flags = flags;
         eloop.registerFd(this, fd, flags, enabled);
@@ -1390,7 +1398,7 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     // can be any combination of dasynq::IN_EVENTS / dasynq::OUT_EVENTS.
     //
     // Can fail with std::bad_alloc or std::system_error.
-    void addWatch(EventLoop &eloop, int fd, int flags)
+    void addWatch(EventLoop &eloop, int fd, int flags, int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
         this->outWatcher.BaseWatcher::init();
@@ -1398,6 +1406,8 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         this->watch_flags = flags | dprivate::multi_watch;
         this->read_removed = false;
         this->write_removed = false;
+        this->prio = inprio;
+        this->outWatcher.prio = outprio;
         eloop.registerFd(this, fd, flags);
     }
     
@@ -1448,10 +1458,11 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     // Registration can fail with std::bad_alloc.
     // Note that in multi-threaded programs, use of this function may be prone to a
     // race condition such that the child terminates before the watcher is registered.
-    void addWatch(EventLoop &eloop, pid_t child)
+    void addWatch(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
         this->watch_pid = child;
+        this->prio = prio;
         eloop.registerChild(this, child);
     }
     
@@ -1459,10 +1470,13 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     // after having reserved resources previously (using reserveWith).
     // Registration cannot fail.
     // Note that in multi-threaded programs, use of this function may be prone to a
-    // race condition such that the child terminates before the watcher is registered.
-    void addReserved(EventLoop &eloop, pid_t child) noexcept
+    // race condition such that the child terminates before the watcher is registered;
+    // use the "fork" member function to avoid this.
+    void addReserved(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY) noexcept
     {
         BaseWatcher::init();
+        this->watch_pid = child;
+        this->prio = prio;
         eloop.registerReservedChild(this, child);
     }
     
@@ -1563,8 +1577,9 @@ class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     public:
     
     // Allocate a timer (using the MONOTONIC clock)
-    void addTimer(EventLoop &eloop)
+    void addTimer(EventLoop &eloop, int prio = DEFAULT_PRIORITY)
     {
+        this->priority = prio;
         eloop.registerTimer(this);
     }
     
