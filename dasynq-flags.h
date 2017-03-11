@@ -1,3 +1,6 @@
+#ifndef DASYNQ_FLAGS_H_INCLUDED
+#define DASYNQ_FLAGS_H_INCLUDED
+
 namespace dasynq {
 
 // Event type bits
@@ -11,3 +14,5 @@ constexpr unsigned int ONE_SHOT = 8;
 constexpr unsigned int IO_EVENTS = IN_EVENTS | OUT_EVENTS;
 
 }
+
+#endif

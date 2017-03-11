@@ -12,7 +12,9 @@
 #include "dasynq-flags.h"
 #include "dasynq-binaryheap.h"
 
-#if defined(DASYNQ_HAVE_KQUEUE)
+#if defined(DASYNQ_CUSTOM_LOOP_IMPLEMENTATION)
+// Loop and LoopTraits defined already; used for testing
+#elif defined(DASYNQ_HAVE_KQUEUE)
 #include "dasynq-kqueue.h"
 #include "dasynq-itimer.h"
 #include "dasynq-childproc.h"
