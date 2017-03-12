@@ -1322,7 +1322,39 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
         }
     }
     
-    // virtual Rearm fdEvent(EventLoop<T_Mutex> *, int fd, int flags) = 0;
+    // Add an Fd watch via a lambda. The watch is allocated dynamically and destroys
+    // itself when removed from the event loop.
+    template <typename T>
+    static FdWatcher<EventLoop> *addWatch(EventLoop &eloop, int fd, int flags, T watchHndlr)
+    {
+        class LambdaFdWatcher : public FdWatcher<EventLoop>
+        {
+            private:
+            T watchHndlr;
+            
+            public:
+            LambdaFdWatcher(T watchHandlr_a) : watchHndlr(watchHandlr_a)
+            {
+                //
+            }
+            
+            Rearm fdEvent(EventLoop &eloop, int fd, int flags) override
+            {
+                return watchHndlr(eloop, fd, flags);
+            }
+            
+            void watchRemoved() noexcept override
+            {
+                delete this;
+            }
+        };
+        
+        LambdaFdWatcher * lfd = new LambdaFdWatcher(watchHndlr);
+        lfd->addWatch(eloop, fd, flags);
+        return lfd;
+    }
+    
+    // virtual Rearm fdEvent(EventLoop<T_Mutex> &, int fd, int flags) = 0;
 };
 
 // A Bi-directional file descriptor watcher with independent read- and write- channels.
