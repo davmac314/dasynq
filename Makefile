@@ -3,15 +3,15 @@ CXX = g++
 #CXX = clang++
 CXXOPTS = -std=c++11 -Wall -Wno-invalid-offsetof
 
-objects = dasynq.o testme.o
+objects = dasynq.o
 
-all: dasynq-test
+all: dasynq.o
 
 $(objects): %.o: %.cc   dasynq.h
 	$(CXX) $(CXXOPTS) -c $< -o $@
 
-dasynq-test: dasynq.o testme.o
-	$(CXX) dasynq.o testme.o -o dasynq-test
+check:
+	$(MAKE) -C tests check
 
 #install: all
 
@@ -19,3 +19,4 @@ dasynq-test: dasynq.o testme.o
 
 clean:
 	rm -f *.o
+	$(MAKE) -C tests clean

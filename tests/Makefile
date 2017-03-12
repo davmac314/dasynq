@@ -14,9 +14,5 @@ $(objects): %.o: %.cc
 dasynq-test: dasynq-tests.o
 	$(CXX) -g dasynq-tests.o -o dasynq-test
 
-#install: all
-
-#install.man:
-
 clean:
 	rm -f *.o
