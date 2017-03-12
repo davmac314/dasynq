@@ -9,10 +9,10 @@ in a single-threaded client. You can instantiate an event loop of your chosen ty
 
     #include "dasynq.h"
     
-    using Loop_t = dasynq::EventLoop<dasynq::NullMutex>();  // single-threaded
-    using Loop_t = dasynq::EventLoop<std::mutex>();         // multi-threaded
+    using loop_t = dasynq::event_loop<dasynq::NullMutex>();  // single-threaded
+    using loop_t = dasynq::event_loop<std::mutex>();         // multi-threaded
 
-    Loop_t my_loop();
+    loop_t my_loop();
 
 There are essentially three ways of using an event loop:
 
@@ -39,15 +39,15 @@ Once you have created an event loop instance, you can create watchers for variou
 register them with the event loop. For example, to watch for input readiness on a file descriptor,
 create an FdWatcher:
 
-    using Rearm = dasync::Rearm;
+    using rearm = dasynq::rearm;
 
-    class MyFdWatcher : public Loop_t::FdWatcher
+    class MyFdWatcher : public loop_t::FdWatcher
     {
-        Rearm fdEvent(Loop_t *, int fd, int flags) override
+        Rearm fdEvent(loop_t &, int fd, int flags) override
         {
             // Process I/O here
     
-            return Rearm::REARM;  // re-enable watcher
+            return rearm::REARM;  // re-enable watcher
         }
     };
 
@@ -59,16 +59,27 @@ The watcher is normally disabled during the processing of the callback method (a
 re-enabled until the callback method has finished executing, if there may be other threads polling
 the event loop. Callback methods cannot be re-entrant!).
 
-Callback methods usually return a "Rearm" value. There are several possible values:
+A more convenient way to add a watcher, in many cases, is to use a lambda expression:
 
-- Rearm::REARM : re-enable the watcheer
-- Rearm::DISARM : disable the watcher (if it has been re-enabled in the meantime, which should
+    using rearm = dasynq::rearm;
+
+    loop_t::FdWatcher::addWatch(my_loop, fd, IN_EVENTS,
+            [](loop_t &eloop, int fd, int flags) -> rearm {
+        // Process I/O here
+
+        return rearm::REARM;
+    });
+
+Callback methods usually return a "rearm" value. There are several possible values:
+
+- rearm::REARM : re-enable the watcheer
+- rearm::DISARM : disable the watcher (if it has been re-enabled in the meantime, which should
                   only be the case for a single-threaded event loop).
-- Rearm::NOOP   : do not change the watcher state (leave it disabled, or enabled if it has been
+- rearm::NOOP   : do not change the watcher state (leave it disabled, or enabled if it has been
                   enabled explicitly; the latter is only safe if only one thread polls the event
                   loop).
-- Rearm::REMOVE : disable and de-register the watcher
-- Rearm::REMOVED : assume the watcher has been removed already and may be invalid. Do not touch
+- rearm::REMOVE : disable and de-register the watcher
+- rearm::REMOVED : assume the watcher has been removed already and may be invalid. Do not touch
                    the watcher in any way! Necessary if the watcher has been deleted.
 
 Note that if multiple threads are polling the event loop, it is difficult to use some of the Rearm
@@ -88,7 +99,7 @@ called.
 
 See example above. Not shown there is the `setEnabled` method:
 
-    setEnabled(Loop_t &, bool b);
+    setEnabled(loop_t &, bool b);
 
 This enables or disables the watcher. You should not enable a watcher that might currently have
 its callback running (unless the event loop is polled by only single thread).
@@ -96,16 +107,16 @@ its callback running (unless the event loop is polled by only single thread).
 Some backends support watching IN_EVENTS | OUT_EVENTS at the same time, but some don't. Use a
 BidiFdWatcher if you need to do that:
 
-    class MyBidiFdWatcher : public Loop_t::BidiFdWatcher
+    class MyBidiFdWatcher : public loop_t::BidiFdWatcher
     {
-        Rearm readReady(Loop_t &, int fd) override
+        rearm readReady(loop_t &, int fd) override
         {
-            return Rearm::REARM;
+            return rearm::REARM;
         }
         
-        Rearm writeReady(Loop_t &, int fd) override
+        rearm writeReady(loop_t &, int fd) override
         {
-            return Rearm::REARM;
+            return rearm::REARM;
         }
     };
 
@@ -118,17 +129,17 @@ callbacks may be called simultaneously! BidiFdWatcher has (protected) methods to
 and output channels separately. A BidiFdWatcher acts as two separate watchers, which can be
 enabled and disabled separately:
 
-    setInWatchEnabled(Loop_t &, bool);
+    setInWatchEnabled(loop_t &, bool);
 
-    setOutWatchEnabled(Loop_t &, bool);
+    setOutWatchEnabled(loop_t &, bool);
 
-    setWatches(Loop_t &, int flags);
+    setWatches(loop_t &, int flags);
 
 It is possible to disarm either the in or out watch if the corresponding handler is active, but
 it is not safe to arm them in that case. This is the same rule as for enabling/disabling watchers
 generally, except that the BidiFdWatcher itself actually constitutes two separate watchers.
 
-Note also that the BidiFdWatcher channels can be separately removed (by returning Rearm::REMOVE
+Note also that the BidiFdWatcher channels can be separately removed (by returning rearm::REMOVE
 from the handler). The watchRemoved() callback is only called when both channels have been
 removed. You cannot register channels with the event loop separately, and you must remove both
 channels before you register the BidiFdWatcher with another (or the same) loop.
@@ -136,12 +147,12 @@ channels before you register the BidiFdWatcher with another (or the same) loop.
 
 ## 2.2 Signal watchers
 
-    class MySignalWatcher : public Loop_t::SignalWatcher
+    class MySignalWatcher : public loop_t::SignalWatcher
     {
 	// SignalWatcher defines type "SigInfo_p"
-        Rearm received(Loop_t &, int signo, SigInfo_p siginfo)
+        rearm received(loop_t &, int signo, SigInfo_p siginfo)
         {
-            return Rearm::REARM;
+            return rearm::REARM;
         }
     };
 
@@ -157,11 +168,11 @@ watcher for that signal to an event loop.
 
 ## 2.3 Child process watchers
 
-    class MyChildProcWatcher : public Loop_t::ChildProcWatcher
+    class MyChildProcWatcher : public loop_t::ChildProcWatcher
     {
-        Rearm childStatus(Loop_t &, pid_t child, int status)
+        rearm childStatus(loop_t &, pid_t child, int status)
         {
-            return Rearm::REARM;
+            return rearm::REARM;
         }
     };
 
