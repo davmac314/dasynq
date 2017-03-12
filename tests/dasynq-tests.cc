@@ -12,9 +12,9 @@ namespace dasynq {
 #include "dasynq.h"
 
 
-using Loop_t = dasynq::EventLoop<dasynq::NullMutex>;
+using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
 
-using dasynq::Rearm;
+using dasynq::rearm;
 using dasynq::test_io_engine;
 
 // Set up two file descriptor watches on two different descriptors, and make sure the correct handler
@@ -27,15 +27,15 @@ void testFdWatch1()
     bool seen2 = false;
     
     Loop_t::FdWatcher::addWatch(my_loop, 0, dasynq::IN_EVENTS,
-            [&seen1](Loop_t &eloop, int fd, int flags) -> Rearm {
+            [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
         seen1 = true;
-        return Rearm::REMOVE;
+        return rearm::REMOVE;
     });
     
     Loop_t::FdWatcher::addWatch(my_loop, 1, dasynq::IN_EVENTS,
-            [&seen2](Loop_t &eloop, int fd, int flags) -> Rearm {
+            [&seen2](Loop_t &eloop, int fd, int flags) -> rearm {
         seen2 = true;
-        return Rearm::REMOVE;
+        return rearm::REMOVE;
     });
 
     test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
@@ -66,15 +66,15 @@ void testFdWatch2()
     bool seen2 = false;
     
     auto watcher1 = Loop_t::FdWatcher::addWatch(my_loop, 0, dasynq::IN_EVENTS,
-            [&seen1](Loop_t &eloop, int fd, int flags) -> Rearm {
+            [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
         seen1 = true;
-        return Rearm::REARM;
+        return rearm::REARM;
     });
 
     auto watcher2 = Loop_t::FdWatcher::addWatch(my_loop, 1, dasynq::IN_EVENTS,
-            [&seen2](Loop_t &eloop, int fd, int flags) -> Rearm {
+            [&seen2](Loop_t &eloop, int fd, int flags) -> rearm {
         seen2 = true;
-        return Rearm::DISARM;
+        return rearm::DISARM;
     });
     
     test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);

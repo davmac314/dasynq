@@ -11,8 +11,8 @@ TEventLoop & getSystemLoop()
 }
 
 // Instantiate templates:
-template class EventLoop<NullMutex>;
-template class EventLoop<DMutex>;
+template class event_loop<NullMutex>;
+template class event_loop<DMutex>;
 
 
 }
