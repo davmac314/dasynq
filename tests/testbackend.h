@@ -158,6 +158,11 @@ template <class Base> class test_loop : public Base, io_receiver
         test_io_engine::pull_events(*this);
     }
     
+    void interruptWait()
+    {
+    
+    }
+    
     void addFdWatch(int fd, void * callback, int eventmask, bool enabled)
     {
         if (! enabled) eventmask = 0;
@@ -175,14 +180,23 @@ template <class Base> class test_loop : public Base, io_receiver
         // TODO
     }
     
-    void enableFdWatch_nolock(int fd, void *userdata, int events)
+    void enableFdWatch_nolock(int fd_num, void *userdata, int events)
     {
-        // TODO
+        auto srch = fd_data_map.find(fd_num);
+        if (srch != fd_data_map.end()) {
+            srch->second.events = events;
+            srch->second.userdata = userdata;
+        }
+    }
+    
+    void removeFdWatch(int fd, int events)
+    {
+        removeFdWatch_nolock(fd, events);
     }
     
     void removeFdWatch_nolock(int fd, int events)
     {
-        // TODO
+        fd_data_map.erase(fd);
     }
     
     void rearmSignalWatch_nolock(int signo)
@@ -203,7 +217,11 @@ template <class Base> class test_loop : public Base, io_receiver
         if (srch != fd_data_map.end()) {
             auto &data = srch->second;
             if ((data.events & events) != 0) {
-                Base::receiveFdEvent(*this, test_loop_traits::FD_r(), srch->second.userdata, srch->second.events);
+                int rep_events = data.events & events;
+                if (data.events & ONE_SHOT) {
+                    data.events &= ~IN_EVENTS & ~OUT_EVENTS;
+                }
+                Base::receiveFdEvent(*this, test_loop_traits::FD_r(), data.userdata, rep_events);
             }
         }
     }
