@@ -390,14 +390,12 @@ template <class Base> class KqueueLoop : public Base
             SigInfo siginfo;
             int rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             while (rsigno > 0) {
-                // TODO avoid this hack for SIGCHLD somehow
-                if (rsigno != SIGCHLD) {
+                if (Base::receiveSignal(*this, siginfo, sigdataMap[rsigno])) {
                     sigdelset(&sigmask, rsigno);
                     // TODO accumulate and disable multiple filters with a single kevents call
                     //      rather than disabling each individually
                     setFilterEnabled(EVFILT_SIGNAL, rsigno, false);
                 }
-                Base::receiveSignal(*this, siginfo, sigdataMap[rsigno]);
                 rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             }
         }
