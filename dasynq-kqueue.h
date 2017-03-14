@@ -93,16 +93,16 @@ static inline int sigtimedwait(const sigset_t *ssp, siginfo_t *info, struct time
 static inline void prepare_signal(int signo) { }
 static inline void unprep_signal(int signo) { }
 
-static void get_siginfo(int signo, siginfo_t *siginfo)
+static bool get_siginfo(int signo, siginfo_t *siginfo)
 {
-	struct timespec timeout;
-	timeout.tv_sec = 0;
-	timeout.tv_nsec = 0;
+    struct timespec timeout;
+    timeout.tv_sec = 0;
+    timeout.tv_nsec = 0;
 
-	sigset_t mask;
-	sigfillset(&mask);
-	sigdelset(&mask, signo);
-	sigtimedwait(&mask, siginfo, &timeout);
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, signo);
+    return (sigtimedwait(&mask, siginfo, &timeout) != -1);
 }
 
 #elif defined(__APPLE__)
@@ -111,32 +111,33 @@ static siginfo_t * siginfo_p;
 
 static void signalHandler(int signo, siginfo_t *siginfo, void *v)
 {
-	*siginfo_p = *siginfo;
+    *siginfo_p = *siginfo;
 }
 
 static inline void prepare_signal(int signo)
 {
-	struct sigaction the_action;
-	the_action.sa_sigaction = signalHandler;
-	the_action.sa_flags = SA_SIGINFO;
-	sigfillset(&the_action.sa_mask);
+    struct sigaction the_action;
+    the_action.sa_sigaction = signalHandler;
+    the_action.sa_flags = SA_SIGINFO;
+    sigfillset(&the_action.sa_mask);
 
-	sigaction(signo, &the_action, nullptr);
+    sigaction(signo, &the_action, nullptr);
 }
 
 static inline void unprep_signal(int signo)
 {
-	signal(signo, SIG_DFL);
+    signal(signo, SIG_DFL);
 }
 
-static void get_siginfo(int signo, siginfo_t *siginfo)
+static bool get_siginfo(int signo, siginfo_t *siginfo)
 {
-	siginfo_p = siginfo;
+    siginfo_p = siginfo;
 
-	sigset_t mask;
-	sigfillset(&mask);
-	sigdelset(&mask, signo);
-	sigsuspend(&mask);
+    sigset_t mask;
+    sigfillset(&mask);
+    sigdelset(&mask, signo);
+    sigsuspend(&mask);
+    return true;
 }
 
 #endif
@@ -176,8 +177,8 @@ template <class Base> class KqueueLoop : public Base
         for (int i = 0; i < r; i++) {
             if (events[i].filter == EVFILT_SIGNAL) {
                 SigInfo siginfo;
-                get_siginfo(events[i].ident, &siginfo.info);
-                if (Base::receiveSignal(*this, siginfo, (void *)events[i].udata)) {
+                if (get_siginfo(events[i].ident, &siginfo.info)
+                        && Base::receiveSignal(*this, siginfo, (void *)events[i].udata)) {
                     sigdelset(&sigmask, events[i].ident);
                     events[i].flags = EV_DISABLE;
                 }
