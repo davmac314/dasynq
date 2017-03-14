@@ -39,7 +39,7 @@ class KqueueTraits
         public:
         int get_signo() { return info.si_signo; }
         int get_sicode() { return info.si_code; }
-        char * get_ssiaddr() { return info.si_addr; }
+        void * get_ssiaddr() { return info.si_addr; }
         
         void set_signo(int signo) { info.si_signo = signo; }
     };    
@@ -79,7 +79,8 @@ class KqueueTraits
 // essentially an incomplete version of the same thing. Discussion with OpenBSD developer
 // Ted Unangst suggested that the siginfo_t structure returned might not always have all
 // fields set correctly. Furthermore there is a bug such that specifying a zero timeout (or
-// indeed any timeout less than a tick) results in NO timeout.
+// indeed any timeout less than a tick) results in NO timeout. We get around this by instead
+// specifying an *invalid* timeout, which won't error out if a signal is pending.
 static inline int sigtimedwait(const sigset_t *ssp, siginfo_t *info, struct timespec *timeout)
 {
     // We know that we're only called with a timeout of 0 (which doesn't work properly) and
@@ -88,6 +89,56 @@ static inline int sigtimedwait(const sigset_t *ssp, siginfo_t *info, struct time
     timeout->tv_nsec = 1000000001;
     return __thrsigdivert(*ssp, info, timeout);
 }
+
+static inline void prepare_signal(int signo) { }
+static inline void unprep_signal(int signo) { }
+
+static void get_siginfo(int signo, siginfo_t *siginfo)
+{
+	struct timespec timeout;
+	timeout.tv_sec = 0;
+	timeout.tv_nsec = 0;
+
+	sigset_t mask;
+	sigfillset(&mask);
+	sigdelset(&mask, signo);
+	sigtimedwait(&mask, siginfo, &timeout);
+}
+
+#elif defined(__APPLE__)
+
+static siginfo_t * siginfo_p;
+
+static void signalHandler(int signo, siginfo_t *siginfo, void *v)
+{
+	*siginfo_p = *siginfo;
+}
+
+static inline void prepare_signal(int signo)
+{
+	struct sigaction the_action;
+	the_action.sa_sigaction = signalHandler;
+	the_action.sa_flags = SA_SIGINFO;
+	sigfillset(&the_action.sa_mask);
+
+	sigaction(signo, &the_action, nullptr);
+}
+
+static inline void unprep_signal(int signo)
+{
+	signal(signo, SIG_DFL);
+}
+
+static void get_siginfo(int signo, siginfo_t *siginfo)
+{
+	siginfo_p = siginfo;
+
+	sigset_t mask;
+	sigfillset(&mask);
+	sigdelset(&mask, signo);
+	sigsuspend(&mask);
+}
+
 #endif
 
 template <class Base> class KqueueLoop : public Base
@@ -125,20 +176,13 @@ template <class Base> class KqueueLoop : public Base
         for (int i = 0; i < r; i++) {
             if (events[i].filter == EVFILT_SIGNAL) {
                 SigInfo siginfo;
-                sigset_t sset;
-                sigemptyset(&sset);
-                sigaddset(&sset, events[i].ident);
-                struct timespec timeout;
-                timeout.tv_sec = 0;
-                timeout.tv_nsec = 0;
-                if (sigtimedwait(&sset, &siginfo.info, &timeout) > 0) {
-                    if (Base::receiveSignal(*this, siginfo, (void *)events[i].udata)) {
-                        sigdelset(&sigmask, events[i].ident);
-                        events[i].flags = EV_DISABLE;
-                    }
-                    else {
-                        events[i].flags = EV_ENABLE;
-                    }
+                get_siginfo(events[i].ident, &siginfo.info);
+                if (Base::receiveSignal(*this, siginfo, (void *)events[i].udata)) {
+                    sigdelset(&sigmask, events[i].ident);
+                    events[i].flags = EV_DISABLE;
+                }
+                else {
+                    events[i].flags = EV_ENABLE;
                 }
             }
             else if (events[i].filter == EVFILT_READ || events[i].filter == EVFILT_WRITE) {
@@ -271,6 +315,8 @@ template <class Base> class KqueueLoop : public Base
         sigdataMap[signo] = userdata;
         sigaddset(&sigmask, signo);
         
+        prepare_signal(signo);
+
         struct kevent evt;
         EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ADD, 0, 0, userdata);
         // TODO use EV_DISPATCH if available (not on OpenBSD)
@@ -294,6 +340,7 @@ template <class Base> class KqueueLoop : public Base
     
     void removeSignalWatch_nolock(int signo) noexcept
     {
+        unprep_signal(signo);
         sigdelset(&sigmask, signo);
         
         struct kevent evt;
@@ -332,6 +379,13 @@ template <class Base> class KqueueLoop : public Base
         
         {
             std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+
+#if defined(__APPLE__)
+            sigset_t pending_mask;
+            sigpending(&pending_mask);
+            // XXX TODO
+
+#else
             struct timespec timeout;
             timeout.tv_sec = 0;
             timeout.tv_nsec = 0;
@@ -348,6 +402,7 @@ template <class Base> class KqueueLoop : public Base
                 Base::receiveSignal(*this, siginfo, sigdataMap[rsigno]);
                 rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             }
+#endif
         }
         
         struct kevent events[16];
