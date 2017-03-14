@@ -377,15 +377,12 @@ template <class Base> class KqueueLoop : public Base
         // signals that have been registered - in many cases that will allow
         // us to skip the sigtimedwait call altogether.
         
+        // The check is not necessary on systems that don't queue signals.
+
+#if _POSIX_REALTIME_SIGNALS > 0
         {
             std::lock_guard<decltype(Base::lock)> guard(Base::lock);
 
-#if defined(__APPLE__)
-            sigset_t pending_mask;
-            sigpending(&pending_mask);
-            // XXX TODO
-
-#else
             struct timespec timeout;
             timeout.tv_sec = 0;
             timeout.tv_nsec = 0;
@@ -402,8 +399,8 @@ template <class Base> class KqueueLoop : public Base
                 Base::receiveSignal(*this, siginfo, sigdataMap[rsigno]);
                 rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             }
-#endif
         }
+#endif
         
         struct kevent events[16];
         struct timespec ts;
