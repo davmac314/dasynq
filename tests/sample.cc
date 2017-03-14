@@ -6,25 +6,25 @@
 
 using namespace dasynq;
 
-using Loop_t = EventLoop<std::mutex>;
+using Loop_t = event_loop<std::mutex>;
 
 class MySignalWatcher : public Loop_t::SignalWatcher
 {
-    Rearm received(Loop_t & eloop, int signo, SigInfo_p siginfo) override
+    rearm received(Loop_t & eloop, int signo, SigInfo_p siginfo) override
     {
         using namespace std;
         cout << "Got signal: " << signo << endl;
-        return Rearm::REARM;
+        return rearm::REARM;
     }
 };
 
 class MyTimer : public Loop_t::Timer
 {
-    Rearm timerExpiry(Loop_t & eloop, int expiry_count)
+    rearm timerExpiry(Loop_t & eloop, int expiry_count)
     {
         using namespace std;
         cout << "Got timeout!" << endl;
-        return Rearm::REMOVE;
+        return rearm::REMOVE;
     }
 };
 
