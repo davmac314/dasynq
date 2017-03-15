@@ -158,7 +158,7 @@ template <class Base> class test_loop : public Base, io_receiver
         test_io_engine::pull_events(*this);
     }
     
-    void interruptWait()
+    void interrupt_wait()
     {
     
     }

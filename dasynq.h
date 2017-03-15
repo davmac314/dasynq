@@ -1,16 +1,11 @@
 #ifndef DASYNQ_H_INCLUDED
 #define DASYNQ_H_INCLUDED
 
-#if defined(__OpenBSD__) || defined(__APPLE__)
-#define DASYNQ_HAVE_KQUEUE 1
-#endif
-
-#if defined(__linux__)
-#define DASYNQ_HAVE_EPOLL 1
-#endif
+#include "dasynq-config.h"
 
 #include "dasynq-flags.h"
 #include "dasynq-binaryheap.h"
+#include "dasynq-interrupt.h"
 
 #if defined(DASYNQ_CUSTOM_LOOP_IMPLEMENTATION)
 // Loop and LoopTraits defined already; used for testing
@@ -19,7 +14,7 @@
 #include "dasynq-itimer.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = KqueueLoop<ITimerEvents<ChildProcEvents<T>>>;
+    template <typename T> using Loop = KqueueLoop<interrupt_channel<ITimerEvents<ChildProcEvents<T>>, T>>;
     using LoopTraits = KqueueTraits;
 }
 #elif defined(DASYNQ_HAVE_EPOLL)
@@ -27,7 +22,7 @@ namespace dasynq {
 #include "dasynq-timerfd.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = EpollLoop<TimerFdEvents<ChildProcEvents<T>>>;
+    template <typename T> using Loop = EpollLoop<interrupt_channel<TimerFdEvents<ChildProcEvents<T>>, T>>;
     using LoopTraits = EpollTraits;
 }
 #endif
@@ -41,20 +36,7 @@ namespace dasynq {
 #include <unistd.h>
 #include <fcntl.h>
 
-
 // TODO consider using atomic variables instead of explicit locking where appropriate
-
-// Allow optimisation of empty classes by including this in the body:
-// May be included as the last entry for a class which is only
-// _potentially_ empty.
-
-#ifdef __GNUC__
-#ifndef __clang__
-#define DASYNQ_EMPTY_BODY    char empty[0];  // Make class instances take up no space (gcc)    
-#else
-#define DASYNQ_EMPTY_BODY    char empty[0] __attribute__((unused));  // Make class instances take up no space (clang)
-#endif
-#endif
 
 #include "dasynq-mutex.h"
 
@@ -902,7 +884,7 @@ template <typename T_Mutex> class event_loop
         std::unique_lock<T_Mutex> ulock(wait_lock);
         attn_waitqueue.queue(&qnode);        
         if (! attn_waitqueue.checkHead(qnode)) {
-            loop_mech.interruptWait();
+            loop_mech.interrupt_wait();
             while (! attn_waitqueue.checkHead(qnode)) {
                 qnode.wait(ulock);
             }
