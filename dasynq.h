@@ -14,7 +14,7 @@
 #include "dasynq-itimer.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = KqueueLoop<interrupt_channel<ITimerEvents<ChildProcEvents<T>>, T>>;
+    template <typename T> using Loop = KqueueLoop<interrupt_channel<ITimerEvents<ChildProcEvents<T>>>>;
     using LoopTraits = KqueueTraits;
 }
 #elif defined(DASYNQ_HAVE_EPOLL)
@@ -22,7 +22,7 @@ namespace dasynq {
 #include "dasynq-timerfd.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = EpollLoop<interrupt_channel<TimerFdEvents<ChildProcEvents<T>>, T>>;
+    template <typename T> using Loop = EpollLoop<interrupt_channel<TimerFdEvents<ChildProcEvents<T>>>>;
     using LoopTraits = EpollTraits;
 }
 #endif
@@ -579,6 +579,9 @@ namespace dprivate {
                 lock.unlock();
             }
         }
+
+        public:
+        using mutex_t = T_Mutex;
     };
 }
 
