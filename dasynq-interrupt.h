@@ -40,7 +40,7 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
             fcntl(filedes[0], F_SETFD, O_CLOEXEC);
             fcntl(filedes[1], F_SETFD, O_CLOEXEC);
             fcntl(filedes[0], F_SETFL, O_NONBLOCK);
-            fcntl(filedesp1[, F_SETFL, O_NONBLOCK);
+            fcntl(filedes[1], F_SETFL, O_NONBLOCK);
         }
         return r;
     }
