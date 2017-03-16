@@ -4,6 +4,7 @@
 #include <sys/timerfd.h>
 #include <time.h>
 
+#include "dasynq-timerbase.h"
 #include "dasynq-binaryheap.h"
 
 namespace dasynq {
@@ -17,54 +18,12 @@ namespace dasynq {
 // we are given a handle; we need to use this to modify the watch. We delegate the
 // process of allocating a handle to a priority heap implementation (BinaryHeap).
 
-
-class TimerData
-{
-    public:
-    // initial time?
-    struct timespec interval_time; // interval (if 0, one-off timer)
-    int expiry_count;  // number of times expired
-    bool enabled;   // whether timer reports events  
-    void *userdata;
-    
-    TimerData(void *udata = nullptr) : interval_time({0,0}), expiry_count(0), enabled(true), userdata(udata)
-    {
-        // constructor
-    }
-};
-
-class CompareTimespec
-{
-    public:
-    bool operator()(const struct timespec &a, const struct timespec &b)
-    {
-        if (a.tv_sec < b.tv_sec) {
-            return true;
-        }
-        
-        if (a.tv_sec == b.tv_sec) {
-            return a.tv_nsec < b.tv_nsec;
-        }
-        
-        return false;
-    }
-};
-
-using timer_handle_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>::handle_t;
-
-static void init_timer_handle(timer_handle_t &hnd) noexcept
-{
-    BinaryHeap<TimerData, struct timespec, CompareTimespec>::init_handle(hnd);
-}
-
-
 template <class Base> class TimerFdEvents : public Base
 {
     private:
     int timerfd_fd = -1;
 
     BinaryHeap<TimerData, struct timespec, CompareTimespec> timer_queue;
-
     
     static int divide_timespec(const struct timespec &num, const struct timespec &den)
     {
