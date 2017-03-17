@@ -1,7 +1,7 @@
-# -include ../mconfig
 CXX = g++
-#CXX = clang++
-CXXOPTS = -std=c++11 -Wall -Wno-invalid-offsetof
+CXXOPTS = -std=c++11 -Os -Wall -Wno-invalid-offsetof
+THREADOPT = -pthread
+SANITIZE = -fsanitize=address,null,return,bounds,alignment,object-size 
 
 objects = dasynq.o
 
@@ -11,7 +11,7 @@ $(objects): %.o: %.cc   dasynq.h
 	$(CXX) $(CXXOPTS) -c $< -o $@
 
 check:
-	$(MAKE) -C tests check
+	$(MAKE) CXXOPTS="$(CXXOPTS)" SANITIZE="$(SANITIZE)" THREADOPT="$(THREADOPT)" -C tests check
 
 #install: all
 
