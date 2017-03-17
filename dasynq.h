@@ -136,7 +136,7 @@ namespace dprivate {
     class BaseWatcher
     {
         template <typename T_Mutex, typename Traits> friend class EventDispatch;
-        template <typename T_Mutex> friend class dasynq::event_loop;
+        template <typename T_Mutex, template <typename> class, typename> friend class dasynq::event_loop;
         
         protected:
         WatchType watchType;
