@@ -2,17 +2,9 @@
 #include <iostream>
 
 #include "testbackend.h"
-
-namespace dasynq {
-    template <typename T> using Loop = test_loop<T>;
-    using LoopTraits = test_loop_traits;
-}
-
-#define DASYNQ_CUSTOM_LOOP_IMPLEMENTATION 1
 #include "dasynq.h"
 
-
-using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+using Loop_t = dasynq::event_loop<dasynq::NullMutex, dasynq::test_loop, dasynq::test_loop_traits>;
 
 using dasynq::rearm;
 using dasynq::test_io_engine;
