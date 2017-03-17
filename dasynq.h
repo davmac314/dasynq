@@ -45,21 +45,21 @@ namespace dasynq {
 #ifdef __APPLE__
 int pipe2(int filedes[2], int flags)
 {
-	if (pipe(filedes) == -1) {
-		return -1;
-	}
+    if (pipe(filedes) == -1) {
+        return -1;
+    }
 
-	if (flags & O_CLOEXEC) {
-		fcntl(filedes[0], F_SETFD, FD_CLOEXEC);
-		fcntl(filedes[1], F_SETFD, FD_CLOEXEC);
-	}
+    if (flags & O_CLOEXEC) {
+	fcntl(filedes[0], F_SETFD, FD_CLOEXEC);
+	fcntl(filedes[1], F_SETFD, FD_CLOEXEC);
+    }
 
-	if (flags & O_NONBLOCK) {
-		fcntl(filedes[0], F_SETFL, O_NONBLOCK);
-		fcntl(filedes[1], F_SETFL, O_NONBLOCK);
-	}
+    if (flags & O_NONBLOCK) {
+	fcntl(filedes[0], F_SETFL, O_NONBLOCK);
+	fcntl(filedes[1], F_SETFL, O_NONBLOCK);
+    }
 
-	return 0;
+    return 0;
 }
 #endif
 
