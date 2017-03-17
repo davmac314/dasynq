@@ -419,6 +419,8 @@ namespace dprivate {
         
         protected:
         T_Mutex lock;
+
+        template <typename T> void init(T *loop) { }
         
         // Receive a signal; return true to disable signal watch or false to leave enabled
         template <typename T>
