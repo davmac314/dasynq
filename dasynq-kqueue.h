@@ -129,7 +129,7 @@ static inline void unprep_signal(int signo)
     signal(signo, SIG_DFL);
 }
 
-static bool get_siginfo(int signo, siginfo_t *siginfo)
+static inline bool get_siginfo(int signo, siginfo_t *siginfo)
 {
     siginfo_p = siginfo;
 
