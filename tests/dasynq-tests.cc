@@ -216,7 +216,6 @@ void ftestMultiThread1()
     create_pipe(pipe2);
 
     char wbuf[1] = {'a'};
-    char rbuf[1];
     write(pipe2[1], wbuf, 1);
 
     auto fwatch = Loop_t::FdWatcher::addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS,
@@ -228,8 +227,6 @@ void ftestMultiThread1()
     std::thread t([&my_loop]() -> void {
         my_loop.run();
     });
-
-    sleep(1);
 
     fwatch->deregister(my_loop);
 
