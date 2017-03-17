@@ -162,6 +162,12 @@ void ftestSigWatch()
 
     using SigInfo_p = Loop_t::SignalWatcher::SigInfo_p;
 
+    sigset_t sigmask;
+    sigemptyset(&sigmask);
+    sigaddset(&sigmask, SIGUSR1);
+    sigaddset(&sigmask, SIGUSR2);
+    sigprocmask(SIG_BLOCK, &sigmask, nullptr);
+
     Loop_t::SignalWatcher::addWatch(my_loop, SIGUSR1,
             [&seen1](Loop_t &eloop, int signo, SigInfo_p info) -> rearm {
         seen1 = true;
