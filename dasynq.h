@@ -1231,6 +1231,36 @@ public:
         eloop.deregister(this, this->siginfo.get_signo());
     }
     
+    template <typename T>
+    static SignalWatcher<EventLoop> *addWatch(EventLoop &eloop, int signo, T watchHndlr)
+    {
+        class LambdaSigWatcher : public SignalWatcher<EventLoop>
+        {
+            private:
+            T watchHndlr;
+
+            public:
+            LambdaSigWatcher(T watchHandlr_a) : watchHndlr(watchHandlr_a)
+            {
+                //
+            }
+
+            rearm received(EventLoop &eloop, int signo, SigInfo_p siginfo) override
+            {
+                return watchHndlr(eloop, signo, siginfo);
+            }
+
+            void watchRemoved() noexcept override
+            {
+                delete this;
+            }
+        };
+
+        LambdaSigWatcher * lsw = new LambdaSigWatcher(watchHndlr);
+        lsw->addWatch(eloop, signo);
+        return lsw;
+    }
+
     virtual rearm received(EventLoop &eloop, int signo, SigInfo_p siginfo) = 0;
 };
 
