@@ -1,5 +1,6 @@
 #include <cassert>
 #include <iostream>
+#include <thread>
 
 #include "testbackend.h"
 #include "dasynq.h"
@@ -201,6 +202,55 @@ void ftestSigWatch()
     assert(seen2);
 }
 
+void ftestMultiThread1()
+{
+    using Loop_t = dasynq::event_loop<std::mutex>;
+    Loop_t my_loop;
+
+    bool seen1 = false;
+    bool seen2 = false;
+
+    int pipe1[2];
+    int pipe2[2];
+    create_pipe(pipe1);
+    create_pipe(pipe2);
+
+    char wbuf[1] = {'a'};
+    char rbuf[1];
+    write(pipe2[1], wbuf, 1);
+
+    auto fwatch = Loop_t::FdWatcher::addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS,
+            [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
+        seen1 = true;
+        return rearm::REMOVE;
+    });
+
+    std::thread t([&my_loop]() -> void {
+        my_loop.run();
+    });
+
+    sleep(1);
+
+    fwatch->deregister(my_loop);
+
+    Loop_t::FdWatcher::addWatch(my_loop, pipe2[0], dasynq::IN_EVENTS,
+            [&seen2](Loop_t &eloop, int fd, int flags) -> rearm {
+        seen2 = true;
+        return rearm::REMOVE;
+    });
+
+    // join thread
+    t.join();
+
+    assert(seen2);
+    assert(!seen1);
+
+    close(pipe1[0]);
+    close(pipe1[1]);
+    close(pipe2[0]);
+    close(pipe2[1]);
+}
+
 int main(int argc, char **argv)
 {
     std::cout << "testFdWatch1... ";
@@ -217,6 +267,10 @@ int main(int argc, char **argv)
 
     std::cout << "ftestSigWatch... ";
     ftestSigWatch();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftestMultiThread1... ";
+    ftestMultiThread1();
     std::cout << "PASSED" << std::endl;
     
     return 0;
