@@ -104,7 +104,8 @@ enum class ClockType
 using SigInfo = LoopTraits::SigInfo;
 
 // Forward declarations:
-template <typename T_Mutex> class event_loop;
+template <typename T_Mutex, template <typename> class Loop = dasynq::Loop, typename LoopTraits = dasynq::LoopTraits>
+class event_loop;
 
 namespace dprivate {
     // (non-public API)
@@ -177,17 +178,18 @@ namespace dprivate {
     };
     
     // Base signal event - not part of public API
-    template <typename T_Mutex>
+    template <typename T_Mutex, typename Traits>
     class BaseSignalWatcher : public BaseWatcher
     {
-        template <typename M, typename Traits> friend class EventDispatch;
+        friend class EventDispatch<T_Mutex, Traits>;
         friend class dasynq::event_loop<T_Mutex>;
 
         protected:
-        SigInfo siginfo;
+        typename Traits::SigInfo siginfo;
         BaseSignalWatcher() : BaseWatcher(WatchType::SIGNAL) { }
 
         public:
+        using SigInfo = typename Traits::SigInfo;
         typedef SigInfo &SigInfo_p;
         
         virtual rearm received(event_loop<T_Mutex> &eloop, int signo, SigInfo_p siginfo) = 0;
@@ -408,7 +410,7 @@ namespace dprivate {
         // queue data structure/pointer
         PrioQueue event_queue;
         
-        using BaseSignalWatcher = dasynq::dprivate::BaseSignalWatcher<T_Mutex>;
+        using BaseSignalWatcher = dasynq::dprivate::BaseSignalWatcher<T_Mutex,Traits>;
         using BaseFdWatcher = dasynq::dprivate::BaseFdWatcher<T_Mutex>;
         using BaseBidiFdWatcher = dasynq::dprivate::BaseBidiFdWatcher<T_Mutex>;
         using BaseChildWatcher = dasynq::dprivate::BaseChildWatcher<T_Mutex>;
@@ -586,23 +588,25 @@ namespace dprivate {
 }
 
 
-template <typename T_Mutex> class event_loop
+template <typename T_Mutex, template <typename> class Loop, typename LoopTraits>
+class event_loop
 {
-    friend class dprivate::FdWatcher<event_loop<T_Mutex>>;
-    friend class dprivate::BidiFdWatcher<event_loop<T_Mutex>>;
-    friend class dprivate::SignalWatcher<event_loop<T_Mutex>>;
-    friend class dprivate::ChildProcWatcher<event_loop<T_Mutex>>;
-    friend class dprivate::Timer<event_loop<T_Mutex>>;
+    using my_event_loop_t = event_loop<T_Mutex, Loop, LoopTraits>;
+    friend class dprivate::FdWatcher<my_event_loop_t>;
+    friend class dprivate::BidiFdWatcher<my_event_loop_t>;
+    friend class dprivate::SignalWatcher<my_event_loop_t>;
+    friend class dprivate::ChildProcWatcher<my_event_loop_t>;
+    friend class dprivate::Timer<my_event_loop_t>;
     
     public:
-    using LoopTraits = dasynq::LoopTraits;
+    using loop_traits_t = LoopTraits;
     
     private:
     template <typename T, typename U> using EventDispatch = dprivate::EventDispatch<T,U>;
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
     using BaseWatcher = dprivate::BaseWatcher;
-    using BaseSignalWatcher = dprivate::BaseSignalWatcher<T_Mutex>;
+    using BaseSignalWatcher = dprivate::BaseSignalWatcher<T_Mutex,LoopTraits>;
     using BaseFdWatcher = dprivate::BaseFdWatcher<T_Mutex>;
     using BaseBidiFdWatcher = dprivate::BaseBidiFdWatcher<T_Mutex>;
     using BaseChildWatcher = dprivate::BaseChildWatcher<T_Mutex>;
@@ -1201,8 +1205,6 @@ template <typename T_Mutex> class event_loop
     using ChildProcWatcher = dprivate::ChildProcWatcher<event_loop<T_Mutex>>;
     using Timer = dprivate::Timer<event_loop<T_Mutex>>;
     
-    // using LoopTraits = dasynq::LoopTraits;
-    
     void run() noexcept
     {
         while (! processEvents()) {
@@ -1231,13 +1233,13 @@ namespace dprivate {
 
 // Posix signal event watcher
 template <typename EventLoop>
-class SignalWatcher : private dprivate::BaseSignalWatcher<typename EventLoop::mutex_t>
+class SignalWatcher : private dprivate::BaseSignalWatcher<typename EventLoop::mutex_t, typename EventLoop::loop_traits_t>
 {
     using BaseWatcher = dprivate::BaseWatcher;
     using T_Mutex = typename EventLoop::mutex_t;
     
 public:
-    using SigInfo_p = typename dprivate::BaseSignalWatcher<T_Mutex>::SigInfo_p;
+    using SigInfo_p = typename dprivate::BaseSignalWatcher<T_Mutex, typename EventLoop::loop_traits_t>::SigInfo_p;
 
     // Register this watcher to watch the specified signal.
     // If an attempt is made to register with more than one event loop at
@@ -1382,7 +1384,7 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         else {
             this->watch_flags &= ~events;
         }
-        if (EventLoop::LoopTraits::has_separate_rw_fd_watches) {
+        if (EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
             dprivate::BaseWatcher * watcher = in ? this : &this->outWatcher;
             eloop.setFdEnabled_nolock(watcher, this->watch_fd, events | ONE_SHOT, b);
             if (! b) {
@@ -1427,7 +1429,7 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     void setWatches(EventLoop &eloop, int newFlags)
     {
         std::lock_guard<T_Mutex> guard(eloop.getBaseLock());
-        if (LoopTraits::has_separate_rw_fd_watches) {
+        if (EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
             setWatchEnabled(eloop, true, (newFlags & IN_EVENTS) != 0);
             setWatchEnabled(eloop, false, (newFlags & OUT_EVENTS) != 0);
         }
@@ -1539,7 +1541,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     // - 0 in the child
     pid_t fork(EventLoop &eloop)
     {
-        if (EventLoop::LoopTraits::supports_childwatch_reservation) {
+        if (EventLoop::loop_traits_t::supports_childwatch_reservation) {
             // Reserve a watch, fork, then claim reservation
             reserveWatch(eloop);
             
