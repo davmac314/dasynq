@@ -3,6 +3,7 @@
 
 #include <cstddef>
 #include <cstdlib>
+#include <utility>
 #include <new>
 
 // Vector with possibility to shrink capacity arbitrarily
