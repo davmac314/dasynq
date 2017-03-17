@@ -341,6 +341,9 @@ namespace dprivate {
         waitqueue_node<T_Mutex> * unqueue()
         {
             head = head->next;
+            if (head == nullptr) {
+                tail = nullptr;
+            }
             return head;
         }
         
@@ -367,6 +370,7 @@ namespace dprivate {
             else {
                 head = node;
             }
+            tail = node;
         }
     };
     
@@ -898,8 +902,9 @@ class event_loop
             nhead->signal();
         }
         else {
-            nhead = wait_waitqueue.getHead();
-            if (nhead != nullptr) {
+            if (! wait_waitqueue.isEmpty()) {
+                auto nhead = wait_waitqueue.getHead();
+                wait_waitqueue.unqueue();
                 attn_waitqueue.queue(nhead);
                 nhead->signal();
             }
