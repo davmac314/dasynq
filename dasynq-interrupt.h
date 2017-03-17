@@ -69,6 +69,8 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
             close (pipe_w_fd);
             throw;
         }
+
+        Base::init(loop_mech);
     }
 
     template <typename T>
