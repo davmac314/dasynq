@@ -98,11 +98,6 @@ enum class ClockType
     MONOTONIC
 };
 
-// Information about a received signal.
-// This is essentially a wrapper for the POSIX siginfo_t; its existence allows for mechanisms that receive
-// equivalent signal information in a different format (eg signalfd on Linux).
-using SigInfo = LoopTraits::SigInfo;
-
 // Forward declarations:
 template <typename T_Mutex, template <typename> class Loop = dasynq::Loop, typename LoopTraits = dasynq::LoopTraits>
 class event_loop;
@@ -182,7 +177,7 @@ namespace dprivate {
     class BaseSignalWatcher : public BaseWatcher
     {
         friend class EventDispatch<T_Mutex, Traits>;
-        friend class dasynq::event_loop<T_Mutex>;
+        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
 
         protected:
         typename Traits::SigInfo siginfo;
@@ -191,15 +186,13 @@ namespace dprivate {
         public:
         using SigInfo = typename Traits::SigInfo;
         typedef SigInfo &SigInfo_p;
-        
-        virtual rearm received(event_loop<T_Mutex> &eloop, int signo, SigInfo_p siginfo) = 0;
     };
     
     template <typename T_Mutex>
     class BaseFdWatcher : public BaseWatcher
     {
         template <typename, typename Traits> friend class EventDispatch;
-        friend class dasynq::event_loop<T_Mutex>;
+        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
         
         protected:
         int watch_fd;
@@ -209,23 +202,14 @@ namespace dprivate {
         int event_flags;  // events pending (queued)
         
         BaseFdWatcher() noexcept : BaseWatcher(WatchType::FD) { }
-        
-        public:
-        virtual rearm fdEvent(event_loop<T_Mutex> &eloop, int fd, int flags) = 0;
     };
     
     template <typename T_Mutex>
     class BaseBidiFdWatcher : public BaseFdWatcher<T_Mutex>
     {
         template <typename, typename Traits> friend class EventDispatch;
-        friend class dasynq::event_loop<T_Mutex>;
-        
-        // This should never actually get called:
-        rearm fdEvent(event_loop<T_Mutex> &eloop, int fd, int flags) final
-        {
-            return rearm::REARM; // should not be reachable.
-        };
-        
+        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+
         protected:
         
         // The main instance is the "input" watcher only; we keep a secondary watcher
@@ -234,26 +218,19 @@ namespace dprivate {
         
         int read_removed : 1; // read watch removed?
         int write_removed : 1; // write watch removed?
-        
-        public:
-        virtual rearm readReady(event_loop<T_Mutex> &eloop, int fd) noexcept = 0;
-        virtual rearm writeReady(event_loop<T_Mutex> &eloop, int fd) noexcept = 0;
     };
     
     template <typename T_Mutex>
     class BaseChildWatcher : public BaseWatcher
     {
         template <typename, typename Traits> friend class EventDispatch;
-        friend class dasynq::event_loop<T_Mutex>;
+        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
         
         protected:
         pid_t watch_pid;
         int child_status;
         
         BaseChildWatcher() : BaseWatcher(WatchType::CHILD) { }
-        
-        public:
-        virtual rearm childStatus(event_loop<T_Mutex> &eloop, pid_t child, int status) = 0;
     };
     
 
@@ -261,7 +238,7 @@ namespace dprivate {
     class BaseTimerWatcher : public BaseWatcher
     {
         template <typename, typename Traits> friend class EventDispatch;
-        friend class dasynq::event_loop<T_Mutex>;
+        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
         
         protected:
         timer_handle_t timer_handle;
@@ -271,12 +248,6 @@ namespace dprivate {
         {
             init_timer_handle(timer_handle);
         }
-        
-        public:
-        // Timer expired, and the given number of intervals have elapsed before
-        // expiry evenet was queued. Normally intervals == 1 to indicate no
-        // overrun.
-        virtual rearm timerExpiry(event_loop<T_Mutex> &eloop, int intervals) = 0;
     };
 
     // Classes for implementing a fair(ish) wait queue.
@@ -405,7 +376,7 @@ namespace dprivate {
     // into the queue when eventes are received (receiveXXX methods).
     template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
     {
-        friend class event_loop<T_Mutex>;
+        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
 
         // queue data structure/pointer
         PrioQueue event_queue;
@@ -1117,7 +1088,7 @@ class event_loop
             switch (pqueue->watchType) {
             case WatchType::SIGNAL: {
                 BaseSignalWatcher *bsw = static_cast<BaseSignalWatcher *>(pqueue);
-                rearmType = bsw->received(*this, bsw->siginfo.get_signo(), bsw->siginfo);
+                rearmType = ((SignalWatcher *)bsw)->received(*this, bsw->siginfo.get_signo(), bsw->siginfo);
                 break;
             }
             case WatchType::FD: {
@@ -1125,28 +1096,28 @@ class event_loop
                 if (is_multi_watch) {
                     // The primary watcher for a multi-watch watcher is queued for
                     // read events.
-                    rearmType = bbfw->readReady(*this, bfw->watch_fd);
+                    rearmType = ((BidiFdWatcher *)bbfw)->readReady(*this, bfw->watch_fd);
                     bbfw->event_flags &= ~IN_EVENTS;
                 }
                 else {
-                    rearmType = bfw->fdEvent(*this, bfw->watch_fd, bfw->event_flags);
+                    rearmType = ((FdWatcher *)bfw)->fdEvent(*this, bfw->watch_fd, bfw->event_flags);
                     bfw->event_flags = 0;
                 }
                 break;
             }
             case WatchType::CHILD: {
                 BaseChildWatcher *bcw = static_cast<BaseChildWatcher *>(pqueue);
-                rearmType = bcw->childStatus(*this, bcw->watch_pid, bcw->child_status);
+                rearmType = ((ChildProcWatcher *)bcw)->childStatus(*this, bcw->watch_pid, bcw->child_status);
                 break;
             }
             case WatchType::SECONDARYFD: {
-                rearmType = bbfw->writeReady(*this, bbfw->watch_fd);
+                rearmType = ((BidiFdWatcher *)bbfw)->writeReady(*this, bbfw->watch_fd);
                 bbfw->event_flags &= ~OUT_EVENTS;
                 break;
             }
             case WatchType::TIMER: {
                 BaseTimerWatcher *btw = static_cast<BaseTimerWatcher *>(pqueue);
-                rearmType = btw->timerExpiry(*this, btw->intervals);
+                rearmType = ((Timer *)btw)->timerExpiry(*this, btw->intervals);
                 break;
             }
             default: ;
@@ -1258,7 +1229,7 @@ public:
         eloop.deregister(this, this->siginfo.get_signo());
     }
     
-    // virtual rearm received(EventLoop &, int signo, SigInfo_p info) = 0;
+    virtual rearm received(EventLoop &eloop, int signo, SigInfo_p siginfo) = 0;
 };
 
 // Posix file descriptor event watcher
@@ -1362,7 +1333,7 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
         return lfd;
     }
     
-    // virtual rearm fdEvent(EventLoop<T_Mutex> &, int fd, int flags) = 0;
+    virtual rearm fdEvent(EventLoop &eloop, int fd, int flags) = 0;
 };
 
 // A Bi-directional file descriptor watcher with independent read- and write- channels.
@@ -1440,6 +1411,14 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     }
     
     public:
+
+    // This should never actually get called:
+    /*
+    rearm fdEvent(EventLoop &eloop, int fd, int flags) final
+    {
+        return rearm::REARM; // should not be reachable.
+    };
+    */
     
     // Register a bi-direction file descriptor watcher with an event loop. Flags
     // can be any combination of dasynq::IN_EVENTS / dasynq::OUT_EVENTS.
@@ -1476,8 +1455,8 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         eloop.deregister(this, this->watch_fd);
     }
     
-    // rearm readReady(EventLoop<T_Mutex> * eloop, int fd) noexcept
-    // rearm writeReady(EventLoop<T_Mutex> * eloop, int fd) noexcept
+    virtual rearm readReady(EventLoop &eloop, int fd) noexcept = 0;
+    virtual rearm writeReady(EventLoop &eloop, int fd) noexcept = 0;
 };
 
 // Child process event watcher
@@ -1615,7 +1594,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
         }
     }
     
-    // virtual rearm childStatus(EventLoop &, pid_t child, int status) = 0;
+    virtual rearm childStatus(EventLoop &eloop, pid_t child, int status) = 0;
 };
 
 template <typename EventLoop>
@@ -1655,6 +1634,11 @@ class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     {
         eloop.deregister(this);
     }
+
+    // Timer expired, and the given number of intervals have elapsed before
+    // expiry evenet was queued. Normally intervals == 1 to indicate no
+    // overrun.
+    virtual rearm timerExpiry(EventLoop &eloop, int intervals) = 0;
 };
 
 }  // namespace dasynq::dprivate
