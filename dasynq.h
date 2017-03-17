@@ -1199,11 +1199,11 @@ class event_loop
     public:
     using mutex_t = T_Mutex;
     
-    using FdWatcher = dprivate::FdWatcher<event_loop<T_Mutex>>;
-    using BidiFdWatcher = dprivate::BidiFdWatcher<event_loop<T_Mutex>>;
-    using SignalWatcher = dprivate::SignalWatcher<event_loop<T_Mutex>>;
-    using ChildProcWatcher = dprivate::ChildProcWatcher<event_loop<T_Mutex>>;
-    using Timer = dprivate::Timer<event_loop<T_Mutex>>;
+    using FdWatcher = dprivate::FdWatcher<my_event_loop_t>;
+    using BidiFdWatcher = dprivate::BidiFdWatcher<my_event_loop_t>;
+    using SignalWatcher = dprivate::SignalWatcher<my_event_loop_t>;
+    using ChildProcWatcher = dprivate::ChildProcWatcher<my_event_loop_t>;
+    using Timer = dprivate::Timer<my_event_loop_t>;
     
     void run() noexcept
     {
