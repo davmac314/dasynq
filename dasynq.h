@@ -201,6 +201,11 @@ namespace dprivate {
         int watch_flags;  // events being watched
         int event_flags;  // events pending (queued)
         
+        // watch_flags: for a regular FdWatcher, this specifies the events that the watcher
+        //              is watching (or was watching if disabled). For a BidiFdWatcher, specifies
+        //              the events that the watcher is currently watching (i.e. specifies which
+        //              halves of the Bidi watcher are enabled).
+
         BaseFdWatcher() noexcept : BaseWatcher(WatchType::FD) { }
     };
     
@@ -448,6 +453,7 @@ namespace dprivate {
             bool is_multi_watch = bfdw->watch_flags & multi_watch;
             if (is_multi_watch) {                
                 BaseBidiFdWatcher *bbdw = static_cast<BaseBidiFdWatcher *>(bwatcher);
+                bbdw->watch_flags &= ~flags;
                 if (flags & IN_EVENTS && flags & OUT_EVENTS) {
                     // Queue the secondary watcher first:
                     queueWatcher(&bbdw->outWatcher);
@@ -922,6 +928,7 @@ class event_loop
         }
     }
 
+    // Process rearm return for FdWatcher, including the primary watcher of a BidiFdWatcher
     rearm processFdRearm(BaseFdWatcher * bfw, rearm rearmType, bool is_multi_watch)
     {
         // Called with lock held;

@@ -1,3 +1,6 @@
+#include <sys/socket.h>
+#include <sys/un.h>
+
 #include <cassert>
 #include <iostream>
 #include <thread>
@@ -98,6 +101,13 @@ static void create_pipe(int filedes[2])
     }
 }
 
+static void create_bidi_pipe(int filedes[2])
+{
+    if (socketpair(AF_UNIX, SOCK_STREAM, 0, filedes) == -1) {
+        throw std::system_error(errno, std::system_category());
+    }
+}
+
 void ftestFdWatch1()
 {
     using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
@@ -151,6 +161,130 @@ void ftestFdWatch1()
     close(pipe1[1]);
     close(pipe2[0]);
     close(pipe2[1]);
+}
+
+void ftestBidiFdWatch1()
+{
+    using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+    Loop_t my_loop;
+
+    bool flags1[3] = { false, false, false };  // in, out, removed
+
+    int pipe1[2];
+    create_bidi_pipe(pipe1);
+
+    class MyBidiWatcher : public Loop_t::BidiFdWatcher {
+        bool (&flags)[3];
+
+        public:
+        MyBidiWatcher(bool (&flags_a)[3]) : flags(flags_a)
+        {
+        }
+
+        rearm readReady(Loop_t &eloop, int fd) noexcept override
+        {
+            flags[0] = true;
+            char rbuf;
+            read(fd, &rbuf, 1);
+            return rearm::REMOVE;
+        }
+
+        rearm writeReady(Loop_t &eloop, int fd) noexcept override
+        {
+            flags[1] = true;
+            return rearm::REMOVE;
+        }
+
+        void watchRemoved() noexcept override
+        {
+            flags[2] = true;
+        }
+    };
+
+    MyBidiWatcher watch {flags1};
+
+    // Both read and write trigger remove. Once both have triggered, the watch should auto-remove.
+
+    char wbuf = 'a';
+    write(pipe1[1], &wbuf, 1);
+
+    watch.addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
+
+    my_loop.run();
+
+    assert(flags1[0] && flags1[1]);   // in and out flag should be set
+    assert(flags1[2]);
+
+    close(pipe1[0]);
+    close(pipe1[1]);
+}
+
+void ftestBidiFdWatch2()
+{
+    using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+    Loop_t my_loop;
+
+    bool flags1[3] = { false, false, false };  // in, out, removed
+
+    int pipe1[2];
+    create_bidi_pipe(pipe1);
+
+    class MyBidiWatcher : public Loop_t::BidiFdWatcher {
+        bool (&flags)[3];
+
+        public:
+        MyBidiWatcher(bool (&flags_a)[3]) : flags(flags_a)
+        {
+        }
+
+        rearm readReady(Loop_t &eloop, int fd) noexcept override
+        {
+            flags[0] = true;
+            char rbuf;
+            read(fd, &rbuf, 1);
+            return rearm::REMOVE;
+        }
+
+        rearm writeReady(Loop_t &eloop, int fd) noexcept override
+        {
+            flags[1] = true;
+            return rearm::REARM;
+        }
+
+        void watchRemoved() noexcept override
+        {
+            flags[2] = true;
+        }
+    };
+
+    MyBidiWatcher watch {flags1};
+
+    // Both read and write trigger remove. Once both have triggered, the watch should auto-remove.
+
+    char wbuf = 'a';
+    write(pipe1[1], &wbuf, 1);
+
+    watch.addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
+
+    my_loop.run();
+
+    assert(flags1[0] && flags1[1]);   // in and out flag should be set
+    assert(! flags1[2]);  // watch not removed (write watch not removed)
+
+    flags1[0] = false;
+    flags1[1] = false;
+
+    // Send more to pipe; read watch should not see this, as it is inactive:
+    write(pipe1[1], &wbuf, 1);
+
+    my_loop.run();
+
+    assert(!flags1[0]); // should see no input
+    assert(flags1[1]);  // should see output
+    assert(! flags1[2]);  // watch not removed
+
+    close(pipe1[0]);
+    close(pipe1[1]);
 }
 
 void ftestSigWatch()
@@ -260,6 +394,14 @@ int main(int argc, char **argv)
 
     std::cout << "ftestFdWatch1... ";
     ftestFdWatch1();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftestBidiFdWatch1... ";
+    ftestBidiFdWatch1();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftestBidiFdWatch2... ";
+    ftestBidiFdWatch2();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftestSigWatch... ";
