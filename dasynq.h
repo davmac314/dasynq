@@ -939,10 +939,18 @@ class event_loop
             
             if (rearmType == rearm::REMOVE) {
                 bdfw->read_removed = 1;
-                bdfw->watch_flags &= ~IN_EVENTS;
                 
-                if (! LoopTraits::has_separate_rw_fd_watches) {
+                if (LoopTraits::has_separate_rw_fd_watches) {
+                    bdfw->watch_flags &= ~IN_EVENTS;
+                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd, IN_EVENTS);
+                    return bdfw->write_removed ? rearm::REMOVE : rearm::NOOP;
+                }
+                else {
                     if (! bdfw->write_removed) {
+                        if (bdfw->watch_flags & IN_EVENTS) {
+                            bdfw->watch_flags &= ~IN_EVENTS;
+                            loop_mech.enableFdWatch_nolock(bdfw->watch_fd, bdfw, bdfw->watch_flags);
+                        }
                         return rearm::NOOP;
                     }
                     else {
@@ -950,9 +958,6 @@ class event_loop
                         loop_mech.removeFdWatch_nolock(bdfw->watch_fd, 0 /* not used */);
                         return rearm::REMOVE;
                     }
-                }
-                else {
-                    loop_mech.removeFdWatch_nolock(bdfw->watch_fd, IN_EVENTS);
                 }
             }
             else if (rearmType == rearm::DISARM) {
@@ -996,14 +1001,18 @@ class event_loop
         // Called with lock held
         if (rearmType == rearm::REMOVE) {
             bdfw->write_removed = 1;
-            bdfw->watch_flags &= ~OUT_EVENTS;
             
             if (LoopTraits::has_separate_rw_fd_watches) {
+                bdfw->watch_flags &= ~OUT_EVENTS;
                 loop_mech.removeFdWatch_nolock(bdfw->watch_fd, OUT_EVENTS);
                 return bdfw->read_removed ? rearm::REMOVE : rearm::NOOP;
             }
             else {
                 if (! bdfw->read_removed) {
+                    if (bdfw->watch_flags & OUT_EVENTS) {
+                        bdfw->watch_flags &= ~OUT_EVENTS;
+                        loop_mech.enableFdWatch_nolock(bdfw->watch_fd, bdfw, bdfw->watch_flags);
+                    }
                     return rearm::NOOP;
                 }
                 else {

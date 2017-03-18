@@ -20,6 +20,8 @@ extern "C" {
 #include <unistd.h>
 #include <signal.h>
 
+#include "dasynq-config.h"
+
 namespace dasynq {
 
 template <class Base> class KqueueLoop;
@@ -49,9 +51,7 @@ class KqueueTraits
     // File descriptor optional storage. If the mechanism can return the file descriptor, this
     // class will be empty, otherwise it can hold a file descriptor.
     class FD_s {
-        // Epoll doesn't return the file descriptor (it can, but it can't return both file
-        // descriptor and user data).
-        // TODO make true empty.
+        DASYNQ_EMPTY_BODY
     };
 
     // File descriptor reference (passed to event callback). If the mechanism can return the
