@@ -158,13 +158,6 @@ template <class Base> class ITimerEvents : public Base
 
     template <typename T> void init(T *loop_mech)
     {
-        /*
-        timerfd_fd = timerfd_create(CLOCK_MONOTONIC, TFD_CLOEXEC | TFD_NONBLOCK);
-        if (timerfd_fd == -1) {
-            throw std::system_error(errno, std::system_category());
-        }
-        loop_mech->addFdWatch(timerfd_fd, &timerfd_fd, IN_EVENTS);
-        */
         sigset_t sigmask;
         sigprocmask(SIG_UNBLOCK, nullptr, &sigmask);
         sigaddset(&sigmask, SIGALRM);
@@ -173,18 +166,17 @@ template <class Base> class ITimerEvents : public Base
         Base::init(loop_mech);
     }
 
-    // Add timer, return handle (TODO: clock id param?)
-    void addTimer(timer_handle_t &h, void *userdata)
+    void addTimer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
     {
         timer_queue.allocate(h, userdata);
     }
     
-    void removeTimer(timer_handle_t &timer_id) noexcept
+    void removeTimer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        removeTimer_nolock(timer_id);
+        removeTimer_nolock(timer_id, clock);
     }
     
-    void removeTimer_nolock(timer_handle_t &timer_id) noexcept
+    void removeTimer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         if (timer_queue.is_queued(timer_id)) {
             timer_queue.remove(timer_id);
@@ -194,7 +186,8 @@ template <class Base> class ITimerEvents : public Base
     
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
     //   enable: specifies whether to enable reporting of timeouts/intervals
-    void setTimer(timer_handle_t &timer_id, struct timespec &timeout, struct timespec &interval, bool enable) noexcept
+    void setTimer(timer_handle_t &timer_id, struct timespec &timeout, struct timespec &interval,
+            bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         auto &ts = timer_queue.node_data(timer_id);
         ts.interval_time = interval;
@@ -218,7 +211,8 @@ template <class Base> class ITimerEvents : public Base
     }
 
     // Set timer relative to current time:    
-    void setTimerRel(timer_handle_t &timer_id, struct timespec &timeout, struct timespec &interval, bool enable) noexcept
+    void setTimerRel(timer_handle_t &timer_id, struct timespec &timeout, struct timespec &interval,
+            bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         // TODO consider caching current time somehow; need to decide then when to update cached value.
         struct timespec curtime;
@@ -240,12 +234,12 @@ template <class Base> class ITimerEvents : public Base
     }
     
     // Enables or disabling report of timeouts (does not stop timer)
-    void enableTimer(timer_handle_t &timer_id, bool enable) noexcept
+    void enableTimer(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        enableTimer_nolock(timer_id, enable);
+        enableTimer_nolock(timer_id, enable, clock);
     }
     
-    void enableTimer_nolock(timer_handle_t &timer_id, bool enable) noexcept
+    void enableTimer_nolock(timer_handle_t &timer_id, bool enable, clock_type = clock_type::MONOTONIC) noexcept
     {
         timer_queue.node_data(timer_id).enabled = enable;
     }

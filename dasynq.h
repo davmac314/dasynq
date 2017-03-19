@@ -807,42 +807,42 @@ class event_loop
         releaseLock(qnode);
     }
     
-    void registerTimer(BaseTimerWatcher *callback)
+    void registerTimer(BaseTimerWatcher *callback, clock_type clock)
     {
         loop_mech.prepare_watcher(callback);
         try {
-            loop_mech.addTimer(callback->timer_handle, callback);
+            loop_mech.addTimer(callback->timer_handle, callback, clock);
         }
         catch (...) {
             loop_mech.release_watcher(callback);
         }
     }
     
-    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout)
+    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, clock_type clock)
     {
         struct timespec interval {0, 0};
-        loop_mech.setTimer(callBack->timer_handle, timeout, interval, true);
+        loop_mech.setTimer(callBack->timer_handle, timeout, interval, true, clock);
     }
     
-    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval)
+    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval, clock_type clock)
     {
-        loop_mech.setTimer(callBack->timer_handle, timeout, interval, true);
+        loop_mech.setTimer(callBack->timer_handle, timeout, interval, true, clock);
     }
 
-    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout)
+    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, clock_type clock)
     {
         struct timespec interval {0, 0};
-        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true);
+        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true, clock);
     }
     
-    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval)
+    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval, clock_type clock)
     {
-        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true);
+        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true, clock);
     }
 
-    void deregister(BaseTimerWatcher *callback)
+    void deregister(BaseTimerWatcher *callback, clock_type clock)
     {
-        loop_mech.removeTimer(callback->timer_handle);
+        loop_mech.removeTimer(callback->timer_handle, clock);
         
         waitqueue_node<T_Mutex> qnode;
         getAttnLock(qnode);
@@ -1636,12 +1636,15 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
 template <typename EventLoop>
 class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
 {
+    private:
+    clock_type clock;
+
     public:
     
-    // Allocate a timer (using the MONOTONIC clock)
-    void addTimer(EventLoop &eloop, int prio = DEFAULT_PRIORITY)
+    void addTimer(EventLoop &eloop, clock_type clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)
     {
         this->priority = prio;
+        this->clock = clock;
         eloop.registerTimer(this);
     }
     
