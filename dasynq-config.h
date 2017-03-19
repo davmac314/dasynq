@@ -26,6 +26,7 @@
 #else
 #define DASYNQ_EMPTY_BODY    char empty[0] __attribute__((unused));  // Make class instances take up no space (clang)
 #endif
+#define DASYNQ_UNREACHABLE          __builtin_unreachable()
 #endif
 
 #endif

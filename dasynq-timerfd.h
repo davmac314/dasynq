@@ -60,6 +60,8 @@ template <class Base> class TimerFdEvents : public Base
         case clock_type::MONOTONIC:
             clock_gettime(CLOCK_MONOTONIC, &curtime);
             break;
+        default:
+            DASYNQ_UNREACHABLE;
         }
 
         // Peek timer queue; calculate difference between current time and timeout
@@ -177,7 +179,7 @@ template <class Base> class TimerFdEvents : public Base
         }
     }
 
-    // Add timer, return handle (TODO: clock id param?)
+    // Add timer, store into given handle
     void addTimer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
     {
         switch(clock) {
@@ -187,6 +189,8 @@ template <class Base> class TimerFdEvents : public Base
         case clock_type::MONOTONIC:
             timer_queue.allocate(h, userdata);
             break;
+        default:
+            DASYNQ_UNREACHABLE;
         }
     }
     
@@ -210,6 +214,8 @@ template <class Base> class TimerFdEvents : public Base
             }
             timer_queue.deallocate(timer_id);
             break;
+        default:
+            DASYNQ_UNREACHABLE;
         }
     }
     
@@ -225,6 +231,8 @@ template <class Base> class TimerFdEvents : public Base
         case clock_type::MONOTONIC:
             setTimer(timer_id, timeout, interval, timer_queue, timerfd_fd, enable);
             break;
+        default:
+            DASYNQ_UNREACHABLE;
         }
     }
 
@@ -240,6 +248,8 @@ template <class Base> class TimerFdEvents : public Base
         case clock_type::MONOTONIC:
             sclock = CLOCK_MONOTONIC;
             break;
+        default:
+            DASYNQ_UNREACHABLE;
         }
 
         // TODO consider caching current time somehow; need to decide then when to update cached value.
@@ -270,6 +280,8 @@ template <class Base> class TimerFdEvents : public Base
         case clock_type::MONOTONIC:
             timer_queue.node_data(timer_id).enabled = enable;
             break;
+        default:
+            DASYNQ_UNREACHABLE;
         }
     }
 
