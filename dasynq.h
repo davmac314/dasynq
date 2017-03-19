@@ -1420,8 +1420,16 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         }
     }
     
-    protected:
-    
+    public:
+
+    // This should never actually get called:
+    /*
+    rearm fdEvent(EventLoop &eloop, int fd, int flags) final
+    {
+        return rearm::REARM; // should not be reachable.
+    };
+    */
+
     void setInWatchEnabled(EventLoop &eloop, bool b) noexcept
     {
         eloop.getBaseLock().lock();
@@ -1456,16 +1464,6 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
             eloop.setFdEnabled((dprivate::BaseWatcher *) this, this->watch_fd, this->watch_flags & IO_EVENTS, true);
         }
     }
-    
-    public:
-
-    // This should never actually get called:
-    /*
-    rearm fdEvent(EventLoop &eloop, int fd, int flags) final
-    {
-        return rearm::REARM; // should not be reachable.
-    };
-    */
     
     // Register a bi-direction file descriptor watcher with an event loop. Flags
     // can be any combination of dasynq::IN_EVENTS / dasynq::OUT_EVENTS.
