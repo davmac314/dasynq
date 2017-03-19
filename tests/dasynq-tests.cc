@@ -259,7 +259,7 @@ void ftestBidiFdWatch2()
 
     MyBidiWatcher watch {flags1};
 
-    // Both read and write trigger remove. Once both have triggered, the watch should auto-remove.
+    // Only read watch triggers remove. Once both have triggered, the watch should not have been removed.
 
     char wbuf = 'a';
     write(pipe1[1], &wbuf, 1);
