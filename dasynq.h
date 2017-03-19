@@ -1645,33 +1645,33 @@ class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     {
         this->priority = prio;
         this->clock = clock;
-        eloop.registerTimer(this);
+        eloop.registerTimer(this, clock);
     }
     
     void armTimer(EventLoop &eloop, struct timespec &timeout) noexcept
     {
-        eloop.setTimer(this, timeout);
+        eloop.setTimer(this, timeout, clock);
     }
     
     void armTimer(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
     {
-        eloop.setTimer(this, timeout, interval);
+        eloop.setTimer(this, timeout, interval, clock);
     }
 
     // Arm timer, relative to now:
     void armTimerRel(EventLoop &eloop, struct timespec &timeout) noexcept
     {
-        eloop.setTimerRel(this, timeout);
+        eloop.setTimerRel(this, timeout, clock);
     }
     
     void armTimerRel(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
     {
-        eloop.setTimerRel(this, timeout, interval);
+        eloop.setTimerRel(this, timeout, interval, clock);
     }
     
     void deregister(EventLoop &eloop) noexcept
     {
-        eloop.deregister(this);
+        eloop.deregister(this, clock);
     }
 
     // Timer expired, and the given number of intervals have elapsed before
