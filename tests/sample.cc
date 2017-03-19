@@ -8,7 +8,7 @@ using namespace dasynq;
 
 using Loop_t = event_loop<std::mutex>;
 
-class MySignalWatcher : public Loop_t::SignalWatcher
+class MySignalWatcher : public Loop_t::signal_watcher
 {
     rearm received(Loop_t & eloop, int signo, SigInfo_p siginfo) override
     {
@@ -40,8 +40,8 @@ int main(int argc, char **argv)
     sigprocmask(SIG_BLOCK, &set, NULL);
     
     MySignalWatcher mse1, mse2;
-    mse1.addWatch(eloop, SIGUSR1);
-    mse2.addWatch(eloop, SIGUSR2);
+    mse1.add_watch(eloop, SIGUSR1);
+    mse2.add_watch(eloop, SIGUSR2);
     
     MyTimer mt1;
     mt1.addTimer(eloop);
