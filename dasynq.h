@@ -471,10 +471,10 @@ namespace dprivate {
                 // as the event was delivered. However, the other direction should not be disabled
                 // yet, so we need to re-enable:
                 int in_out_mask = IN_EVENTS | OUT_EVENTS;
-                if (is_multi_watch && bfdw->event_flags != (bfdw->watch_flags & in_out_mask)) {
+                if (is_multi_watch && (bfdw->watch_flags & in_out_mask) != 0) {
                     // We need to re-enable the other channel now:
                     loop_mech.enableFdWatch_nolock(bfdw->watch_fd, userdata,
-                        (bfdw->watch_flags & ~(bfdw->event_flags)) | ONE_SHOT);
+                        (bfdw->watch_flags & in_out_mask) | ONE_SHOT);
                 }
             }
         }
@@ -968,9 +968,6 @@ class event_loop
                 
                 if (! LoopTraits::has_separate_rw_fd_watches) {
                     int watch_flags = bdfw->watch_flags;
-                    // If this is a BidiFdWatch (multiwatch) then we do not want to re-enable a
-                    // channel that has an event pending (is already queued):
-                    watch_flags &= ~(bdfw->event_flags);
                     loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
                             static_cast<BaseWatcher *>(bdfw),
                             (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
@@ -1030,9 +1027,6 @@ class event_loop
             
             if (! LoopTraits::has_separate_rw_fd_watches) {
                 int watch_flags = bdfw->watch_flags;
-                // If this is a BidiFdWatch (multiwatch) then we do not want to re-enable a
-                // channel that has an event pending (is already queued):
-                watch_flags &= ~(bdfw->event_flags);
                 loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
                         static_cast<BaseWatcher *>(bdfw),
                         (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
