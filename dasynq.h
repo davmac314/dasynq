@@ -36,8 +36,6 @@ namespace dasynq {
 #include <unistd.h>
 #include <fcntl.h>
 
-// TODO consider using atomic variables instead of explicit locking where appropriate
-
 #include "dasynq-mutex.h"
 
 namespace dasynq {
@@ -89,13 +87,6 @@ enum class rearm
     /** The watcher has been removed - don't touch it! */
     REMOVED
 // TODO: add a REQUEUE option, which means, "I didn't complete input/output, run me again soon"
-};
-
-// Different timer clock types
-enum class ClockType
-{
-    WALLTIME,
-    MONOTONIC
 };
 
 // Forward declarations:
