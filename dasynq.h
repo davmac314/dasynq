@@ -99,7 +99,7 @@ namespace dprivate {
     template <typename T_Loop> class FdWatcher;
     template <typename T_Loop> class BidiFdWatcher;
     template <typename T_Loop> class signal_watcher;
-    template <typename T_Loop> class ChildProcWatcher;
+    template <typename T_Loop> class child_proc_watcher;
     template <typename T_Loop> class Timer;
     
     enum class WatchType
@@ -569,7 +569,7 @@ class event_loop
     friend class dprivate::FdWatcher<my_event_loop_t>;
     friend class dprivate::BidiFdWatcher<my_event_loop_t>;
     friend class dprivate::signal_watcher<my_event_loop_t>;
-    friend class dprivate::ChildProcWatcher<my_event_loop_t>;
+    friend class dprivate::child_proc_watcher<my_event_loop_t>;
     friend class dprivate::Timer<my_event_loop_t>;
     
     public:
@@ -1115,7 +1115,7 @@ class event_loop
             }
             case WatchType::CHILD: {
                 BaseChildWatcher *bcw = static_cast<BaseChildWatcher *>(pqueue);
-                rearmType = ((ChildProcWatcher *)bcw)->childStatus(*this, bcw->watch_pid, bcw->child_status);
+                rearmType = ((child_proc_watcher *)bcw)->child_status(*this, bcw->watch_pid, bcw->child_status);
                 break;
             }
             case WatchType::SECONDARYFD: {
@@ -1181,7 +1181,7 @@ class event_loop
     using FdWatcher = dprivate::FdWatcher<my_event_loop_t>;
     using BidiFdWatcher = dprivate::BidiFdWatcher<my_event_loop_t>;
     using signal_watcher = dprivate::signal_watcher<my_event_loop_t>;
-    using ChildProcWatcher = dprivate::ChildProcWatcher<my_event_loop_t>;
+    using child_proc_watcher = dprivate::child_proc_watcher<my_event_loop_t>;
     using Timer = dprivate::Timer<my_event_loop_t>;
     
     void run() noexcept
@@ -1497,7 +1497,7 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
 
 // Child process event watcher
 template <typename EventLoop>
-class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::mutex_t>
+class child_proc_watcher : private dprivate::BaseChildWatcher<typename EventLoop::mutex_t>
 {
     using BaseWatcher = dprivate::BaseWatcher;
     using T_Mutex = typename EventLoop::mutex_t;
@@ -1506,7 +1506,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     // Reserve resources for a child watcher with the given event loop.
     // Reservation can fail with std::bad_alloc. Some backends do not support
     // reservation (it will always fail) - check LoopTraits::supports_childwatch_reservation.
-    void reserveWatch(EventLoop &eloop)
+    void reserve_watch(EventLoop &eloop)
     {
         eloop.reserveChildWatch(this);
     }
@@ -1520,7 +1520,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     // Registration can fail with std::bad_alloc.
     // Note that in multi-threaded programs, use of this function may be prone to a
     // race condition such that the child terminates before the watcher is registered.
-    void addWatch(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY)
+    void add_watch(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
         this->watch_pid = child;
@@ -1534,7 +1534,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     // Note that in multi-threaded programs, use of this function may be prone to a
     // race condition such that the child terminates before the watcher is registered;
     // use the "fork" member function to avoid this.
-    void addReserved(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY) noexcept
+    void add_reserved(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY) noexcept
     {
         BaseWatcher::init();
         this->watch_pid = child;
@@ -1558,7 +1558,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
     {
         if (EventLoop::loop_traits_t::supports_childwatch_reservation) {
             // Reserve a watch, fork, then claim reservation
-            reserveWatch(eloop);
+            reserve_watch(eloop);
             
             auto &lock = eloop.getBaseLock();
             lock.lock();
@@ -1630,7 +1630,7 @@ class ChildProcWatcher : private dprivate::BaseChildWatcher<typename EventLoop::
         }
     }
     
-    virtual rearm childStatus(EventLoop &eloop, pid_t child, int status) = 0;
+    virtual rearm child_status(EventLoop &eloop, pid_t child, int status) = 0;
 };
 
 template <typename EventLoop>
