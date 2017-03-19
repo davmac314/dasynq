@@ -369,7 +369,7 @@ void ftestSigWatch()
     bool seen1 = false;
     bool seen2 = false;
 
-    using SigInfo_p = Loop_t::SignalWatcher::SigInfo_p;
+    using SigInfo_p = Loop_t::signal_watcher::SigInfo_p;
 
     sigset_t sigmask;
     sigemptyset(&sigmask);
@@ -377,13 +377,13 @@ void ftestSigWatch()
     sigaddset(&sigmask, SIGUSR2);
     sigprocmask(SIG_BLOCK, &sigmask, nullptr);
 
-    Loop_t::SignalWatcher::addWatch(my_loop, SIGUSR1,
+    Loop_t::signal_watcher::add_watch(my_loop, SIGUSR1,
             [&seen1](Loop_t &eloop, int signo, SigInfo_p info) -> rearm {
         seen1 = true;
         return rearm::REMOVE;
     });
 
-    Loop_t::SignalWatcher::addWatch(my_loop, SIGUSR2,
+    Loop_t::signal_watcher::add_watch(my_loop, SIGUSR2,
             [&seen2](Loop_t &eloop, int signo, SigInfo_p info) -> rearm {
         seen2 = true;
         return rearm::REMOVE;

@@ -107,7 +107,7 @@ namespace dprivate {
     
     template <typename T_Loop> class FdWatcher;
     template <typename T_Loop> class BidiFdWatcher;
-    template <typename T_Loop> class SignalWatcher;
+    template <typename T_Loop> class signal_watcher;
     template <typename T_Loop> class ChildProcWatcher;
     template <typename T_Loop> class Timer;
     
@@ -577,7 +577,7 @@ class event_loop
     using my_event_loop_t = event_loop<T_Mutex, Loop, LoopTraits>;
     friend class dprivate::FdWatcher<my_event_loop_t>;
     friend class dprivate::BidiFdWatcher<my_event_loop_t>;
-    friend class dprivate::SignalWatcher<my_event_loop_t>;
+    friend class dprivate::signal_watcher<my_event_loop_t>;
     friend class dprivate::ChildProcWatcher<my_event_loop_t>;
     friend class dprivate::Timer<my_event_loop_t>;
     
@@ -1105,7 +1105,7 @@ class event_loop
             switch (pqueue->watchType) {
             case WatchType::SIGNAL: {
                 BaseSignalWatcher *bsw = static_cast<BaseSignalWatcher *>(pqueue);
-                rearmType = ((SignalWatcher *)bsw)->received(*this, bsw->siginfo.get_signo(), bsw->siginfo);
+                rearmType = ((signal_watcher *)bsw)->received(*this, bsw->siginfo.get_signo(), bsw->siginfo);
                 break;
             }
             case WatchType::FD: {
@@ -1189,7 +1189,7 @@ class event_loop
     
     using FdWatcher = dprivate::FdWatcher<my_event_loop_t>;
     using BidiFdWatcher = dprivate::BidiFdWatcher<my_event_loop_t>;
-    using SignalWatcher = dprivate::SignalWatcher<my_event_loop_t>;
+    using signal_watcher = dprivate::signal_watcher<my_event_loop_t>;
     using ChildProcWatcher = dprivate::ChildProcWatcher<my_event_loop_t>;
     using Timer = dprivate::Timer<my_event_loop_t>;
     
@@ -1221,7 +1221,7 @@ namespace dprivate {
 
 // Posix signal event watcher
 template <typename EventLoop>
-class SignalWatcher : private dprivate::BaseSignalWatcher<typename EventLoop::mutex_t, typename EventLoop::loop_traits_t>
+class signal_watcher : private dprivate::BaseSignalWatcher<typename EventLoop::mutex_t, typename EventLoop::loop_traits_t>
 {
     using BaseWatcher = dprivate::BaseWatcher;
     using T_Mutex = typename EventLoop::mutex_t;
@@ -1233,7 +1233,7 @@ public:
     // If an attempt is made to register with more than one event loop at
     // a time, behaviour is undefined. The signal should be masked before
     // call.
-    inline void addWatch(EventLoop &eloop, int signo, int prio = DEFAULT_PRIORITY)
+    inline void add_watch(EventLoop &eloop, int signo, int prio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
         this->priority = prio;
@@ -1247,9 +1247,9 @@ public:
     }
     
     template <typename T>
-    static SignalWatcher<EventLoop> *addWatch(EventLoop &eloop, int signo, T watchHndlr)
+    static signal_watcher<EventLoop> *add_watch(EventLoop &eloop, int signo, T watchHndlr)
     {
-        class LambdaSigWatcher : public SignalWatcher<EventLoop>
+        class LambdaSigWatcher : public signal_watcher<EventLoop>
         {
             private:
             T watchHndlr;
@@ -1272,7 +1272,7 @@ public:
         };
 
         LambdaSigWatcher * lsw = new LambdaSigWatcher(watchHndlr);
-        lsw->addWatch(eloop, signo);
+        lsw->add_watch(eloop, signo);
         return lsw;
     }
 
