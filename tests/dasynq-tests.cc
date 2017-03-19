@@ -22,13 +22,13 @@ void testFdWatch1()
     bool seen1 = false;
     bool seen2 = false;
     
-    Loop_t::FdWatcher::addWatch(my_loop, 0, dasynq::IN_EVENTS,
+    Loop_t::fd_watcher::add_watch(my_loop, 0, dasynq::IN_EVENTS,
             [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
         seen1 = true;
         return rearm::REMOVE;
     });
     
-    Loop_t::FdWatcher::addWatch(my_loop, 1, dasynq::IN_EVENTS,
+    Loop_t::fd_watcher::add_watch(my_loop, 1, dasynq::IN_EVENTS,
             [&seen2](Loop_t &eloop, int fd, int flags) -> rearm {
         seen2 = true;
         return rearm::REMOVE;
@@ -61,13 +61,13 @@ void testFdWatch2()
     bool seen1 = false;
     bool seen2 = false;
     
-    auto watcher1 = Loop_t::FdWatcher::addWatch(my_loop, 0, dasynq::IN_EVENTS,
+    auto watcher1 = Loop_t::fd_watcher::add_watch(my_loop, 0, dasynq::IN_EVENTS,
             [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
         seen1 = true;
         return rearm::REARM;
     });
 
-    auto watcher2 = Loop_t::FdWatcher::addWatch(my_loop, 1, dasynq::IN_EVENTS,
+    auto watcher2 = Loop_t::fd_watcher::add_watch(my_loop, 1, dasynq::IN_EVENTS,
             [&seen2](Loop_t &eloop, int fd, int flags) -> rearm {
         seen2 = true;
         return rearm::DISARM;
@@ -121,13 +121,13 @@ void ftestFdWatch1()
     create_pipe(pipe1);
     create_pipe(pipe2);
 
-    Loop_t::FdWatcher::addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS,
+    Loop_t::fd_watcher::add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS,
             [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
         seen1 = true;
         return rearm::REMOVE;
     });
 
-    Loop_t::FdWatcher::addWatch(my_loop, pipe2[0], dasynq::IN_EVENTS,
+    Loop_t::fd_watcher::add_watch(my_loop, pipe2[0], dasynq::IN_EVENTS,
             [&seen2](Loop_t &eloop, int fd, int flags) -> rearm {
         seen2 = true;
         return rearm::REMOVE;
@@ -173,7 +173,7 @@ void ftestBidiFdWatch1()
     int pipe1[2];
     create_bidi_pipe(pipe1);
 
-    class MyBidiWatcher : public Loop_t::BidiFdWatcher {
+    class MyBidiWatcher : public Loop_t::bidi_fd_watcher {
         bool (&flags)[3];
 
         public:
@@ -181,7 +181,7 @@ void ftestBidiFdWatch1()
         {
         }
 
-        rearm readReady(Loop_t &eloop, int fd) noexcept override
+        rearm read_ready(Loop_t &eloop, int fd) noexcept override
         {
             flags[0] = true;
             char rbuf;
@@ -189,13 +189,13 @@ void ftestBidiFdWatch1()
             return rearm::REMOVE;
         }
 
-        rearm writeReady(Loop_t &eloop, int fd) noexcept override
+        rearm write_ready(Loop_t &eloop, int fd) noexcept override
         {
             flags[1] = true;
             return rearm::REMOVE;
         }
 
-        void watchRemoved() noexcept override
+        void watch_removed() noexcept override
         {
             flags[2] = true;
         }
@@ -208,7 +208,7 @@ void ftestBidiFdWatch1()
     char wbuf = 'a';
     write(pipe1[1], &wbuf, 1);
 
-    watch.addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
+    watch.add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
 
     my_loop.run();
 
@@ -229,7 +229,7 @@ void ftestBidiFdWatch2()
     int pipe1[2];
     create_bidi_pipe(pipe1);
 
-    class MyBidiWatcher : public Loop_t::BidiFdWatcher {
+    class MyBidiWatcher : public Loop_t::bidi_fd_watcher {
         bool (&flags)[3];
 
         public:
@@ -237,7 +237,7 @@ void ftestBidiFdWatch2()
         {
         }
 
-        rearm readReady(Loop_t &eloop, int fd) noexcept override
+        rearm read_ready(Loop_t &eloop, int fd) noexcept override
         {
             flags[0] = true;
             char rbuf;
@@ -245,13 +245,13 @@ void ftestBidiFdWatch2()
             return rearm::REMOVE;
         }
 
-        rearm writeReady(Loop_t &eloop, int fd) noexcept override
+        rearm write_ready(Loop_t &eloop, int fd) noexcept override
         {
             flags[1] = true;
             return rearm::REARM;
         }
 
-        void watchRemoved() noexcept override
+        void watch_removed() noexcept override
         {
             flags[2] = true;
         }
@@ -264,7 +264,7 @@ void ftestBidiFdWatch2()
     char wbuf = 'a';
     write(pipe1[1], &wbuf, 1);
 
-    watch.addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
+    watch.add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
 
     my_loop.run();
 
@@ -297,7 +297,7 @@ void ftestBidiFdWatch3()
     int pipe1[2];
     create_bidi_pipe(pipe1);
 
-    class MyBidiWatcher : public Loop_t::BidiFdWatcher {
+    class MyBidiWatcher : public Loop_t::bidi_fd_watcher {
         bool (&flags)[3];
 
         public:
@@ -305,7 +305,7 @@ void ftestBidiFdWatch3()
         {
         }
 
-        rearm readReady(Loop_t &eloop, int fd) noexcept override
+        rearm read_ready(Loop_t &eloop, int fd) noexcept override
         {
             flags[0] = true;
             char rbuf;
@@ -313,13 +313,13 @@ void ftestBidiFdWatch3()
             return rearm::REARM;
         }
 
-        rearm writeReady(Loop_t &eloop, int fd) noexcept override
+        rearm write_ready(Loop_t &eloop, int fd) noexcept override
         {
             flags[1] = true;
             return rearm::NOOP;
         }
 
-        void watchRemoved() noexcept override
+        void watch_removed() noexcept override
         {
             flags[2] = true;
         }
@@ -327,7 +327,7 @@ void ftestBidiFdWatch3()
 
     MyBidiWatcher watch {flags1};
 
-    watch.addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
+    watch.add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
 
     my_loop.run(); // write watch should trigger, and remain disabled
 
@@ -335,7 +335,7 @@ void ftestBidiFdWatch3()
     assert(!flags1[0]);
     assert(!flags1[2]);
 
-    watch.setWatches(my_loop, dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
+    watch.set_watches(my_loop, dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
 
     char wbuf = 'a';
     write(pipe1[1], &wbuf, 1);
@@ -369,7 +369,7 @@ void ftestSigWatch()
     bool seen1 = false;
     bool seen2 = false;
 
-    using SigInfo_p = Loop_t::signal_watcher::SigInfo_p;
+    using siginfo_p = Loop_t::signal_watcher::siginfo_p;
 
     sigset_t sigmask;
     sigemptyset(&sigmask);
@@ -378,13 +378,13 @@ void ftestSigWatch()
     sigprocmask(SIG_BLOCK, &sigmask, nullptr);
 
     Loop_t::signal_watcher::add_watch(my_loop, SIGUSR1,
-            [&seen1](Loop_t &eloop, int signo, SigInfo_p info) -> rearm {
+            [&seen1](Loop_t &eloop, int signo, siginfo_p info) -> rearm {
         seen1 = true;
         return rearm::REMOVE;
     });
 
     Loop_t::signal_watcher::add_watch(my_loop, SIGUSR2,
-            [&seen2](Loop_t &eloop, int signo, SigInfo_p info) -> rearm {
+            [&seen2](Loop_t &eloop, int signo, siginfo_p info) -> rearm {
         seen2 = true;
         return rearm::REMOVE;
     });
@@ -426,7 +426,7 @@ void ftestMultiThread1()
     char wbuf[1] = {'a'};
     write(pipe2[1], wbuf, 1);
 
-    auto fwatch = Loop_t::FdWatcher::addWatch(my_loop, pipe1[0], dasynq::IN_EVENTS,
+    auto fwatch = Loop_t::fd_watcher::add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS,
             [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
         seen1 = true;
         return rearm::REMOVE;
@@ -438,7 +438,7 @@ void ftestMultiThread1()
 
     fwatch->deregister(my_loop);
 
-    Loop_t::FdWatcher::addWatch(my_loop, pipe2[0], dasynq::IN_EVENTS,
+    Loop_t::fd_watcher::add_watch(my_loop, pipe2[0], dasynq::IN_EVENTS,
             [&seen2](Loop_t &eloop, int fd, int flags) -> rearm {
         seen2 = true;
         return rearm::REMOVE;

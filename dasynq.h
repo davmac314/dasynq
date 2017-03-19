@@ -96,11 +96,11 @@ class event_loop;
 namespace dprivate {
     // (non-public API)
     
-    template <typename T_Loop> class FdWatcher;
-    template <typename T_Loop> class BidiFdWatcher;
+    template <typename T_Loop> class fd_watcher;
+    template <typename T_Loop> class bidi_fd_watcher;
     template <typename T_Loop> class signal_watcher;
     template <typename T_Loop> class child_proc_watcher;
-    template <typename T_Loop> class Timer;
+    template <typename T_Loop> class timer;
     
     enum class WatchType
     {
@@ -156,7 +156,7 @@ namespace dprivate {
         // It is guaranteed by the caller that:
         // - the dispatch method is not currently running
         // - the dispatch method will not be called.
-        virtual void watchRemoved() noexcept
+        virtual void watch_removed() noexcept
         {
             // TODO this "delete" behaviour could be dependent on a flag, perhaps?
             // delete this;
@@ -175,8 +175,8 @@ namespace dprivate {
         BaseSignalWatcher() : BaseWatcher(WatchType::SIGNAL) { }
 
         public:
-        using SigInfo = typename Traits::SigInfo;
-        typedef SigInfo &SigInfo_p;
+        using siginfo_t = typename Traits::SigInfo;
+        typedef siginfo_t &siginfo_p;
     };
     
     template <typename T_Mutex>
@@ -192,8 +192,8 @@ namespace dprivate {
         int watch_flags;  // events being watched
         int event_flags;  // events pending (queued)
         
-        // watch_flags: for a regular FdWatcher, this specifies the events that the watcher
-        //              is watching (or was watching if disabled). For a BidiFdWatcher, specifies
+        // watch_flags: for a regular fd_watcher, this specifies the events that the watcher
+        //              is watching (or was watching if disabled). For a bidi_fd_watcher, specifies
         //              the events that the watcher is currently watching (i.e. specifies which
         //              halves of the Bidi watcher are enabled).
 
@@ -518,7 +518,7 @@ namespace dprivate {
                 release_watcher(watcher);
                 
                 lock.unlock();
-                watcher->watchRemoved();
+                watcher->watch_removed();
             }
         }
         
@@ -549,7 +549,7 @@ namespace dprivate {
             
             if (watcher->read_removed && watcher->write_removed) {
                 lock.unlock();
-                watcher->watchRemoved();
+                watcher->watch_removed();
             }
             else {
                 lock.unlock();
@@ -566,11 +566,11 @@ template <typename T_Mutex, template <typename> class Loop, typename LoopTraits>
 class event_loop
 {
     using my_event_loop_t = event_loop<T_Mutex, Loop, LoopTraits>;
-    friend class dprivate::FdWatcher<my_event_loop_t>;
-    friend class dprivate::BidiFdWatcher<my_event_loop_t>;
+    friend class dprivate::fd_watcher<my_event_loop_t>;
+    friend class dprivate::bidi_fd_watcher<my_event_loop_t>;
     friend class dprivate::signal_watcher<my_event_loop_t>;
     friend class dprivate::child_proc_watcher<my_event_loop_t>;
-    friend class dprivate::Timer<my_event_loop_t>;
+    friend class dprivate::timer<my_event_loop_t>;
     
     public:
     using loop_traits_t = LoopTraits;
@@ -919,7 +919,7 @@ class event_loop
         }
     }
 
-    // Process rearm return for FdWatcher, including the primary watcher of a BidiFdWatcher
+    // Process rearm return for fd_watcher, including the primary watcher of a bidi_fd_watcher
     rearm processFdRearm(BaseFdWatcher * bfw, rearm rearmType, bool is_multi_watch)
     {
         // Called with lock held;
@@ -1104,11 +1104,11 @@ class event_loop
                 if (is_multi_watch) {
                     // The primary watcher for a multi-watch watcher is queued for
                     // read events.
-                    rearmType = ((BidiFdWatcher *)bbfw)->readReady(*this, bfw->watch_fd);
+                    rearmType = ((bidi_fd_watcher *)bbfw)->read_ready(*this, bfw->watch_fd);
                     bbfw->event_flags &= ~IN_EVENTS;
                 }
                 else {
-                    rearmType = ((FdWatcher *)bfw)->fdEvent(*this, bfw->watch_fd, bfw->event_flags);
+                    rearmType = ((fd_watcher *)bfw)->fd_event(*this, bfw->watch_fd, bfw->event_flags);
                     bfw->event_flags = 0;
                 }
                 break;
@@ -1119,13 +1119,13 @@ class event_loop
                 break;
             }
             case WatchType::SECONDARYFD: {
-                rearmType = ((BidiFdWatcher *)bbfw)->writeReady(*this, bbfw->watch_fd);
+                rearmType = ((bidi_fd_watcher *)bbfw)->write_ready(*this, bbfw->watch_fd);
                 bbfw->event_flags &= ~OUT_EVENTS;
                 break;
             }
             case WatchType::TIMER: {
                 BaseTimerWatcher *btw = static_cast<BaseTimerWatcher *>(pqueue);
-                rearmType = ((Timer *)btw)->timerExpiry(*this, btw->intervals);
+                rearmType = ((timer *)btw)->timer_expiry(*this, btw->intervals);
                 break;
             }
             default: ;
@@ -1159,10 +1159,10 @@ class event_loop
                 
                 if (rearmType == rearm::REMOVE) {
                     ed.lock.unlock();
-                    // Note that for BidiFd watches, watchRemoved is only called on the primary watch.
+                    // Note that for BidiFd watches, watch_removed is only called on the primary watch.
                     // The process function called above only returns Rearm::REMOVE if both primary and
                     // secondary watches have been removed.
-                    (is_multi_watch ? bbfw : pqueue)->watchRemoved();
+                    (is_multi_watch ? bbfw : pqueue)->watch_removed();
                     ed.lock.lock();
                 }
             }
@@ -1178,11 +1178,11 @@ class event_loop
     public:
     using mutex_t = T_Mutex;
     
-    using FdWatcher = dprivate::FdWatcher<my_event_loop_t>;
-    using BidiFdWatcher = dprivate::BidiFdWatcher<my_event_loop_t>;
+    using fd_watcher = dprivate::fd_watcher<my_event_loop_t>;
+    using bidi_fd_watcher = dprivate::bidi_fd_watcher<my_event_loop_t>;
     using signal_watcher = dprivate::signal_watcher<my_event_loop_t>;
     using child_proc_watcher = dprivate::child_proc_watcher<my_event_loop_t>;
-    using Timer = dprivate::Timer<my_event_loop_t>;
+    using timer = dprivate::timer<my_event_loop_t>;
     
     void run() noexcept
     {
@@ -1218,7 +1218,7 @@ class signal_watcher : private dprivate::BaseSignalWatcher<typename EventLoop::m
     using T_Mutex = typename EventLoop::mutex_t;
     
 public:
-    using SigInfo_p = typename dprivate::BaseSignalWatcher<T_Mutex, typename EventLoop::loop_traits_t>::SigInfo_p;
+    using siginfo_p = typename dprivate::BaseSignalWatcher<T_Mutex, typename EventLoop::loop_traits_t>::siginfo_p;
 
     // Register this watcher to watch the specified signal.
     // If an attempt is made to register with more than one event loop at
@@ -1251,12 +1251,12 @@ public:
                 //
             }
 
-            rearm received(EventLoop &eloop, int signo, SigInfo_p siginfo) override
+            rearm received(EventLoop &eloop, int signo, siginfo_p siginfo) override
             {
                 return watchHndlr(eloop, signo, siginfo);
             }
 
-            void watchRemoved() noexcept override
+            void watch_removed() noexcept override
             {
                 delete this;
             }
@@ -1267,12 +1267,12 @@ public:
         return lsw;
     }
 
-    virtual rearm received(EventLoop &eloop, int signo, SigInfo_p siginfo) = 0;
+    virtual rearm received(EventLoop &eloop, int signo, siginfo_p siginfo) = 0;
 };
 
 // Posix file descriptor event watcher
 template <typename EventLoop>
-class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
+class fd_watcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
 {
     using BaseWatcher = dprivate::BaseWatcher;
     using T_Mutex = typename EventLoop::mutex_t;
@@ -1283,7 +1283,7 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
     // is true; otherwise has unspecified behavior.
     // Only safe to call from within the callback handler (fdEvent). Might not take
     // effect until the current callback handler returns with REARM.
-    void setWatchFlags(int newFlags)
+    void set_watch_flags(int newFlags)
     {
         this->watch_flags = newFlags;
     }
@@ -1303,7 +1303,7 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
     // causes undefined behavior.
     //
     // Can fail with std::bad_alloc or std::system_error.
-    void addWatch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)
+    void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
         this->priority = prio;
@@ -1312,7 +1312,7 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
         eloop.registerFd(this, fd, flags, enabled);
     }
     
-    int getWatchedFd()
+    int get_watched_fd()
     {
         return this->watch_fd;
     }
@@ -1320,7 +1320,7 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
     // Deregister a file descriptor watcher.
     //
     // If other threads may be polling the event loop, it is not safe to assume
-    // the watcher is unregistered until the watchRemoved() callback is issued
+    // the watcher is unregistered until the watch_removed() callback is issued
     // (which will not occur until the event handler returns, if it is active).
     // In a single threaded environment, it is safe to delete the watcher after
     // calling this method as long as the handler (if it is active) accesses no
@@ -1330,7 +1330,7 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
         eloop.deregister(this, this->watch_fd);
     }
     
-    void setEnabled(EventLoop &eloop, bool enable) noexcept
+    void set_enabled(EventLoop &eloop, bool enable) noexcept
     {
         std::lock_guard<T_Mutex> guard(eloop.getBaseLock());
         eloop.setFdEnabled_nolock(this, this->watch_fd, this->watch_flags, enable);
@@ -1342,9 +1342,9 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
     // Add an Fd watch via a lambda. The watch is allocated dynamically and destroys
     // itself when removed from the event loop.
     template <typename T>
-    static FdWatcher<EventLoop> *addWatch(EventLoop &eloop, int fd, int flags, T watchHndlr)
+    static fd_watcher<EventLoop> *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)
     {
-        class LambdaFdWatcher : public FdWatcher<EventLoop>
+        class LambdaFdWatcher : public fd_watcher<EventLoop>
         {
             private:
             T watchHndlr;
@@ -1355,35 +1355,35 @@ class FdWatcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
                 //
             }
             
-            rearm fdEvent(EventLoop &eloop, int fd, int flags) override
+            rearm fd_event(EventLoop &eloop, int fd, int flags) override
             {
                 return watchHndlr(eloop, fd, flags);
             }
             
-            void watchRemoved() noexcept override
+            void watch_removed() noexcept override
             {
                 delete this;
             }
         };
         
         LambdaFdWatcher * lfd = new LambdaFdWatcher(watchHndlr);
-        lfd->addWatch(eloop, fd, flags);
+        lfd->add_watch(eloop, fd, flags);
         return lfd;
     }
     
-    virtual rearm fdEvent(EventLoop &eloop, int fd, int flags) = 0;
+    virtual rearm fd_event(EventLoop &eloop, int fd, int flags) = 0;
 };
 
 // A Bi-directional file descriptor watcher with independent read- and write- channels.
 // This watcher type has two event notification methods which can both potentially be
 // active at the same time.
 template <typename EventLoop>
-class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mutex_t>
+class bidi_fd_watcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mutex_t>
 {
     using BaseWatcher = dprivate::BaseWatcher;
     using T_Mutex = typename EventLoop::mutex_t;
     
-    void setWatchEnabled(EventLoop &eloop, bool in, bool b)
+    void set_watch_enabled(EventLoop &eloop, bool in, bool b)
     {
         int events = in ? IN_EVENTS : OUT_EVENTS;
         
@@ -1421,17 +1421,17 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     };
     */
 
-    void setInWatchEnabled(EventLoop &eloop, bool b) noexcept
+    void set_in_watch_enabled(EventLoop &eloop, bool b) noexcept
     {
         eloop.getBaseLock().lock();
-        setWatchEnabled(eloop, true, b);
+        set_watch_enabled(eloop, true, b);
         eloop.getBaseLock().unlock();
     }
     
-    void setOutWatchEnabled(EventLoop &eloop, bool b) noexcept
+    void set_out_watch_enabled(EventLoop &eloop, bool b) noexcept
     {
         eloop.getBaseLock().lock();
-        setWatchEnabled(eloop, false, b);
+        set_watch_enabled(eloop, false, b);
         eloop.getBaseLock().unlock();
     }
     
@@ -1443,12 +1443,12 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     // (i.e. it is ok to call setWatchFlags from within the readReady/writeReady handlers if no other
     //  thread will poll the event loop; it is always ok to *dis*able a watcher that might be active,
     //  though the re-arm action returned by the callback may undo the effect).
-    void setWatches(EventLoop &eloop, int newFlags)
+    void set_watches(EventLoop &eloop, int newFlags)
     {
         std::lock_guard<T_Mutex> guard(eloop.getBaseLock());
         if (EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
-            setWatchEnabled(eloop, true, (newFlags & IN_EVENTS) != 0);
-            setWatchEnabled(eloop, false, (newFlags & OUT_EVENTS) != 0);
+            set_watch_enabled(eloop, true, (newFlags & IN_EVENTS) != 0);
+            set_watch_enabled(eloop, false, (newFlags & OUT_EVENTS) != 0);
         }
         else {
             this->watch_flags = (this->watch_flags & ~IO_EVENTS) | newFlags;
@@ -1460,7 +1460,7 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     // can be any combination of dasynq::IN_EVENTS / dasynq::OUT_EVENTS.
     //
     // Can fail with std::bad_alloc or std::system_error.
-    void addWatch(EventLoop &eloop, int fd, int flags, int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)
+    void add_watch(EventLoop &eloop, int fd, int flags, int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)
     {
         BaseWatcher::init();
         this->outWatcher.BaseWatcher::init();
@@ -1473,7 +1473,7 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         eloop.registerFd(this, fd, flags);
     }
     
-    int getWatchedFd()
+    int get_watched_fd()
     {
         return this->watch_fd;
     }
@@ -1481,7 +1481,7 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
     // Deregister a bi-direction file descriptor watcher.
     //
     // If other threads may be polling the event loop, it is not safe to assume
-    // the watcher is unregistered until the watchRemoved() callback is issued
+    // the watcher is unregistered until the watch_removed() callback is issued
     // (which will not occur until the event handler returns, if it is active).
     // In a single threaded environment, it is safe to delete the watcher after
     // calling this method as long as the handler (if it is active) accesses no
@@ -1491,8 +1491,8 @@ class BidiFdWatcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::mu
         eloop.deregister(this, this->watch_fd);
     }
     
-    virtual rearm readReady(EventLoop &eloop, int fd) noexcept = 0;
-    virtual rearm writeReady(EventLoop &eloop, int fd) noexcept = 0;
+    virtual rearm read_ready(EventLoop &eloop, int fd) noexcept = 0;
+    virtual rearm write_ready(EventLoop &eloop, int fd) noexcept = 0;
 };
 
 // Child process event watcher
@@ -1634,37 +1634,37 @@ class child_proc_watcher : private dprivate::BaseChildWatcher<typename EventLoop
 };
 
 template <typename EventLoop>
-class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
+class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
 {
     private:
     clock_type clock;
 
     public:
     
-    void addTimer(EventLoop &eloop, clock_type clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)
+    void add_timer(EventLoop &eloop, clock_type clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)
     {
         this->priority = prio;
         this->clock = clock;
         eloop.registerTimer(this, clock);
     }
     
-    void armTimer(EventLoop &eloop, struct timespec &timeout) noexcept
+    void arm_timer(EventLoop &eloop, struct timespec &timeout) noexcept
     {
         eloop.setTimer(this, timeout, clock);
     }
     
-    void armTimer(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
+    void arm_timer(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
     {
         eloop.setTimer(this, timeout, interval, clock);
     }
 
     // Arm timer, relative to now:
-    void armTimerRel(EventLoop &eloop, struct timespec &timeout) noexcept
+    void arm_timer_rel(EventLoop &eloop, struct timespec &timeout) noexcept
     {
         eloop.setTimerRel(this, timeout, clock);
     }
     
-    void armTimerRel(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
+    void arm_timer_rel(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
     {
         eloop.setTimerRel(this, timeout, interval, clock);
     }
@@ -1677,7 +1677,7 @@ class Timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     // Timer expired, and the given number of intervals have elapsed before
     // expiry evenet was queued. Normally intervals == 1 to indicate no
     // overrun.
-    virtual rearm timerExpiry(EventLoop &eloop, int intervals) = 0;
+    virtual rearm timer_expiry(EventLoop &eloop, int intervals) = 0;
 };
 
 }  // namespace dasynq::dprivate
