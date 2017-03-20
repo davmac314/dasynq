@@ -94,6 +94,30 @@ void testFdWatch2()
     watcher2->deregister(my_loop);
 }
 
+static void testTimespecDiv()
+{
+    using dasynq::divide_timespec;
+
+    struct timespec n;
+    struct timespec d;
+
+    n.tv_sec = 0;
+    n.tv_nsec = 999999999;
+    d.tv_sec = 0;
+    d.tv_nsec = 200000000;
+
+    assert(divide_timespec(n, d) == 4);
+
+    d.tv_nsec = 100000000;
+    assert(divide_timespec(n, d) == 9);
+
+    n.tv_sec = 12;
+    n.tv_nsec = 0; // n is 12.0
+    d.tv_sec = 2;
+    d.tv_nsec = 999999999; // d is now 2.999999..
+    assert(divide_timespec(n, d) == 4);
+}
+
 static void create_pipe(int filedes[2])
 {
     if (pipe(filedes) == -1) {
@@ -464,6 +488,10 @@ int main(int argc, char **argv)
 
     std::cout << "testFdWatch2... ";
     testFdWatch2();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "testTimespecDiv... ";
+    testTimespecDiv();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftestFdWatch1... ";

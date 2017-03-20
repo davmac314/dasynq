@@ -22,12 +22,6 @@ template <class Base> class ITimerEvents : public Base
 #define itimerspec itimerval
 #endif
     
-    static int divide_timespec(const struct timespec &num, const struct timespec &den)
-    {
-        // TODO
-        return 0;
-    }
-    
     // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
     // if there are no active timers).
     void set_timer_from_queue()

@@ -28,12 +28,6 @@ template <class Base> class TimerFdEvents : public Base
     timer_queue_t timer_queue;
     timer_queue_t wallclock_queue;
     
-    static int divide_timespec(const struct timespec &num, const struct timespec &den) noexcept
-    {
-        // TODO
-        return 0;
-    }
-    
     // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
     // if there are no active timers).
     static void set_timer_from_queue(int fd, timer_queue_t &queue) noexcept
