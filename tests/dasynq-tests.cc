@@ -100,22 +100,47 @@ static void testTimespecDiv()
 
     struct timespec n;
     struct timespec d;
+    struct timespec rem;
 
+    // 0.9999.. / 0.2
     n.tv_sec = 0;
     n.tv_nsec = 999999999;
     d.tv_sec = 0;
     d.tv_nsec = 200000000;
 
-    assert(divide_timespec(n, d) == 4);
+    assert(divide_timespec(n, d, rem) == 4);
+    assert(rem.tv_sec == 0);
+    assert(rem.tv_nsec == 199999999);
 
+    // 0.9999.. / 0.1
     d.tv_nsec = 100000000;
-    assert(divide_timespec(n, d) == 9);
+    assert(divide_timespec(n, d, rem) == 9);
+    assert(rem.tv_sec == 0);
+    assert(rem.tv_nsec == 99999999);
 
+    // 12.0 / 2.9999..
     n.tv_sec = 12;
     n.tv_nsec = 0; // n is 12.0
     d.tv_sec = 2;
     d.tv_nsec = 999999999; // d is now 2.999999..
-    assert(divide_timespec(n, d) == 4);
+    assert(divide_timespec(n, d, rem) == 4);
+    assert(rem.tv_sec == 0);
+    assert(rem.tv_nsec == 4);
+
+    // 12.999999996 / 2.99...
+    n.tv_nsec = 999999996;
+    assert(divide_timespec(n, d, rem) == 4);
+    assert(rem.tv_sec == 1);
+    assert(rem.tv_nsec == 0);
+
+    // 0.9 / 1.5
+    n.tv_sec = 0;
+    n.tv_nsec = 900000000;
+    d.tv_sec = 1;
+    d.tv_nsec = 500000000;
+    assert(divide_timespec(n, d, rem) == 0);
+    assert(rem.tv_sec == 0);
+    assert(rem.tv_nsec == 900000000);
 }
 
 static void create_pipe(int filedes[2])

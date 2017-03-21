@@ -41,28 +41,36 @@ static void init_timer_handle(timer_handle_t &hnd) noexcept
     BinaryHeap<TimerData, struct timespec, CompareTimespec>::init_handle(hnd);
 }
 
-static int divide_timespec(const struct timespec &num, const struct timespec &den)
+static int divide_timespec(const struct timespec &num, const struct timespec &den, struct timespec &rem)
 {
     if (num.tv_sec < den.tv_sec) {
+        rem = num;
         return 0;
     }
 
     if (num.tv_sec == den.tv_sec) {
         if (num.tv_nsec < den.tv_nsec) {
+            rem = num;
             return 0;
         }
         if (num.tv_sec == 0) {
+            rem.tv_sec = 0;
+            rem.tv_nsec = num.tv_nsec % den.tv_nsec;
             return num.tv_nsec / den.tv_nsec;
         }
         // num.tv_sec == den.tv_sec and both are >= 1.
         // The result can only be 1:
+        rem.tv_sec = 0;
+        rem.tv_nsec = num.tv_nsec - den.tv_nsec;
         return 1;
     }
 
     // At this point, num.tv_sec >= 1.
 
-    auto r_sec = num.tv_sec;
-    auto r_nsec = num.tv_nsec;
+    auto &r_sec = rem.tv_sec;
+    auto &r_nsec = rem.tv_nsec;
+    r_sec = num.tv_sec;
+    r_nsec = num.tv_nsec;
     auto d_sec = den.tv_sec;
     auto d_nsec = den.tv_nsec;
 
