@@ -55,6 +55,9 @@ class BinaryHeap
     {
         T hd;
         hindex_t heap_index;
+
+        handle_t(const handle_t &) = delete;
+        handle_t() { }
     };
     
     // Initialise a handle (if it does not have a suitable constructor). Need not do anything
@@ -226,7 +229,7 @@ class BinaryHeap
         return hvec.empty();
     }
     
-    bool is_queued(handle_t hnd)
+    bool is_queued(handle_t & hnd)
     {
         return hnd.heap_index != (hindex_t) -1;
     }

@@ -210,7 +210,7 @@ namespace dprivate {
         
         // The main instance is the "input" watcher only; we keep a secondary watcher
         // with a secondary set of flags for the "output" watcher:
-        BaseWatcher outWatcher = BaseWatcher(WatchType::SECONDARYFD);
+        BaseWatcher outWatcher {WatchType::SECONDARYFD};
         
         int read_removed : 1; // read watch removed?
         int write_removed : 1; // write watch removed?
@@ -492,7 +492,7 @@ namespace dprivate {
                 return nullptr;
             }
             
-            auto rhndl = event_queue.get_root();
+            auto & rhndl = event_queue.get_root();
             BaseWatcher *r = event_queue.node_data(rhndl);
             event_queue.pull_root();
             return r;
