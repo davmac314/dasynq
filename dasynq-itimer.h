@@ -11,7 +11,7 @@ namespace dasynq {
 
 // Timer implementation based on the (basically obselete) POSIX itimer interface.
 
-template <class Base> class ITimerEvents : public Base
+template <class Base> class ITimerEvents : public timer_base<Base>
 {
     private:
     int timerfd_fd = -1;
@@ -89,58 +89,11 @@ template <class Base> class ITimerEvents : public Base
             // should we use the REALTIME clock instead? I have no idea :/
 #endif
             
-            // Peek timer queue; calculate difference between current time and timeout
-            struct timespec * timeout = &timer_queue.get_root_priority();
-            while (timeout->tv_sec < curtime.tv_sec || (timeout->tv_sec == curtime.tv_sec &&
-                    timeout->tv_nsec <= curtime.tv_nsec)) {
-                // Increment expiry count
-                timer_queue.node_data(timer_queue.get_root()).expiry_count++;
-                // (a periodic timer may have overrun; calculated below).
-                
-                auto thandle = timer_queue.get_root();
-                TimerData &data = timer_queue.node_data(thandle);
-                timespec &interval = data.interval_time;
-                if (interval.tv_sec == 0 && interval.tv_nsec == 0) {
-                    // Non periodic timer
-                    timer_queue.pull_root();
-                    if (data.enabled) {
-                        int expiry_count = data.expiry_count;
-                        data.expiry_count = 0;
-                        Base::receiveTimerExpiry(thandle, timer_queue.node_data(thandle).userdata, expiry_count);
-                    }
-                    if (timer_queue.empty()) {
-                        break;
-                    }
-                }
-                else {
-                    // Periodic timer TODO
-                    // First calculate the overrun in time:
-                    /*
-                    struct timespec diff;
-                    diff.tv_sec = curtime.tv_sec - timeout->tv_sec;
-                    diff.tv_nsec = curtime.tv_nsec - timeout->tv_nsec;
-                    if (diff.tv_nsec < 0) {
-                        diff.tv_nsec += 1000000000;
-                        diff.tv_sec--;
-                    }
-                    */
-                    // Now we have to divide the time overrun by the period to find the
-                    // interval overrun. This requires a division of a value not representable
-                    // as a long...
-                    // TODO use divide_timespec
-                    // TODO better not to remove from queue maybe, but instead mark as inactive,
-                    // adjust timeout, and bubble into correct position
-                    // call Base::receieveTimerEvent
-                    // TODO
-                }
-                
-                // repeat until all expired timeouts processed
-                // timeout = &timer_queue[0].timeout;
-                //  (shouldn't be necessary; address hasn't changed...)
-            }
+            timer_base<Base>::process_timer_queue(timer_queue, curtime);
+
             // arm timerfd with timeout from head of queue
             set_timer_from_queue();
-            loop_mech.rearmSignalWatch_nolock(SIGALRM);
+            // loop_mech.rearmSignalWatch_nolock(SIGALRM);
             return false; // don't disable signal watch
         }
         else {
