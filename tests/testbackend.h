@@ -131,12 +131,12 @@ template <class Base> class test_loop : public Base, io_receiver
         fd_data_map.insert({fd, data});
     }
     
-    void enableTimer_nolock(timer_handle_t &hnd, bool enable)
+    void enableTimer_nolock(timer_handle_t &hnd, bool enable, clock_type clock = clock_type::MONOTONIC)
     {
         // TODO
     }
     
-    void removeTimer_nolock(timer_handle_t &hnd)
+    void removeTimer_nolock(timer_handle_t &hnd, clock_type clock = clock_type::MONOTONIC)
     {
         // TODO
     }
