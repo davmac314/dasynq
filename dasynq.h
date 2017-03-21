@@ -239,6 +239,7 @@ namespace dprivate {
         protected:
         timer_handle_t timer_handle;
         int intervals;
+        clock_type clock;
 
         BaseTimerWatcher() : BaseWatcher(WatchType::TIMER)
         {
@@ -253,7 +254,7 @@ namespace dprivate {
     template <typename T_Mutex> class waitqueue;
     template <typename T_Mutex> class waitqueue_node;
 
-    // Select an appropriate conditiona variable type for a mutex:
+    // Select an appropriate condition variable type for a mutex:
     // condition_variable if mutex is std::mutex, or condition_variable_any
     // otherwise.
     template <class T_Mutex> class condvarSelector;
@@ -1035,10 +1036,10 @@ class event_loop
     {
         // Called with lock held
         if (rearmType == rearm::REARM) {
-            loop_mech.enableTimer_nolock(btw->timer_handle, true);
+            loop_mech.enableTimer_nolock(btw->timer_handle, true, btw->clock);
         }
         else if (rearmType == rearm::REMOVE) {
-            loop_mech.removeTimer_nolock(btw->timer_handle);
+            loop_mech.removeTimer_nolock(btw->timer_handle, btw->clock);
         }
     }
 
@@ -1636,8 +1637,7 @@ class child_proc_watcher : private dprivate::BaseChildWatcher<typename EventLoop
 template <typename EventLoop>
 class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
 {
-    private:
-    clock_type clock;
+    using base_t = BaseTimerWatcher<typename EventLoop::mutex_t>;
 
     public:
     
@@ -1650,23 +1650,23 @@ class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     
     void arm_timer(EventLoop &eloop, struct timespec &timeout) noexcept
     {
-        eloop.setTimer(this, timeout, clock);
+        eloop.setTimer(this, timeout, base_t::clock);
     }
     
     void arm_timer(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
     {
-        eloop.setTimer(this, timeout, interval, clock);
+        eloop.setTimer(this, timeout, interval, base_t::clock);
     }
 
     // Arm timer, relative to now:
     void arm_timer_rel(EventLoop &eloop, struct timespec &timeout) noexcept
     {
-        eloop.setTimerRel(this, timeout, clock);
+        eloop.setTimerRel(this, timeout, base_t::clock);
     }
     
     void arm_timer_rel(EventLoop &eloop, struct timespec &timeout, struct timespec &interval) noexcept
     {
-        eloop.setTimerRel(this, timeout, interval, clock);
+        eloop.setTimerRel(this, timeout, interval, base_t::clock);
     }
     
     void deregister(EventLoop &eloop) noexcept

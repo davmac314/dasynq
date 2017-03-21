@@ -20,11 +20,21 @@ class MySignalWatcher : public Loop_t::signal_watcher
 
 class MyTimer : public Loop_t::timer
 {
-    rearm timer_expiry(Loop_t & eloop, int expiry_count)
+    rearm timer_expiry(Loop_t & eloop, int expiry_count) override
     {
         using namespace std;
-        cout << "Got timeout!" << endl;
+        cout << "Got timeout (1)!" << endl;
         return rearm::REMOVE;
+    }
+};
+
+class MyTimer2 : public Loop_t::timer
+{
+    rearm timer_expiry(Loop_t & eloop, int expiry_count) override
+    {
+        using namespace std;
+        cout << "Got timeout (2)!" << endl;
+        return rearm::REARM;
     }
 };
 
@@ -48,10 +58,11 @@ int main(int argc, char **argv)
     struct timespec timeout {3, 0};
     mt1.arm_timer_rel(eloop, timeout);
     
-    MyTimer mt2;
+    MyTimer2 mt2;
     mt2.add_timer(eloop);
     timeout = {4, 0};
-    mt2.arm_timer_rel(eloop, timeout);
+    struct timespec interval {1, 500000000}; // 1.5s
+    mt2.arm_timer_rel(eloop, timeout, interval);
 
     sleep(1);
     
