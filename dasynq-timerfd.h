@@ -57,7 +57,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
             DASYNQ_UNREACHABLE;
         }
 
-        process_timer_queue(queue, curtime);
+        timer_base<Base>::process_timer_queue(queue, curtime);
 
         // arm timerfd with timeout from head of queue
         set_timer_from_queue(fd, queue);
