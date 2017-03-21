@@ -41,7 +41,7 @@ static void init_timer_handle(timer_handle_t &hnd) noexcept
     BinaryHeap<TimerData, struct timespec, CompareTimespec>::init_handle(hnd);
 }
 
-static int divide_timespec(const struct timespec &num, const struct timespec &den, struct timespec &rem)
+static inline int divide_timespec(const struct timespec &num, const struct timespec &den, struct timespec &rem)
 {
     if (num.tv_sec < den.tv_sec) {
         rem = num;

@@ -293,7 +293,7 @@ void ftestBidiFdWatch1()
     int pipe1[2];
     create_bidi_pipe(pipe1);
 
-    class MyBidiWatcher : public Loop_t::bidi_fd_watcher {
+    class MyBidiWatcher : public Loop_t::bidi_fd_watcher_impl<MyBidiWatcher> {
         bool (&flags)[3];
 
         public:
@@ -301,7 +301,7 @@ void ftestBidiFdWatch1()
         {
         }
 
-        rearm read_ready(Loop_t &eloop, int fd) noexcept override
+        rearm read_ready(Loop_t &eloop, int fd) noexcept
         {
             flags[0] = true;
             char rbuf;
@@ -309,7 +309,7 @@ void ftestBidiFdWatch1()
             return rearm::REMOVE;
         }
 
-        rearm write_ready(Loop_t &eloop, int fd) noexcept override
+        rearm write_ready(Loop_t &eloop, int fd) noexcept
         {
             flags[1] = true;
             return rearm::REMOVE;
@@ -349,7 +349,7 @@ void ftestBidiFdWatch2()
     int pipe1[2];
     create_bidi_pipe(pipe1);
 
-    class MyBidiWatcher : public Loop_t::bidi_fd_watcher {
+    class MyBidiWatcher : public Loop_t::bidi_fd_watcher_impl<MyBidiWatcher> {
         bool (&flags)[3];
 
         public:
@@ -357,7 +357,7 @@ void ftestBidiFdWatch2()
         {
         }
 
-        rearm read_ready(Loop_t &eloop, int fd) noexcept override
+        rearm read_ready(Loop_t &eloop, int fd) noexcept
         {
             flags[0] = true;
             char rbuf;
@@ -365,7 +365,7 @@ void ftestBidiFdWatch2()
             return rearm::REMOVE;
         }
 
-        rearm write_ready(Loop_t &eloop, int fd) noexcept override
+        rearm write_ready(Loop_t &eloop, int fd) noexcept
         {
             flags[1] = true;
             return rearm::REARM;
@@ -417,7 +417,7 @@ void ftestBidiFdWatch3()
     int pipe1[2];
     create_bidi_pipe(pipe1);
 
-    class MyBidiWatcher : public Loop_t::bidi_fd_watcher {
+    class MyBidiWatcher : public Loop_t::bidi_fd_watcher_impl<MyBidiWatcher> {
         bool (&flags)[3];
 
         public:
@@ -425,7 +425,7 @@ void ftestBidiFdWatch3()
         {
         }
 
-        rearm read_ready(Loop_t &eloop, int fd) noexcept override
+        rearm read_ready(Loop_t &eloop, int fd) noexcept
         {
             flags[0] = true;
             char rbuf;
@@ -433,7 +433,7 @@ void ftestBidiFdWatch3()
             return rearm::REARM;
         }
 
-        rearm write_ready(Loop_t &eloop, int fd) noexcept override
+        rearm write_ready(Loop_t &eloop, int fd) noexcept
         {
             flags[1] = true;
             return rearm::NOOP;
