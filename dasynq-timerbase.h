@@ -125,10 +125,11 @@ static int divide_timespec(const struct timespec &num, const struct timespec &de
     return rval;
 }
 
+using timer_queue_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>;
+
 template <typename Base> class timer_base : public Base
 {
     protected:
-    using timer_queue_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>;
 
     void process_timer_queue(timer_queue_t &queue, const struct timespec &curtime)
     {

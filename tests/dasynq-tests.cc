@@ -143,6 +143,77 @@ static void testTimespecDiv()
     assert(rem.tv_nsec == 900000000);
 }
 
+static void test_timer_base_processing()
+{
+    using dasynq::timer_handle_t;
+    using dasynq::timer_queue_t;
+
+    class tbase {
+        public:
+        std::vector<void *> received_expirations;
+
+        void receiveTimerExpiry(dasynq::timer_handle_t & thandle, void *userdata, int expiry_count)
+        {
+            received_expirations.push_back(userdata);
+        }
+    };
+
+    class ttb_t : public dasynq::timer_base<tbase>
+    {
+        public:
+        void process(timer_queue_t &queue, struct timespec curtime)
+        {
+            dasynq::timer_base<tbase>::process_timer_queue(queue, curtime);
+        }
+    };
+
+    ttb_t ttb;
+
+    timer_queue_t timer_queue;
+
+    // First timer is a one-shot timer expiring at 3 seconds:
+    timer_handle_t hnd1;
+    timer_queue.allocate(hnd1);
+    timer_queue.node_data(hnd1).interval_time = {0, 0};
+    timer_queue.node_data(hnd1).userdata = &hnd1;
+    timer_queue.insert(hnd1, {3, 0});
+
+    // Second timer expires at 4 seconds and then every 1 second after:
+    timer_handle_t hnd2;
+    timer_queue.allocate(hnd2);
+    timer_queue.node_data(hnd2).interval_time = {1, 0};
+    timer_queue.node_data(hnd2).userdata = &hnd2;
+    timer_queue.insert(hnd2, {4, 0});
+
+    ttb.process(timer_queue, {0, 0});
+    assert(ttb.received_expirations.empty());
+
+    ttb.process(timer_queue, {1, 0});
+    assert(ttb.received_expirations.empty());
+
+    ttb.process(timer_queue, {3, 0});
+    assert(ttb.received_expirations.size() == 1);
+    assert(ttb.received_expirations[0] == &hnd1);
+
+    ttb.process(timer_queue, {4, 5});
+    assert(ttb.received_expirations.size() == 2);
+    assert(ttb.received_expirations[1] == &hnd2);
+    timer_queue.node_data(hnd2).enabled = true;
+
+    ttb.process(timer_queue, {5, 5});
+    assert(ttb.received_expirations.size() == 3);
+    assert(ttb.received_expirations[2] == &hnd2);
+    timer_queue.node_data(hnd2).enabled = true;
+
+    ttb.process(timer_queue, {6, 0});
+    assert(ttb.received_expirations.size() == 4);
+    assert(ttb.received_expirations[3] == &hnd2);
+    // don't re-enable the timer this time: shouldn't fire again
+
+    ttb.process(timer_queue, {7, 0});
+    assert(ttb.received_expirations.size() == 4);
+}
+
 static void create_pipe(int filedes[2])
 {
     if (pipe(filedes) == -1) {
@@ -517,6 +588,10 @@ int main(int argc, char **argv)
 
     std::cout << "testTimespecDiv... ";
     testTimespecDiv();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_timer_base_processing... ";
+    test_timer_base_processing();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftestFdWatch1... ";

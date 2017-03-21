@@ -24,7 +24,6 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
     int timerfd_fd = -1;
     int systemtime_fd = -1;
 
-    using timer_queue_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>;
     timer_queue_t timer_queue;
     timer_queue_t wallclock_queue;
     

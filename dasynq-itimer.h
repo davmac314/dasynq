@@ -16,7 +16,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
     private:
     int timerfd_fd = -1;
 
-    BinaryHeap<TimerData, struct timespec, CompareTimespec> timer_queue;
+    timer_queue_t timer_queue;
     
 #if defined(__APPLE__)
 #define itimerspec itimerval
