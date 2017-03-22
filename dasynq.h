@@ -7,6 +7,35 @@
 #include "dasynq-binaryheap.h"
 #include "dasynq-interrupt.h"
 
+// Dasynq uses a "mix-in" pattern to produce an event loop implementation incorporating selectable implementations of
+// various components (main backend, timers, child process watch mechanism etc). In C++ this can be achieved by
+// a template for some component which extends its own type parameter:
+//
+//     template <typename Base> class X : public B { .... }
+//
+// We can chain several such components together (and so so below) to "mix in" the functionality of each into the final
+// class, eg:
+//
+//     template <typename T> using Loop = EpollLoop<interrupt_channel<TimerFdEvents<ChildProcEvents<T>>>>;
+//
+// (which defines an alias template "Loop", whose implementation will use the epoll backend, a standard interrupt channel
+// implementation, a timerfd-based timer implementation, and the standard child process watch implementation).
+// We sometimes need the base class to be able to call derived-class members: to do this we pass a reference to
+// the derived instance into a templated method in the base, called "init":
+//
+//     template <typename T> void init(T *derived)
+//     {
+//         // can call method on derived:
+//         derived->add_listener();
+//         // chain to next class:
+//         Base::init(derived);
+//     }
+//
+// At the base all this is the EventDispatch class, defined below, which receives event notifications and inserts
+// them into a queue for processing. The event_loop class, also below, wraps this (via composition) in an interface
+// which can be used to register/de-regsiter/enable/disable event watchers, and which can process the queued events
+// by calling the watcher callbacks. The event_loop class also provides some synchronisation to ensure thread-safety.
+
 #if defined(DASYNQ_CUSTOM_LOOP_IMPLEMENTATION)
 // Loop and LoopTraits defined already; used for testing
 #elif defined(DASYNQ_HAVE_KQUEUE)
