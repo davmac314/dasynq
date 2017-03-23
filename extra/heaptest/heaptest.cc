@@ -10,16 +10,19 @@
 
 #include <iostream>
 
+template <typename A, typename B, typename C> using Nary = dasynq::NaryHeap<A,B,C, 16>;
+
 int main(int argc, char **argv)
 {
     // Template arguments are: data type, priority type, comparator
-    // auto heap = dasynq::PairingHeap<int, int, std::less<int>>();
     // auto heap = dasynq::BinaryHeap<int, int, std::less<int>>();
     // auto heap = dasynq::NaryHeap<int, int>();
+    // auto heap = dasynq::PairingHeap<int, int, std::less<int>>();
     // auto heap = dasynq::BTreeQueue<int, int, std::less<int>, 16>();
     
-    // auto heap = StableHeap<dasynq::PairingHeap, int, int>();
-    auto heap = StableHeap<dasynq::BinaryHeap, int, int>();
+    // auto heap = StableHeap<dasynq::BinaryHeap, int, int>();
+    // auto heap = StableHeap<Nary, int, int>();
+    auto heap = StableHeap<dasynq::PairingHeap, int, int>();
     
     constexpr int NUM = 10000000;
     // constexpr int NUM = 5;

@@ -19,11 +19,6 @@ class BTreeQueue
     
     private:
     
-    // used to inhibit SeptNode construction
-    class no_sept_cons
-    {
-    };
-    
     struct SeptNode
     {
         P prio[N];
@@ -31,18 +26,19 @@ class BTreeQueue
         SeptNode * children[N + 1];
         SeptNode * parent;
         
-        SeptNode() : parent(nullptr)
+        SeptNode()
+        {
+            // Do nothing; constructor will be run later
+        }
+
+        void init()
         {
             for (int i = 0; i < N; i++) {
                 hn_p[i] = nullptr;
                 children[i] = nullptr;
             }
             children[N] = nullptr;
-        }
-        
-        SeptNode(no_sept_cons &&nsc)
-        {
-            // Do nothing; constructor will be run later
+            parent = nullptr;
         }
         
         int num_vals() noexcept
@@ -88,8 +84,6 @@ class BTreeQueue
         }
     };
     
-    std::vector<SeptNode *> sn_reserve;
-    
     struct HeapNode
     {
         T data;
@@ -112,81 +106,60 @@ class BTreeQueue
         }
     };
 
-    // A slot in the backing vector can be free, or occupied. We use a union to cover
-    // these cases; if the slot is free, it just contains a link to the next free slot.
-    /*
-    union HeapNodeU
-    {
-        HeapNode hn;
-        int next_free;
-        
-        HeapNodeU() { }
-    };
-    */
-    
-    // std::vector<HeapNodeU> bvec;
-    
-    // int first_free = -1;
-    
-    // int root_node = -1;
-    
-    int num_alloced = 0;
-    int num_septs = 0;
-    int next_sept = 1;  // next num_allocd for which we need another SeptNode in reserve.
-    
     SeptNode * root_sept = nullptr; // root of the B=Tree
     SeptNode * left_sept = nullptr; // leftmost child (cache)
+    SeptNode * sn_reserve;
+
+    int num_alloced = 0;
+    int num_septs = 0;
+    int num_septs_needed = 0;
+    int next_sept = 1;  // next num_allocd for which we need another SeptNode in reserve.
+    
+    // Note that sept nodes are always at least half full, except for the root sept node.
+    // For up to N nodes, one sept node is needed;
+    //        at N+1 nodes, three sept nodes are needed: a root and two leaves;
+    //     for every N/2 nodes thereafter, an additional sept node may be required.
+    // A simple approximation is, s = (n * 2 + N - 1) / N.
+    // (Actually we get away with much less, if nodes have the same priority, since they are
+    // then linked in list and effectively become a single node).
     
     void alloc_slot()
     {
         num_alloced++;
         
         if (__builtin_expect(num_alloced == next_sept, 0)) {
-            sn_reserve.push_back(new SeptNode(no_sept_cons()));
-            // TODO properly handle allocation failure
-            num_septs++;
+            if (++num_septs_needed > num_septs) {
+                try {
+                    SeptNode *new_res = new SeptNode();
+                    new_res->parent = sn_reserve;
+                    sn_reserve = new_res;
+                    num_septs++;
+                }
+                catch (...) {
+                    num_septs_needed--;
+                    num_alloced--;
+                    throw;
+                }
+            }
             next_sept += N/2;
         }
-        
-        /*
-        if (first_free != -1) {
-            int r = first_free;
-            first_free = bvec[r].next_free;
-            return r;
-        }
-        else {
-            int r = bvec.size();
-            bvec.emplace_back();
-            return r;
-        }
-        */
     }
     
     SeptNode * alloc_sept()
     {
-        SeptNode * r = sn_reserve.back();
-        sn_reserve.pop_back();
-        new (r) SeptNode();
+        SeptNode * r = sn_reserve;
+        sn_reserve = r->parent;
+        r->init();
         return r;
     }
     
     void release_sept(SeptNode *s)
     {
-        // delete if we have an overabundance of nodes
-        if (__builtin_expect(num_alloced < next_sept - N/2, 0)) {
-            delete s;
-            num_septs--;
-            next_sept -= N/2;
-        }
-        else {
-            // TODO this can fail?
-            sn_reserve.push_back(s);
-        }
+        s->parent = sn_reserve;
+        sn_reserve = s;
     }
 
     public:
-    
-    //using handle_t = HeapNode;
     
     T & node_data(handle_t & hn) noexcept
     {
@@ -202,6 +175,9 @@ class BTreeQueue
     template <typename ...U> void allocate(handle_t &hndl, U... u)
     {
         alloc_slot();
+        // TODO should not really new over an existing object.
+        //      T element in HeapNode should be obscured so we don't need a default-constructed
+        //      T in it.
         new (& hndl) HeapNode(u...);
     }
     
@@ -210,15 +186,18 @@ class BTreeQueue
         hn.HeapNode::~HeapNode();
         num_alloced--;
         
-        /*
-        if (index == bvec.size() - 1) {
-            bvec.pop_back();
+        // Potentially release reserved sept node
+        if (__builtin_expect(num_alloced < next_sept - N/2, 0)) {
+            next_sept -= N/2;
+            num_septs_needed--;
+            if (num_septs_needed < num_septs - 1) {
+                // Note the "-1" margin is to alleviate bouncing allocation/deallocation
+                SeptNode * r = sn_reserve;
+                sn_reserve = r->parent;
+                delete r;
+                num_septs--;
+            }
         }
-        else {
-            bvec[index].next_free = first_free;
-            first_free = index;
-        }
-        */
     }
     
     bool set_priority(handle_t & index, P & pval)
@@ -671,6 +650,7 @@ class BTreeQueue
         return root_sept == nullptr;
     }
     
+    /*
     void check_consistency()
     {
         check_consistency(root_sept);
@@ -736,7 +716,6 @@ class BTreeQueue
         }
     }
     
-    /*
     void dumpnode(SeptNode * node, std::vector<SeptNode *> &q = {})
     {
         using namespace std;
