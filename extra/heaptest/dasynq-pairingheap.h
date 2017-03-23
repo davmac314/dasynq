@@ -188,6 +188,7 @@ class PairingHeap
     public:
     
     using handle_t = int;
+    using handle_t_r = int;
     
     T & node_data(int index)
     {

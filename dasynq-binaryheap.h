@@ -23,6 +23,7 @@ class BinaryHeap
 {
     public:
     struct handle_t;
+    using handle_t_r = handle_t &;
     
     private:
     

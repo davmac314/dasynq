@@ -51,6 +51,7 @@ class StableHeap : private H<T,StablePrio<P>,CompareStablePrio<P,C>>
     public:
     
     using handle_t = typename Base::handle_t;
+    using handle_t_r = typename Base::handle_t_r;
     
     bool insert(handle_t & index, P pval = P())
     {
@@ -73,12 +74,12 @@ class StableHeap : private H<T,StablePrio<P>,CompareStablePrio<P,C>>
         Base::pull_root();
     }
     
-    void deallocate(handle_t & index)
+    void deallocate(handle_t_r index)
     {
         Base::deallocate(index);
     }
     
-    void remove(handle_t & hnd)
+    void remove(handle_t_r hnd)
     {
         Base::remove(hnd);
     }

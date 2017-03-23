@@ -15,6 +15,7 @@ class BTreeQueue
     
     public:
     using handle_t = HeapNode;
+    using handle_t_r = HeapNode &;
     
     private:
     
@@ -178,6 +179,7 @@ class BTreeQueue
             next_sept -= N/2;
         }
         else {
+            // TODO this can fail?
             sn_reserve.push_back(s);
         }
     }
