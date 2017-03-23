@@ -48,10 +48,10 @@ with -O3):
 
 |                |   (A) |   (B) |   (C) |   (D) |
 | -------------- | ----- | ----- | ----- | ----- |
-| Ordered fill   |  1549 |  1243 |   816 |   802 |
-| Random f/dq    | 11834 |  6666 | 11339 |  4632 |
-| Cycle f/dq     |   579 |   813 |   200 |   458 |
-| Flat pri f/dq  |  1593 |  1235 |   649 |   213 |
+| Ordered fill   |  1549 |  1243 |   788 |   802 |
+| Random f/dq    | 11834 |  6666 | 11672 |  4632 |
+| Cycle f/dq     |   579 |   813 |   179 |   458 |
+| Flat pri f/dq  |  1593 |  1235 |   708 |   213 |
 
  * (A) Stable BinaryHeap
  * (B) Stable NaryHeap (N=16)
@@ -78,19 +78,15 @@ For unstable heaps, the results are as follows:
 
 |                |   (A) |   (B) |   (C) |   (D) |
 | -------------- | ----- | ----- | ----- | ----- |
-| Ordered fill   |  1329 |  1041 |   512 |   802 |
-| Random f/dq    |  8924 |  5659 | 10001 |  4632 |
-| Cycle f/dq     |   525 |   720 |   195 |   458 |
-| Flat pri f/dq  |   203 |   213 |    64 |   213 |
+| Ordered fill   |  1329 |  1041 |   569 |   802 |
+| Random f/dq    |  8924 |  5659 | 10989 |  4632 |
+| Cycle f/dq     |   525 |   720 |   171 |   458 |
+| Flat pri f/dq  |   203 |   213 |    73 |   213 |
 
  * (A) BinaryHeap
  * (B) NaryHeap (N=16)
  * (C) PairingHeap
  * (D) BTreeQueue (stable)
-
-NOTE: the current implementation of PairingHeap does not release memory (ever),
-which probably explains the exceptional performance in the flat priority queue/
-dequeue test.
 
 Surprisingly enough, the BTreeQueue remains one of the most performant data
 structures to implement a priority queue even when stability is not required.

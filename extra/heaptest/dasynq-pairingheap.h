@@ -1,7 +1,6 @@
 #ifndef DASYNQ_PAIRINGHEAP_H
 #define DASYNQ_PAIRINGHEAP_H
 
-#include <vector>
 #include <functional>
 
 namespace dasynq {
@@ -13,17 +12,24 @@ class PairingHeap
     {
         T data;
         P prio;
-        int next_sibling;
-        int prev_sibling; // (or parent)
-        int first_child;
+        HeapNode * next_sibling;
+        HeapNode * prev_sibling; // (or parent)
+        HeapNode * first_child;
         
         template <typename ...U> HeapNode(U... u) : data(u...)
         {
-            next_sibling = -1;
-            prev_sibling = -1;
-            first_child = -1;
+            next_sibling = nullptr;
+            prev_sibling = nullptr;
+            first_child = nullptr;
         }
     };
+
+    public:
+
+    using handle_t = HeapNode;
+    using handle_t_r = HeapNode &;
+
+    private:
 
     // A slot in the backing vector can be free, or occupied. We use a union to cover
     // these cases; if the slot is free, it just contains a link to the next free slot.
@@ -35,202 +41,173 @@ class PairingHeap
         HeapNodeU() { }
     };
     
-    std::vector<HeapNodeU> bvec;
+    handle_t * root_node = nullptr;
     
-    int first_free = -1;
-    int root_node = -1;
-    
-    int alloc_slot()
+    bool merge(handle_t &node)
     {
-        if (first_free != -1) {
-            int r = first_free;
-            first_free = bvec[r].next_free;
-            return r;
-        }
-        else {
-            int r = bvec.size();
-            bvec.emplace_back();
-            return r;
-        }
-    }
-    
-    bool merge(int index)
-    {
-        if (root_node == -1) {
-            root_node = index;
+        if (root_node == nullptr) {
+            root_node = &node;
             return true;
         }
         else {
             Compare is_less;
-            if (is_less(bvec[root_node].hn.prio, bvec[index].hn.prio)) {
+            if (is_less(root_node->prio, node.prio)) {
                 // inserted node becomes new subtree
-                int root_fc = bvec[root_node].hn.first_child;
-                bvec[index].hn.next_sibling = root_fc;
-                if (root_fc != -1) {
-                    bvec[root_fc].hn.prev_sibling = index;
+                handle_t * root_fc = root_node->first_child;
+                node.next_sibling = root_fc;
+                if (root_fc != nullptr) {
+                    root_fc->prev_sibling = &node;
                 }
-                bvec[index].hn.prev_sibling = root_node; // (parent)
-                bvec[root_node].hn.first_child = index;
+                node.prev_sibling = root_node; // (parent)
+                root_node->first_child = &node;
                 return false;
             }
             else {
                 // inserted node becomes new root
-                int indx_fc = bvec[index].hn.first_child;
-                bvec[root_node].hn.next_sibling = indx_fc;
-                if (indx_fc != -1) {
-                    bvec[indx_fc].hn.prev_sibling = root_node;
+                handle_t * indx_fc = node.first_child;
+                root_node->next_sibling = indx_fc;
+                if (indx_fc != nullptr) {
+                    indx_fc->prev_sibling = root_node;
                 }
-                bvec[index].hn.first_child = root_node;
-                bvec[root_node].hn.prev_sibling = index; // (parent)
-                root_node = index;
+                node.first_child = root_node;
+                root_node->prev_sibling = &node; // (parent)
+                root_node = &node;
                 return true;
             }
         }
     }
     
     // merge a pair of sub-heaps, where i2 is the next sibling of i1
-    int merge_pair(int i1, int i2)
+    handle_t * merge_pair(handle_t * i1, handle_t * i2)
     {
         Compare is_less;
-        if (is_less(bvec[i2].hn.prio, bvec[i1].hn.prio)) {
+        if (is_less(i2->prio, i1->prio)) {
             std::swap(i1, i2);
-            int i2_prevsibling = bvec[i2].hn.prev_sibling; // may be parent ptr
-            if (i2_prevsibling != -1) {
-                if (bvec[i2_prevsibling].hn.first_child == i2) {
-                    bvec[i2_prevsibling].hn.first_child = i1;
+            handle_t * i2_prevsibling = i2->prev_sibling; // may be parent ptr
+            if (i2_prevsibling != nullptr) {
+                if (i2_prevsibling->first_child == i2) {
+                    i2_prevsibling->first_child = i1;
                 }
                 else {
-                    bvec[i2_prevsibling].hn.next_sibling = i1;
+                    i2_prevsibling->next_sibling = i1;
                 }
             }
-            bvec[i1].hn.prev_sibling = i2_prevsibling;
+           i1->prev_sibling = i2_prevsibling;
         }
         else {
             // i1 will be the root; set its next sibling:
-            int i2_nextsibling = bvec[i2].hn.next_sibling;
-            bvec[i1].hn.next_sibling = i2_nextsibling;
-            if (i2_nextsibling != -1) {
-                bvec[i2_nextsibling].hn.prev_sibling = i1;
+            handle_t * i2_nextsibling = i2->next_sibling;
+            i1->next_sibling = i2_nextsibling;
+            if (i2_nextsibling != nullptr) {
+                i2_nextsibling->prev_sibling = i1;
             }
         }
         
         // i1 is now the "lesser" node index
-        int i1_firstchild = bvec[i1].hn.first_child;
-        bvec[i2].hn.next_sibling = i1_firstchild;
-        if (i1_firstchild != -1) {
-            bvec[i1_firstchild].hn.prev_sibling = i2;
+        handle_t * i1_firstchild = i1->first_child;
+        i2->next_sibling = i1_firstchild;
+        if (i1_firstchild != nullptr) {
+            i1_firstchild->prev_sibling = i2;
         }
-        bvec[i1].hn.first_child = i2;
-        bvec[i2].hn.prev_sibling = i1; // (parent)
+        i1->first_child = i2;
+        i2->prev_sibling = i1; // (parent)
         return i1;
     }
 
-    int merge_pairs(int index)
+    handle_t * merge_pairs(handle_t * node)
     {
         // merge in pairs, left to right, then merge all resulting pairs right-to-left
         
-        if (index == -1) return -1;
+        if (node == nullptr) return nullptr;
         
-        int prev_pair = -1;
-        int sibling = bvec[index].hn.next_sibling;
-        if (sibling == -1) {
-            return index;
+        handle_t * prev_pair = nullptr;
+        handle_t * sibling = node->next_sibling;
+        if (sibling == nullptr) {
+            return node;
         }
         
-        while (sibling != -1) {
+        while (sibling != nullptr) {
             // bvec[index].hn.parent = -1;
             // bvec[sibling].hn.parent = -1;
-            int r = merge_pair(index, sibling);
-            index = bvec[r].hn.next_sibling;
+            handle_t * r = merge_pair(node, sibling);
+            node = r->next_sibling;
             
-            if (prev_pair != -1) {
-                bvec[r].hn.next_sibling = prev_pair;
-                bvec[prev_pair].hn.prev_sibling = r;
+            if (prev_pair != nullptr) {
+                r->next_sibling = prev_pair;
+                prev_pair->prev_sibling = r;
             }
             else {
-                bvec[r].hn.next_sibling = -1;
+                r->next_sibling = nullptr;
             }
-            bvec[r].hn.prev_sibling = -1;
+            r->prev_sibling = nullptr;
             
             prev_pair = r;
-            if (index != -1) {
-                bvec[index].hn.prev_sibling = -1;
-                sibling = bvec[index].hn.next_sibling;
+            if (node != nullptr) {
+                node->prev_sibling = nullptr;
+                sibling = node->next_sibling;
             }
             else {
-                sibling = -1;
+                sibling = nullptr;
             }
         }
         
-        if (index != -1) {
+        if (node != nullptr) {
             // un-paired subheap at the end: move it to the start of the pair list
             //bvec[index].hn.parent = -1;
-            bvec[index].hn.prev_sibling = -1;
-            bvec[index].hn.next_sibling = prev_pair;
-            bvec[prev_pair].hn.prev_sibling = index;
-            prev_pair = index;
+            node->prev_sibling = nullptr;
+            node->next_sibling = prev_pair;
+            prev_pair->prev_sibling = node;
+            prev_pair = node;
         }
         else {
-            bvec[prev_pair].hn.prev_sibling = -1;
+            prev_pair->prev_sibling = nullptr;
         }
         
         // Now merge the resulting heaps one by one
-        index = prev_pair;
-        sibling = bvec[index].hn.next_sibling;
-        while (sibling != -1) {
-            index = merge_pair(index, sibling);
-            sibling = bvec[index].hn.next_sibling;
+        node = prev_pair;
+        sibling = node->next_sibling;
+        while (sibling != nullptr) {
+            node = merge_pair(node, sibling);
+            sibling = node->next_sibling;
         }
         
-        return index;
+        return node;
     }
 
     public:
-    
-    using handle_t = int;
-    using handle_t_r = int;
-    
-    T & node_data(int index)
+
+    T & node_data(handle_t &index)
     {
-        return bvec[index].hn.data;
+        return index.data;
     }
     
     // Allocate a slot, but do not incorporate into the heap:
-    template <typename ...U> void allocate(int &hndl, U... u)
+    template <typename ...U> void allocate(handle_t &hndl, U... u)
     {
-        hndl = alloc_slot();
-        new (& bvec[hndl].hn) HeapNode(u...);
+        new (& hndl) HeapNode(u...);
     }
     
-    void deallocate(int index)
+    void deallocate(handle_t & index)
     {
-        bvec[index].hn.HeapNode::~HeapNode();
-        if (index == bvec.size() - 1) {
-            bvec.pop_back();
-        }
-        else {
-            bvec[index].next_free = first_free;
-            first_free = index;
-        }
     }
     
-    bool set_priority(int index, P pval)
+    bool set_priority(handle_t_r index, P pval)
     {
         remove(index);
         return insert(index, pval);
     }
 
     // Insert an allocated slot into the heap
-    bool insert(int index, P pval = P())
+    bool insert(handle_t_r node, P pval = P())
     {
-        bvec[index].hn.prio = pval;
-        return merge(index);
+        node.prio = pval;
+        return merge(node);
     }
     
     // Remove a slot from the heap (but don't deallocate it)
-    void remove(int index)
+    void remove(handle_t_r node)
     {
-        if (index == root_node) {
+        if (&node == root_node) {
             pull_root();
             return;
         }
@@ -242,61 +219,61 @@ class PairingHeap
         // First we have to find the node in the linked list of siblings, to cut it out:
         // int parent = bvec[index].hn.parent;
         
-        int prev_sibling = bvec[index].hn.prev_sibling;
-        int next_sibling = bvec[index].hn.next_sibling;
-        if (bvec[prev_sibling].hn.first_child == index) {
+        handle_t * prev_sibling = node.prev_sibling;
+        handle_t * next_sibling = node.next_sibling;
+        if (prev_sibling->first_child == &node) {
             // we are the first child
-            bvec[prev_sibling].hn.first_child = next_sibling;
-            if (next_sibling != -1) {
-                bvec[next_sibling].hn.prev_sibling = prev_sibling;
+            prev_sibling->first_child = next_sibling;
+            if (next_sibling != nullptr) {
+                next_sibling->prev_sibling = prev_sibling;
             }
         }
         else {
-            bvec[prev_sibling].hn.next_sibling = next_sibling;
-            if (next_sibling != -1) {
-                bvec[next_sibling].hn.prev_sibling = prev_sibling;
+            prev_sibling->next_sibling = next_sibling;
+            if (next_sibling != nullptr) {
+                next_sibling->prev_sibling = prev_sibling;
             }
         }
         
-        int first_child = bvec[index].hn.first_child;
-        bvec[index].hn.next_sibling = -1;
-        bvec[index].hn.prev_sibling = -1;
-        bvec[index].hn.first_child = -1;
+        handle_t * first_child = node.first_child;
+        node.next_sibling = nullptr;
+        node.prev_sibling = nullptr;
+        node.first_child = nullptr;
         
-        if (first_child != -1) {
-            bvec[root_node].hn.next_sibling = first_child;
-            bvec[first_child].hn.prev_sibling = root_node;
+        if (first_child != nullptr) {
+            root_node->next_sibling = first_child;
+            first_child->prev_sibling = root_node;
         
             root_node = merge_pairs(root_node);
         }
     }
     
-    int get_root()
+    handle_t_r get_root()
     {
-        return root_node;
+        return *root_node;
     }
     
-    P & get_root_priority()
+    const P & get_root_priority()
     {
-        return bvec[root_node].hn.prio;
+        return root_node->prio;
     }
     
-    int pull_root()
+    handle_t * pull_root()
     {
-        int nr = merge_pairs(bvec[root_node].hn.first_child);
-        bvec[root_node].hn.first_child = -1;
+        handle_t * nr = merge_pairs(root_node->first_child);
+        root_node->first_child = nullptr;
         root_node = nr;
         return nr;
     }
     
-    bool is_queued(int hndl)
+    bool is_queued(handle_t_r hndl)
     {
-        return bvec[hndl].hn.prev_sibling != -1 || root_node == hndl;
+        return hndl.prev_sibling != nullptr || root_node == &hndl;
     }
     
     bool empty()
     {
-        return root_node == -1;
+        return root_node == nullptr;
     }
     
     /*
