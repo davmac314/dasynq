@@ -2,6 +2,7 @@
 #include "dasynq-btreequeue.h"
 #include "dasynq-pairingheap.h"
 #include "dasynq-binaryheap.h"
+#include "dasynq-naryheap.h"
 #include <functional>
 #include <random>
 #include <chrono>
@@ -14,9 +15,11 @@ int main(int argc, char **argv)
     // Template arguments are: data type, priority type, comparator
     // auto heap = dasynq::PairingHeap<int, int, std::less<int>>();
     // auto heap = dasynq::BinaryHeap<int, int, std::less<int>>();
+    // auto heap = dasynq::NaryHeap<int, int>();
     // auto heap = dasynq::BTreeQueue<int, int, std::less<int>, 16>();
     
     auto heap = StableHeap<dasynq::PairingHeap, int, int>();
+    // auto heap = StableHeap<dasynq::BinaryHeap, int, int>();
     
     constexpr int NUM = 10000000;
     // constexpr int NUM = 5;
@@ -38,7 +41,7 @@ int main(int argc, char **argv)
     }
     
     for (int i = 0; i < NUM; i++) {
-        auto r = heap.get_root();
+        auto &r = heap.get_root();
         // std::cout << heap.get_data(r) << std::endl;
         heap.pull_root();
         heap.deallocate(r);
@@ -61,7 +64,7 @@ int main(int argc, char **argv)
     }
     
     for (int i = 0; i < NUM; i++) {
-        auto r = heap.get_root();
+        auto & r = heap.get_root();
         // std::cout << heap.get_data(r) << std::endl;
         heap.pull_root();
         heap.deallocate(r);
@@ -85,7 +88,7 @@ int main(int argc, char **argv)
     }
     
     for (int i = 0; i < NUM; i++) {
-        auto r = heap.get_root();
+        auto & r = heap.get_root();
         // std::cout << heap.get_data(r) << std::endl;
         heap.pull_root();
         heap.deallocate(r);
@@ -110,7 +113,7 @@ int main(int argc, char **argv)
         active++;
         
         if (active > 1000) {
-            auto r = heap.get_root();
+            auto & r = heap.get_root();
             heap.pull_root();
             heap.deallocate(r);
             active--;
@@ -118,7 +121,7 @@ int main(int argc, char **argv)
     }
     
     for (int i = 0; i < 1000; i++) {
-        auto r = heap.get_root();
+        auto & r = heap.get_root();
         heap.pull_root();
         heap.deallocate(r);
     }
