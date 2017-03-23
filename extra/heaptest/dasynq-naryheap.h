@@ -1,7 +1,7 @@
 #ifndef DASYNC_NARYHEAP_H_INCLUDED
 #define DASYNC_NARYHEAP_H_INCLUDED
 
-#include <vector>
+#include "dasynq-svec.h"
 #include <type_traits>
 #include <functional>
 #include <limits>
@@ -27,7 +27,7 @@ namespace dasynq {
  * P : priority type (eg int)
  * Compare : functional object type to compare priorities
  */
-template <typename T, typename P, typename Compare = std::less<P>, int N = 8>
+template <typename T, typename P, typename Compare = std::less<P>, int N = 16>
 class NaryHeap
 {
     public:
@@ -49,7 +49,7 @@ class NaryHeap
         }
     };
 
-    std::vector<HeapNode> hvec;
+    svector<HeapNode> hvec;
 
     using hindex_t = typename decltype(hvec)::size_type;
 
@@ -259,11 +259,11 @@ class NaryHeap
     {
         num_nodes--;
 
-        /*
-        // TODO we should shrink the capacity of hvec if num_nodes is sufficiently
-        // less than its current capacity, however, there is no way with a standard
-        // vector to shrink capacity to an arbitrary amount. :/
-        */
+        // shrink the capacity of hvec if num_nodes is sufficiently less than
+        // its current capacity:
+        if (num_nodes < hvec.capacity() / 4) {
+            hvec.shrink_to(num_nodes * 2);
+        }
     }
 
     bool insert(handle_t & hnd, P pval = P()) noexcept
