@@ -5,7 +5,6 @@
 #include <time.h>
 
 #include "dasynq-timerbase.h"
-#include "dasynq-binaryheap.h"
 
 namespace dasynq {
 
