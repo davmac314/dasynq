@@ -8,9 +8,10 @@ using namespace dasynq;
 
 using Loop_t = event_loop<std::mutex>;
 
-class MySignalWatcher : public Loop_t::signal_watcher
+class MySignalWatcher : public Loop_t::signal_watcher_impl<MySignalWatcher>
 {
-    rearm received(Loop_t & eloop, int signo, siginfo_p siginfo) override
+    public:
+    rearm received(Loop_t & eloop, int signo, siginfo_p siginfo)
     {
         using namespace std;
         cout << "Got signal: " << signo << endl;
@@ -18,9 +19,10 @@ class MySignalWatcher : public Loop_t::signal_watcher
     }
 };
 
-class MyTimer : public Loop_t::timer
+class MyTimer : public Loop_t::timer_impl<MyTimer>
 {
-    rearm timer_expiry(Loop_t & eloop, int expiry_count) override
+    public:
+    rearm timer_expiry(Loop_t & eloop, int expiry_count)
     {
         using namespace std;
         cout << "Got timeout (1)!" << endl;
@@ -28,9 +30,10 @@ class MyTimer : public Loop_t::timer
     }
 };
 
-class MyTimer2 : public Loop_t::timer
+class MyTimer2 : public Loop_t::timer_impl<MyTimer2>
 {
-    rearm timer_expiry(Loop_t & eloop, int expiry_count) override
+    public:
+    rearm timer_expiry(Loop_t & eloop, int expiry_count)
     {
         using namespace std;
         cout << "Got timeout (2)!" << endl;
