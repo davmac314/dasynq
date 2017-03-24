@@ -1760,6 +1760,7 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
 template <typename EventLoop>
 class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
 {
+    template <typename, typename> friend class timer_impl;
     using base_t = BaseTimerWatcher<typename EventLoop::mutex_t>;
 
     public:
@@ -1794,7 +1795,7 @@ class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     
     void deregister(EventLoop &eloop) noexcept
     {
-        eloop.deregister(this, clock);
+        eloop.deregister(this, this->clock);
     }
 
     // Timer expired, and the given number of intervals have elapsed before
@@ -1811,7 +1812,7 @@ class timer_impl : public timer<EventLoop>
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.getBaseLock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->child_status(loop, this->watch_pid, this->child_status);
+        auto rearmType = static_cast<Derived *>(this)->timer_expiry(loop, this->intervals);
 
         loop.getBaseLock().lock();
 
@@ -1823,7 +1824,7 @@ class timer_impl : public timer<EventLoop>
                 rearmType = rearm::REMOVE;
             }
 
-            rearmType = loop.processTimerRearm(this, rearmType);
+            loop.processTimerRearm(this, rearmType);
 
             if (rearmType == rearm::REMOVE) {
                 loop.getBaseLock().unlock();
