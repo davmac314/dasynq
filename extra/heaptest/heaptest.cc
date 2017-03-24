@@ -104,6 +104,32 @@ int main(int argc, char **argv)
     std::cout << "Random fill/dequeue: " << millis << std::endl;
 
     if (! heap.empty()) abort();
+
+    // Random fill/random remove
+
+    int * order = new int[NUM];
+    for (int i = 0; i < NUM; i++) order[i] = i;
+    std::shuffle(order, order + NUM, gen);
+
+    starttime = std::chrono::high_resolution_clock::now();
+
+    for (int i = 0; i < NUM; i++) {
+        int ii = r(gen);
+        heap.allocate(indexes[i], ii);
+        heap.insert(indexes[i], ii);
+    }
+
+    for (int i = 0; i < NUM; i++) {
+        heap.remove(indexes[order[i]]);
+        heap.deallocate(indexes[order[i]]);
+    }
+
+    endtime = std::chrono::high_resolution_clock::now();
+    millis = std::chrono::duration_cast<std::chrono::milliseconds>(endtime - starttime).count();
+
+    std::cout << "Random fill/random remove: " << millis << std::endl;
+
+    if (! heap.empty()) abort();
     
     // Queue cycle
     
@@ -139,7 +165,6 @@ int main(int argc, char **argv)
     
     // Ordered fill/random remove
 
-    int * order = new int[NUM];
     for (int i = 0; i < NUM; i++) order[i] = i;
     std::shuffle(order, order + NUM, gen);
     
