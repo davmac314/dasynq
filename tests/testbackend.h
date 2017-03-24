@@ -3,7 +3,6 @@
 #include <unordered_map>
 
 #include "dasynq-flags.h"
-#include "dasynq-binaryheap.h"
 #include "dasynq-timerbase.h"
 
 namespace dasynq {
@@ -102,7 +101,7 @@ class test_loop_traits
 
 template <class Base> class test_loop : public Base, io_receiver
 {
-    using timer_handle_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>::handle_t;
+    using timer_handle_t = timer_queue_t::handle_t;
     
     struct fd_data
     {

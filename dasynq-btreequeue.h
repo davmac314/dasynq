@@ -108,7 +108,7 @@ class BTreeQueue
 
     SeptNode * root_sept = nullptr; // root of the B=Tree
     SeptNode * left_sept = nullptr; // leftmost child (cache)
-    SeptNode * sn_reserve;
+    SeptNode * sn_reserve = nullptr;
 
     int num_alloced = 0;
     int num_septs = 0;
@@ -650,6 +650,15 @@ class BTreeQueue
         return root_sept == nullptr;
     }
     
+    ~BTreeQueue()
+    {
+        while (sn_reserve != nullptr) {
+            auto *next = sn_reserve->parent;
+            delete sn_reserve;
+            sn_reserve = next;
+        }
+    }
+
     /*
     void check_consistency()
     {

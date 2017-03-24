@@ -1,6 +1,8 @@
 #ifndef DASYNQ_TIMERBASE_H_INCLUDED
 #define DASYNQ_TIMERBASE_H_INCLUDED
 
+#include "dasynq-pairingheap.h"
+
 namespace dasynq {
 
 class TimerData
@@ -34,11 +36,12 @@ class CompareTimespec
     }
 };
 
-using timer_handle_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>::handle_t;
+using timer_queue_t = PairingHeap<TimerData, struct timespec, CompareTimespec>;
+using timer_handle_t = timer_queue_t::handle_t;
 
 static void init_timer_handle(timer_handle_t &hnd) noexcept
 {
-    BinaryHeap<TimerData, struct timespec, CompareTimespec>::init_handle(hnd);
+    timer_queue_t::init_handle(hnd);
 }
 
 static inline int divide_timespec(const struct timespec &num, const struct timespec &den, struct timespec &rem)
@@ -125,8 +128,6 @@ static inline int divide_timespec(const struct timespec &num, const struct times
     return rval;
 }
 
-using timer_queue_t = BinaryHeap<TimerData, struct timespec, CompareTimespec>;
-
 template <typename Base> class timer_base : public Base
 {
     protected:
@@ -134,7 +135,7 @@ template <typename Base> class timer_base : public Base
     void process_timer_queue(timer_queue_t &queue, const struct timespec &curtime)
     {
         // Peek timer queue; calculate difference between current time and timeout
-        struct timespec * timeout = &queue.get_root_priority();
+        const struct timespec * timeout = &queue.get_root_priority();
         while (timeout->tv_sec < curtime.tv_sec || (timeout->tv_sec == curtime.tv_sec &&
                 timeout->tv_nsec <= curtime.tv_nsec)) {
             auto & thandle = queue.get_root();

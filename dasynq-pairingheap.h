@@ -276,6 +276,11 @@ class PairingHeap
         return root_node == nullptr;
     }
     
+    static void init_handle(handle_t_r hndl)
+    {
+
+    }
+
     /*
     void dumpnode(int n, std::vector<int> &q)
     {
