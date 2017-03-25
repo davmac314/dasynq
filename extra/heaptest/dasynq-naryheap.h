@@ -47,6 +47,8 @@ class NaryHeap
         {
             // nothing to do
         }
+
+        HeapNode() { }
     };
 
     svector<HeapNode> hvec;
@@ -82,13 +84,20 @@ class NaryHeap
     // necessary to override assignment between elements to correctly update the reference in the
     // handle.
 
-    bool bubble_down()
+    bool bubble_down() noexcept
     {
         return bubble_down(hvec.size() - 1);
     }
 
     // Bubble a newly added timer down to the correct position
-    bool bubble_down(hindex_t pos)
+    bool bubble_down(hindex_t pos) noexcept
+    {
+        P op = hvec[pos].data;
+        handle_t * ohndl = hvec[pos].hnd_p;
+        return bubble_down(pos, ohndl, op);
+    }
+
+    bool bubble_down(hindex_t pos, handle_t * ohndl, const P &op) noexcept
     {
         // int pos = v.size() - 1;
         Compare lt;
@@ -99,12 +108,15 @@ class NaryHeap
             auto mh_base = pos - mh_index;
             while (mh_index > 0) {
                 hindex_t parent = (mh_index - 1) / 2;
-                if (! lt(hvec[mh_index + mh_base].data, hvec[parent + mh_base].data)) {
+                if (! lt(op, hvec[parent + mh_base].data)) {
+                    pos = mh_index + mh_base;
+                    hvec[pos].hnd_p = ohndl;
+                    ohndl->heap_index = pos;
                     return false;
                 }
 
-                std::swap(hvec[mh_index + mh_base], hvec[parent + mh_base]);
-                std::swap(hvec[mh_index + mh_base].hnd_p->heap_index, hvec[parent + mh_base].hnd_p->heap_index);
+                hvec[mh_index + mh_base] = hvec[parent + mh_base];
+                hvec[mh_index + mh_base].hnd_p->heap_index = mh_index + mh_base;
                 mh_index = parent;
             }
 
@@ -117,22 +129,31 @@ class NaryHeap
             auto parent_idx = (rem / 2) + (N / 2) - 1;
 
             hindex_t parent = parent_unit * (N - 1) + parent_idx;
-            if (! lt(hvec[pos].data, hvec[parent].data)) {
+            if (! lt(op, hvec[parent].data)) {
                 break;
             }
 
-            std::swap(hvec[pos], hvec[parent]);
-            std::swap(hvec[pos].hnd_p->heap_index, hvec[parent].hnd_p->heap_index);
+            hvec[pos] = hvec[parent];
+            hvec[pos].hnd_p->heap_index = pos;
             pos = parent;
         }
+
+        hvec[pos].hnd_p = ohndl;
+        ohndl->heap_index = pos;
 
         return pos == 0;
     }
 
     void bubble_up(hindex_t pos = 0)
     {
+        P p = hvec[pos].data;
+        handle_t &hndl = *hvec[pos].hnd_p;
+        bubble_up(pos, hvec.size() - 1, hndl, p);
+    }
+
+    void bubble_up(hindex_t pos, hindex_t rmax, handle_t &h, const P &p) noexcept
+    {
         Compare lt;
-        hindex_t rmax = hvec.size();
 
         while (true) {
             auto containing_unit = pos / (N - 1);
@@ -145,7 +166,10 @@ class NaryHeap
                 hindex_t rchild = lchild + 1;
 
                 if (rchild >= rmax) {
-                    if (lchild >= rmax) {
+                    if (lchild > rmax) {
+                        hvec[pos].hnd_p = &h;
+                        hvec[pos].data = p;
+                        h.heap_index = pos;
                         return;
                     }
                     selchild = lchild;
@@ -155,20 +179,18 @@ class NaryHeap
                     selchild = lt(hvec[lchild].data, hvec[rchild].data) ? lchild : rchild;
                 }
 
-                if (! lt(hvec[selchild].data, hvec[pos].data)) {
+                if (! lt(hvec[selchild].data, p)) {
+                    hvec[pos].hnd_p = &h;
+                    hvec[pos].data = p;
+                    h.heap_index = pos;
                     return;
                 }
 
-                std::swap(hvec[selchild].hnd_p->heap_index, hvec[pos].hnd_p->heap_index);
-                std::swap(hvec[selchild], hvec[pos]);
+                hvec[pos] = hvec[selchild];
+                hvec[pos].hnd_p->heap_index = pos;
                 pos = selchild;
                 mh_index = pos - mh_base;
             }
-
-            //auto containing_unit = pos / (N - 1);
-            //auto parent_unit = (containing_unit - 1) / N;
-            //auto rem = (containing_unit - 1) % N;
-            //auto parent_idx = (rem / 2) + (N / 2) - 1;
 
             auto left_unit = containing_unit * N + (mh_index - (N/2 - 1)) * 2 + 1;
             // auto right_unit = left_unit + 1;
@@ -177,8 +199,8 @@ class NaryHeap
             hindex_t lchild = left_unit * (N - 1);
             hindex_t rchild = lchild + (N - 1);
             if (rchild >= rmax) {
-                if (lchild >= rmax) {
-                    return;
+                if (lchild > rmax) {
+                    break;
                 }
                 selchild = lchild;
             }
@@ -187,14 +209,18 @@ class NaryHeap
                 selchild = lt(hvec[lchild].data, hvec[rchild].data) ? lchild : rchild;
             }
 
-            if (! lt(hvec[selchild].data, hvec[pos].data)) {
+            if (! lt(hvec[selchild].data, p)) {
                 break;
             }
 
-            std::swap(hvec[selchild].hnd_p->heap_index, hvec[pos].hnd_p->heap_index);
-            std::swap(hvec[selchild], hvec[pos]);
+            hvec[pos] = hvec[selchild];
+            hvec[pos].hnd_p->heap_index = pos;
             pos = selchild;
         }
+
+        hvec[pos].hnd_p = &h;
+        hvec[pos].data = p;
+        h.heap_index = pos;
     }
 
     void remove_h(hindex_t hidx)
@@ -204,12 +230,16 @@ class NaryHeap
         if (hvec.size() != hidx + 1) {
             // replace the first element with the last:
             // bvec[hvec.back().data_index].heap_index = hidx;
-            hvec.back().hnd_p->heap_index = hidx;
-            hvec[hidx] = hvec.back();
-            hvec.pop_back();
+
+            //hvec.back().hnd_p->heap_index = hidx;
+            //hvec[hidx] = hvec.back();
+            //hvec.pop_back();
 
             // Now bubble up:
-            bubble_up(hidx);
+            //bubble_up(hidx);
+
+            bubble_up(hidx, hvec.size() - 2, *(hvec.back().hnd_p), hvec.back().data);
+            hvec.pop_back();
         }
         else {
             hvec.pop_back();
@@ -266,11 +296,16 @@ class NaryHeap
         }
     }
 
-    bool insert(handle_t & hnd, P pval = P()) noexcept
+    bool insert(handle_t & hnd) noexcept
     {
-        hnd.heap_index = hvec.size();
+        P pval = P();
+        return insert(hnd, pval);
+    }
+
+    bool insert(handle_t & hnd, const P & pval) noexcept
+    {
         hvec.emplace_back(&hnd, pval);
-        return bubble_down();
+        return bubble_down(hvec.size() - 1, &hnd, pval);
     }
 
     // Get the root node handle. (Returns a handle_t or reference to handle_t).
