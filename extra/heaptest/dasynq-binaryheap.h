@@ -128,19 +128,45 @@ class BinaryHeap
         }
     }
 
+    void bubble_up(hindex_t pos, handle_t &h, const P &p)
+    {
+        Compare lt;
+        hindex_t rmax = hvec.size() - 1;
+        hindex_t max = (rmax - 1) / 2;
+
+        while (pos <= max) {
+            hindex_t selchild;
+            hindex_t lchild = pos * 2 + 1;
+            hindex_t rchild = lchild + 1;
+            if (rchild >= rmax) {
+                selchild = lchild;
+            }
+            else {
+                // select the sooner of lchild and rchild
+                selchild = lt(hvec[lchild].data, hvec[rchild].data) ? lchild : rchild;
+            }
+
+            if (! lt(hvec[selchild].data, p)) {
+                break;
+            }
+
+            hvec[pos].hnd_p = hvec[selchild].hnd_p;
+            hvec[pos].data = hvec[selchild].data;
+            hvec[pos].hnd_p->heap_index = pos;
+            pos = selchild;
+        }
+
+        hvec[pos].hnd_p = &h;
+        hvec[pos].data = p;
+        h.heap_index = pos;
+    }
+
     void remove_h(hindex_t hidx)
     {
-        // bvec[hvec[hidx].data_index].heap_index = -1;
         hvec[hidx].hnd_p->heap_index = -1;
         if (hvec.size() != hidx + 1) {
-            // replace the first element with the last:
-            // bvec[hvec.back().data_index].heap_index = hidx;
-            hvec.back().hnd_p->heap_index = hidx;
-            hvec[hidx] = hvec.back();
+            bubble_up(hidx, *(hvec.back().hnd_p), hvec.back().data);
             hvec.pop_back();
-            
-            // Now bubble up:
-            bubble_up(hidx);
         }
         else {
             hvec.pop_back();
