@@ -38,6 +38,8 @@ class BinaryHeap
         {
             // nothing to do
         }
+
+        HeapNode() { }
     };
     
     svector<HeapNode> hvec;
@@ -70,37 +72,37 @@ class BinaryHeap
     
     private:
     
-    // In hindsight, I probably could have used std::priority_queue rather than re-implementing a
-    // queue here. However, priority_queue doesn't expose the container (except as a protected
-    // member) and so would make it more complicated to reserve storage. It would also have been
-    // necessary to override assignment between elements to correctly update the reference in the
-    // handle.
-    
-    bool bubble_down()
-    {
-        return bubble_down(hvec.size() - 1);
-    }
-    
     // Bubble a newly added timer down to the correct position
-    bool bubble_down(hindex_t pos)
+    bool bubble_down(hindex_t pos) noexcept
+    {
+        handle_t * ohndl = hvec[pos].hnd_p;
+        P op = hvec[pos].data;
+        return bubble_down(pos, ohndl, op);
+    }
+
+    bool bubble_down(hindex_t pos, handle_t * ohndl, const P &op) noexcept
     {
         // int pos = v.size() - 1;
         Compare lt;
         while (pos > 0) {
             hindex_t parent = (pos - 1) / 2;
-            if (! lt(hvec[pos].data, hvec[parent].data)) {
+            if (! lt(op, hvec[parent].data)) {
                 break;
             }
-            
-            std::swap(hvec[pos], hvec[parent]);
-            std::swap(hvec[pos].hnd_p->heap_index, hvec[parent].hnd_p->heap_index);
+
+            hvec[pos] = hvec[parent];
+            hvec[pos].hnd_p->heap_index = pos;
             pos = parent;
         }
-        
+
+        hvec[pos].hnd_p = ohndl;
+        hvec[pos].data = op;
+        ohndl->heap_index = pos;
+
         return pos == 0;
     }
     
-    void bubble_up(hindex_t pos = 0)
+    void bubble_up(hindex_t pos = 0) noexcept
     {
         Compare lt;
         hindex_t rmax = hvec.size();
@@ -128,7 +130,7 @@ class BinaryHeap
         }
     }
 
-    void bubble_up(hindex_t pos, handle_t &h, const P &p)
+    void bubble_up(hindex_t pos, handle_t &h, const P &p) noexcept
     {
         Compare lt;
         hindex_t rmax = hvec.size() - 1;
@@ -150,8 +152,7 @@ class BinaryHeap
                 break;
             }
 
-            hvec[pos].hnd_p = hvec[selchild].hnd_p;
-            hvec[pos].data = hvec[selchild].data;
+            hvec[pos] = hvec[selchild];
             hvec[pos].hnd_p->heap_index = pos;
             pos = selchild;
         }
@@ -161,7 +162,7 @@ class BinaryHeap
         h.heap_index = pos;
     }
 
-    void remove_h(hindex_t hidx)
+    void remove_h(hindex_t hidx) noexcept
     {
         hvec[hidx].hnd_p->heap_index = -1;
         if (hvec.size() != hidx + 1) {
@@ -223,11 +224,18 @@ class BinaryHeap
         }
     }
 
-    bool insert(handle_t & hnd, P pval = P()) noexcept
+    bool insert(handle_t & hnd) noexcept
+    {
+        P pval = P();
+        return insert(hnd, pval);
+    }
+
+    bool insert(handle_t & hnd, const P &pval) noexcept
     {
         hnd.heap_index = hvec.size();
-        hvec.emplace_back(&hnd, pval);
-        return bubble_down();
+        //hvec.emplace_back(&hnd, pval);
+        hvec.emplace_back();
+        return bubble_down(hvec.size() - 1, &hnd, pval);
     }
     
     // Get the root node handle. (Returns a handle_t or reference to handle_t).
