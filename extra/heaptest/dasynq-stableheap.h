@@ -23,7 +23,7 @@ template <typename P, typename C>
 class CompareStablePrio
 {
     public:
-    bool operator()(StablePrio<P> &a, StablePrio<P> &b)
+    bool operator()(const StablePrio<P> &a, const StablePrio<P> &b)
     {
         C lt;
         if (lt(a.p, b.p)) {
