@@ -32,7 +32,7 @@
  *
  * Thu 17/11/2016 - Modified by Davin McCall <davmac@davmac.org>
  *
- *     Remove event watchers in between runs; formatting.
+ *     Remove event watchers in between runs; formatting; minor reorganisation.
  */
 
 #define	timersub(tvp, uvp, vvp)						\
@@ -89,7 +89,7 @@ read_cb(int fd, short which, void *arg)
               {
 #if NATIVE
                 evto [idx].repeat = 10. + drand48 ();
-                ev_timer_again (&evto [idx]);
+                ev_timer_again (EV_DEFAULT_UC_ &evto [idx]);
 #else
                 abort ();
 #endif
@@ -135,37 +135,42 @@ run_once(void)
 	static struct timeval ta, ts, te, tv;
 
 	gettimeofday(&ta, NULL);
-	for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2) {
+
+    // Set up event watches:
+	for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2)
+	  {
           if (native)
             {
 #if NATIVE
-              if (ev_is_active (&evio [i]))
-                ev_io_stop (&evio [i]);
+              //if (ev_is_active (&evio [i]))
+              //  ev_io_stop (&evio [i]);
 
               ev_io_set (&evio [i], cp [0], EV_READ);
-              ev_io_start (&evio [i]);
+              ev_io_start (EV_DEFAULT_UC_ &evio [i]);
 
               evto [i].repeat = 10. + drand48 ();
-              ev_timer_again (&evto [i]);
+              ev_timer_again (EV_DEFAULT_UC_ &evto [i]);
 #else
               abort ();
 #endif
             }
           else
             {
-		//event_del(&events[i]);
-		event_set(&events[i], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) i);
-		// event_priority_set(&events[i], drand48() * 1000); // DAV
-                if (timers) {
-                    tv.tv_sec  = 10.;
-                    tv.tv_usec = drand48() * 1e6;
+              //event_del(&events[i]);
+              event_set(&events[i], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) i);
+              // event_priority_set(&events[i], drand48() * 1000);
+              if (timers)
+                {
+                  tv.tv_sec  = 10.;
+                  tv.tv_usec = drand48() * 1e6;
                 }
-		event_add(&events[i], timers ? &tv : 0);
+		      event_add(&events[i], timers ? &tv : 0);
             }
-	}
+	  }
 
 	event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
 
+	// Make the chosen number of descriptors active:
 	fired = 0;
 	space = num_pipes / num_active;
 	space = space * 2;
@@ -174,23 +179,37 @@ run_once(void)
 
 	count = 0;
 	writes = num_writes;
-	{ int xcount = 0;
-	gettimeofday(&ts, NULL);
-	do {
-		event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
-		xcount++;
-	} while (count != fired);
-	gettimeofday(&te, NULL);
+	{
+	    int xcount = 0;
+	    gettimeofday(&ts, NULL);
+	    do {
+	        event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
+	        xcount++;
+	    } while (count != fired);
+	    gettimeofday(&te, NULL);
 
-	//if (xcount != count) fprintf(stderr, "Xcount: %d, Rcount: %d\n", xcount, count);
+	    //if (xcount != count) fprintf(stderr, "Xcount: %d, Rcount: %d\n", xcount, count);
 	}
 
 	timersub(&te, &ta, &ta);
 	timersub(&te, &ts, &ts);
-		fprintf(stdout, "%8ld %8ld\n",
+
+	fprintf(stdout, "%8ld %8ld\n",
 			ta.tv_sec * 1000000L + ta.tv_usec,
-			ts.tv_sec * 1000000L + ts.tv_usec
-                        );
+			ts.tv_sec * 1000000L + ts.tv_usec);
+
+    cp = pipes;
+	for (int j = 0; j < num_pipes; j++, cp += 2) {
+        if (native) {
+#if NATIVE
+            ev_io_stop(EV_DEFAULT_UC_ &evio[j]);
+#endif
+        }
+        else {
+            event_del(&events[j]);
+            event_set(&events[j], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) j);
+        }
+    }
 
 	return (&te);
 }
@@ -210,14 +229,14 @@ main (int argc, char **argv)
     while ((c = getopt(argc, argv, "n:a:w:te")) != -1) {
         switch (c) {
             case 'n':
-	        num_pipes = atoi(optarg);
+                num_pipes = atoi(optarg);
                 break;
             case 'a':
                 num_active = atoi(optarg);
-		break;
+                break;
             case 'w':
                 num_writes = atoi(optarg);
-		break;
+                break;
             case 'e':
                 native = 1;
                 break;
@@ -250,14 +269,19 @@ main (int argc, char **argv)
 
     event_init();
 
+    // Open as many pipes/sockets as required; allocate watchers and timers:
     for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2) {
-#if NATIVE
         if (native) {
+#if NATIVE
             ev_init (&evto [i], timer_cb);
             ev_init (&evio [i], read_thunk);
             evio [i].data = (void *)i;
-        }
 #endif
+        }
+        else {
+            // This actually adds the event to the event loop, so we don't do it here:
+            // event_set(&events[i], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) i);
+        }
 #ifdef USE_PIPES
         if (pipe(cp) == -1) {
 #else
@@ -270,9 +294,6 @@ main (int argc, char **argv)
 
     for (i = 0; i < 2; i++) {
         tv = run_once();
-        for (int j = 0; j < num_pipes; j++) {
-            event_del(&events[j]);
-        }
     }
 
     exit(0);

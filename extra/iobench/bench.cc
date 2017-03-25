@@ -30,7 +30,10 @@
  *     Added chain event propagation to improve the sensitivity of
  *     the measure respect to the event loop efficency.
  *
+ * Thu 17/11/2016 - Modified by Davin McCall <davmac@davmac.org>
  *
+ *     Remove event watchers in between runs; formatting; minor reorganisation;
+ *     change event loop to Dasynq instead of libev/libevent.
  */
 
 #define	timersub(tvp, uvp, vvp)						\
@@ -74,19 +77,20 @@ using namespace std;
 
 
 
-class Pipeio : public NEventLoop::FdWatcher
+class Pipeio : public NEventLoop::fd_watcher_impl<Pipeio>
 {
     public:
     int idx;
 
-    virtual Rearm fdEvent(NEventLoop &eloop, int fd, int flags);
+    rearm fd_event(NEventLoop &eloop, int fd, int flags);
 };
 
-class PTimer : public NEventLoop::Timer
+class PTimer : public NEventLoop::timer_impl<PTimer>
 {
-    virtual Rearm timerExpiry(NEventLoop &eloop, int intervals)
+    public:
+    rearm timer_expiry(NEventLoop &eloop, int intervals)
     {
-    	return Rearm::DISARM;
+    	return rearm::DISARM;
     }
 };
 
@@ -94,26 +98,26 @@ class PTimer : public NEventLoop::Timer
 static vector<Pipeio> evio;
 static vector<PTimer> evto;
 
-Rearm Pipeio::fdEvent(NEventLoop &eloop, int fd, int flags)
+rearm Pipeio::fd_event(NEventLoop &eloop, int fd, int flags)
 {
     int widx = idx + 1;
     if (timers) {
         struct timespec ts;
         ts.tv_sec = 10;
         ts.tv_nsec = drand48() * 1e9;
-        evto[idx].armTimerRel(eloop, ts);
+        evto[idx].arm_timer_rel(eloop, ts);
     }
 
     unsigned char ch;
     count += read(fd, &ch, sizeof(ch));
     if (writes) {
-	if (widx >= num_pipes)
-	    widx -= num_pipes;
-	write(pipes[2 * widx + 1], "e", 1);
-	writes--;
-	fired++;
+        if (widx >= num_pipes)
+            widx -= num_pipes;
+        write(pipes[2 * widx + 1], "e", 1);
+        writes--;
+        fired++;
     }
-    return Rearm::REARM;
+    return rearm::REARM;
 }
 
 
@@ -126,14 +130,14 @@ run_once(void)
 
     gettimeofday(&ta, NULL);
     for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2) {
-        evio[i].addWatch(eloop, cp[0], IN_EVENTS, true, i /* prio */);
+        evio[i].add_watch(eloop, cp[0], IN_EVENTS, true, i /* prio */);
         if (timers) {
-            evto[i].addTimer(eloop);
+            evto[i].add_timer(eloop);
             
             struct timespec tsv;
             tsv.tv_sec = 10;
             tsv.tv_nsec = drand48() * 1e9;
-            evto[i].armTimerRel(eloop, tsv);
+            evto[i].arm_timer_rel(eloop, tsv);
         }
     }
     
@@ -163,8 +167,15 @@ run_once(void)
     timersub(&te, &ts, &ts);
     fprintf(stdout, "%8ld %8ld\n",
 		ta.tv_sec * 1000000L + ta.tv_usec,
-		ts.tv_sec * 1000000L + ts.tv_usec
-            );
+		ts.tv_sec * 1000000L + ts.tv_usec);
+
+    // deregister watchers now
+    for (int j = 0; j < num_pipes; j++) {
+        evio[j].deregister(eloop);
+        if (timers) {
+            evto[j].deregister(eloop);
+        }
+    }
 
     return (&te);
 }
@@ -235,13 +246,6 @@ main (int argc, char **argv)
     for (i = 0; i < 2; i++) {
         tv = run_once();
 
-        // deregister watchers now
-        for (int j = 0; j < num_pipes; j++) {
-            evio[j].deregister(eloop);
-            if (timers) {
-                evto[j].deregister(eloop);
-            }
-        }
     }
 
     exit(0);
