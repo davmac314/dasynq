@@ -4,8 +4,7 @@
 #include "dasynq-config.h"
 
 #include "dasynq-flags.h"
-#include "dasynq-pairingheap.h"
-#include "dasynq-btreequeue.h"
+#include "dasynq-naryheap.h"
 #include "dasynq-interrupt.h"
 
 // Dasynq uses a "mix-in" pattern to produce an event loop implementation incorporating selectable implementations of
@@ -95,7 +94,7 @@ namespace dprivate {
     class BaseWatcher;
 }
 
-using PrioQueue = BTreeQueue<dprivate::BaseWatcher *, int>;
+using PrioQueue = NaryHeap<dprivate::BaseWatcher *, int>;
 
 inline namespace {
     constexpr int DEFAULT_PRIORITY = 50;

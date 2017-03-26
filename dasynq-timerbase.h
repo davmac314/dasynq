@@ -1,7 +1,7 @@
 #ifndef DASYNQ_TIMERBASE_H_INCLUDED
 #define DASYNQ_TIMERBASE_H_INCLUDED
 
-#include "dasynq-pairingheap.h"
+#include "dasynq-naryheap.h"
 
 namespace dasynq {
 
@@ -36,7 +36,7 @@ class CompareTimespec
     }
 };
 
-using timer_queue_t = PairingHeap<TimerData, struct timespec, CompareTimespec>;
+using timer_queue_t = NaryHeap<TimerData, struct timespec, CompareTimespec>;
 using timer_handle_t = timer_queue_t::handle_t;
 
 static void init_timer_handle(timer_handle_t &hnd) noexcept
