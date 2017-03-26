@@ -35,6 +35,9 @@
  *     Remove event watchers in between runs; formatting; minor reorganisation.
  */
 
+#define EV_MINPRI 0
+#define EV_MAXPRI 1000
+
 #define	timersub(tvp, uvp, vvp)						\
 	do {								\
 		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
@@ -74,7 +77,7 @@ static struct event *events;
 static int timers, native;
 static struct ev_io *evio;
 static struct ev_timer *evto;
-
+static int set_prios;
 
 
 void
@@ -158,7 +161,9 @@ run_once(void)
             {
               //event_del(&events[i]);
               event_set(&events[i], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) i);
-              // event_priority_set(&events[i], drand48() * 1000);
+              if (set_prios) {
+                  event_priority_set(&events[i], drand48() * 1000);
+              }
               if (timers)
                 {
                   tv.tv_sec  = 10.;
@@ -226,7 +231,7 @@ main (int argc, char **argv)
     num_pipes = 100;
     num_active = 1;
     num_writes = num_pipes;
-    while ((c = getopt(argc, argv, "n:a:w:te")) != -1) {
+    while ((c = getopt(argc, argv, "n:a:w:tep")) != -1) {
         switch (c) {
             case 'n':
                 num_pipes = atoi(optarg);
@@ -242,6 +247,9 @@ main (int argc, char **argv)
                 break;
             case 't':
                 timers = 1;
+                break;
+            case 'p':
+                set_prios = 1;
                 break;
             default:
                 fprintf(stderr, "Illegal argument \"%c\"\n", c);

@@ -66,6 +66,7 @@ static int count, writes, fired;
 static int *pipes;
 static int num_pipes, num_active, num_writes;
 static int timers, native;
+static int set_prios;
 
 using namespace dasynq;
 
@@ -130,7 +131,12 @@ run_once(void)
 
     gettimeofday(&ta, NULL);
     for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2) {
-        evio[i].add_watch(eloop, cp[0], IN_EVENTS, true, i /* prio */);
+        if (set_prios) {
+            evio[i].add_watch(eloop, cp[0], IN_EVENTS, true, static_cast<int>(drand48() * 1000));
+        }
+        else {
+            evio[i].add_watch(eloop, cp[0], IN_EVENTS, true);
+        }
         if (timers) {
             evto[i].add_timer(eloop);
             
@@ -192,7 +198,7 @@ main (int argc, char **argv)
     num_pipes = 100;
     num_active = 1;
     num_writes = num_pipes;
-    while ((c = getopt(argc, argv, "n:a:w:te")) != -1) {
+    while ((c = getopt(argc, argv, "n:a:w:tep")) != -1) {
         switch (c) {
             case 'n':
                 num_pipes = atoi(optarg);
@@ -208,6 +214,9 @@ main (int argc, char **argv)
                 break;
             case 't':
                 timers = 1;
+                break;
+            case 'p':
+                set_prios = 1;
                 break;
             default:
                 fprintf(stderr, "Illegal argument \"%c\"\n", c);
@@ -245,7 +254,6 @@ main (int argc, char **argv)
 
     for (i = 0; i < 2; i++) {
         tv = run_once();
-
     }
 
     exit(0);
