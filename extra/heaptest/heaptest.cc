@@ -3,6 +3,7 @@
 #include "dasynq-pairingheap.h"
 #include "dasynq-binaryheap.h"
 #include "dasynq-naryheap.h"
+#include "dasynq-daryheap.h"
 #include <functional>
 #include <random>
 #include <chrono>
@@ -11,13 +12,14 @@
 #include <iostream>
 
 template <typename A, typename B, typename C> using Nary = dasynq::NaryHeap<A,B,C, 16>;
+template <typename A, typename B, typename C> using Dary = dasynq::DaryHeap<A,B,C, 4>;
 
 int main(int argc, char **argv)
 {
     // Template arguments are: data type, priority type, comparator
     // auto heap = dasynq::BinaryHeap<int, int, std::less<int>>();
     // auto heap = dasynq::NaryHeap<int, int>();
-    // auto heap = dasynq::PairingHeap<int, int, std::less<int>>();
+    // auto heap = dasynq::DaryHeap<int, int, std::less<int>, 4>();
     // auto heap = dasynq::BTreeQueue<int, int, std::less<int>, 16>();
     
     // auto heap = StableHeap<dasynq::BinaryHeap, int, int>();
@@ -150,7 +152,7 @@ int main(int argc, char **argv)
         }
     }
     
-    for (int i = 0; i < 1000; i++) {
+    for (int i = 0; i < std::min(1000, NUM); i++) {
         handle_t_r r = heap.get_root();
         heap.pull_root();
         heap.deallocate(r);
