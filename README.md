@@ -24,7 +24,7 @@ Dasynq provides such functionality.
 Note that an event loop generally supports managing various different kinds of event. Dasynq currrently
 can be used for sockets and pipes (more generally, for file descriptors which provide suitable semantics,
 which includes various kinds of device handle), as well as for POSIX signals, and for child process
-status notifications (termination etc).
+status notifications (termination etc). It also supports one-shot and periodic timers.
 
 Dasynq is fully multi-threaded, allowing events to be polled and processed on any thread, unlike nearly
 every other event loop library (some of which are thread-safe, but which require that events be polled
@@ -59,9 +59,9 @@ when compared to the majority of other libraries:
 
 Other features of Dasynq include:
 
-- Support for assigning priorities to events;
+- Support for assigning priorities to events (with an arbitrary range of priority values);
 - Efficient use of modern facilities such as epoll and kqueue, where available;
-- Use of efficient internal data structures.
+- Good performance.
 
 
 ## Using Dasynq
