@@ -1179,7 +1179,7 @@ class signal_watcher : private dprivate::BaseSignalWatcher<typename EventLoop::m
     using BaseWatcher = dprivate::BaseWatcher;
     using T_Mutex = typename EventLoop::mutex_t;
     
-public:
+    public:
     using siginfo_p = typename dprivate::BaseSignalWatcher<T_Mutex, typename EventLoop::loop_traits_t>::siginfo_p;
 
     // Register this watcher to watch the specified signal.
@@ -1380,10 +1380,9 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
         auto rearmType = static_cast<Derived *>(this)->fd_event(loop, this->watch_fd, this->event_flags);
 
         loop.getBaseLock().lock();
-        this->event_flags = 0;
 
         if (rearmType != rearm::REMOVED) {
-
+            this->event_flags = 0;
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
@@ -1536,10 +1535,9 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
         auto rearmType = static_cast<Derived *>(this)->read_ready(loop, this->watch_fd);
 
         loop.getBaseLock().lock();
-        this->event_flags &= ~IN_EVENTS;
 
         if (rearmType != rearm::REMOVED) {
-
+            this->event_flags &= ~IN_EVENTS;
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
@@ -1564,10 +1562,9 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
         auto rearmType = static_cast<Derived *>(this)->write_ready(loop, this->watch_fd);
 
         loop.getBaseLock().lock();
-        this->event_flags &= ~OUT_EVENTS;
 
         if (rearmType != rearm::REMOVED) {
-
+            this->event_flags &= ~OUT_EVENTS;
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
