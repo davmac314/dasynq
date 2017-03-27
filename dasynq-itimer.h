@@ -188,7 +188,15 @@ template <class Base> class ITimerEvents : public timer_base<Base>
     
     void enableTimer_nolock(timer_handle_t &timer_id, bool enable, clock_type = clock_type::MONOTONIC) noexcept
     {
-        timer_queue.node_data(timer_id).enabled = enable;
+        auto &node_data = timer_queue.node_data(timer_id);
+        auto expiry_count = node_data.expiry_count;
+        if (expiry_count != 0) {
+            node_data.expiry_count = 0;
+            Base::receiveTimerExpiry(timer_id, node_data.userdata, expiry_count);
+        }
+        else {
+            timer_queue.node_data(timer_id).enabled = enable;
+        }
     }
 
     void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept

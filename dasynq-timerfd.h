@@ -85,6 +85,18 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
         // TODO locking (here and everywhere)
     }
 
+    timer_queue_t & get_queue(clock_type clock)
+    {
+        switch(clock) {
+        case clock_type::SYSTEM:
+            return wallclock_queue;
+        case clock_type::MONOTONIC:
+            return timer_queue;
+        default:
+            DASYNQ_UNREACHABLE;
+        }
+    }
+
     public:
     template <typename T>
     void receiveFdEvent(T &loop_mech, typename Base::FD_r fd_r, void * userdata, int flags)
@@ -127,16 +139,8 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
     // Add timer, store into given handle
     void addTimer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
     {
-        switch(clock) {
-        case clock_type::SYSTEM:
-            wallclock_queue.allocate(h, userdata);
-            break;
-        case clock_type::MONOTONIC:
-            timer_queue.allocate(h, userdata);
-            break;
-        default:
-            DASYNQ_UNREACHABLE;
-        }
+        timer_queue_t & queue = get_queue(clock);
+        queue.allocate(h, userdata);
     }
     
     void removeTimer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
@@ -146,22 +150,11 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
     
     void removeTimer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        switch(clock) {
-        case clock_type::SYSTEM:
-            if (wallclock_queue.is_queued(timer_id)) {
-                wallclock_queue.remove(timer_id);
-            }
-            wallclock_queue.deallocate(timer_id);
-            break;
-        case clock_type::MONOTONIC:
-            if (timer_queue.is_queued(timer_id)) {
-                timer_queue.remove(timer_id);
-            }
-            timer_queue.deallocate(timer_id);
-            break;
-        default:
-            DASYNQ_UNREACHABLE;
+        timer_queue_t & queue = get_queue(clock);
+        if (queue.is_queued(timer_id)) {
+            queue.remove(timer_id);
         }
+        queue.deallocate(timer_id);
     }
 
     void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
@@ -171,19 +164,9 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
 
     void stop_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        switch(clock) {
-        case clock_type::SYSTEM:
-            if (wallclock_queue.is_queued(timer_id)) {
-                wallclock_queue.remove(timer_id);
-            }
-            break;
-        case clock_type::MONOTONIC:
-            if (timer_queue.is_queued(timer_id)) {
-                timer_queue.remove(timer_id);
-            }
-            break;
-        default:
-            DASYNQ_UNREACHABLE;
+        timer_queue_t & queue = get_queue(clock);
+        if (queue.is_queued(timer_id)) {
+            queue.remove(timer_id);
         }
     }
 
@@ -241,15 +224,16 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
     
     void enableTimer_nolock(timer_handle_t & timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        switch (clock) {
-        case clock_type::SYSTEM:
-            wallclock_queue.node_data(timer_id).enabled = enable;
-            break;
-        case clock_type::MONOTONIC:
-            timer_queue.node_data(timer_id).enabled = enable;
-            break;
-        default:
-            DASYNQ_UNREACHABLE;
+        timer_queue_t & queue = get_queue(clock);
+
+        auto &node_data = queue.node_data(timer_id);
+        auto expiry_count = node_data.expiry_count;
+        if (expiry_count != 0) {
+            node_data.expiry_count = 0;
+            Base::receiveTimerExpiry(timer_id, node_data.userdata, expiry_count);
+        }
+        else {
+            queue.node_data(timer_id).enabled = enable;
         }
     }
 
