@@ -26,20 +26,22 @@ template <class Base> class ITimerEvents : public timer_base<Base>
     void set_timer_from_queue()
     {
         struct itimerspec newtime;
+        struct itimerval newalarm;
         if (timer_queue.empty()) {
-            newtime.it_value = {0, 0};
-            newtime.it_interval = {0, 0};
+            newalarm.it_value = {0, 0};
+            newalarm.it_interval = {0, 0};
+            setitimer(ITIMER_REAL, &newalarm, nullptr);
+            return;
         }
-        else {
+
 #if defined(__APPLE__)
-            auto &rp = timer_queue.get_root_priority();
-            newtime.it_value.tv_sec = rp.tv_sec;
-            newtime.it_value.tv_usec = rp.tv_nsec / 1000;
+        auto &rp = timer_queue.get_root_priority();
+        newtime.it_value.tv_sec = rp.tv_sec;
+        newtime.it_value.tv_usec = rp.tv_nsec / 1000;
 #else
-            newtime.it_value = timer_queue.get_root_priority();
-            newtime.it_interval = {0, 0};
+        newtime.it_value = timer_queue.get_root_priority();
+        newtime.it_interval = {0, 0};
 #endif
-        }
         
         struct timespec curtime;
 #if defined(__APPLE__)
@@ -50,7 +52,6 @@ template <class Base> class ITimerEvents : public timer_base<Base>
 #else
         clock_gettime(CLOCK_MONOTONIC, &curtime);
 #endif
-        struct itimerval newalarm;
         newalarm.it_interval = {0, 0};
         newalarm.it_value.tv_sec = newtime.it_value.tv_sec - curtime.tv_sec;
 #if defined(__APPLE__)
