@@ -8,7 +8,7 @@
 #include "testbackend.h"
 #include "dasynq.h"
 
-using Loop_t = dasynq::event_loop<dasynq::NullMutex, dasynq::test_loop, dasynq::test_loop_traits>;
+using Loop_t = dasynq::event_loop<dasynq::null_mutex, dasynq::test_loop, dasynq::test_loop_traits>;
 
 using dasynq::rearm;
 using dasynq::test_io_engine;
@@ -230,7 +230,7 @@ static void create_bidi_pipe(int filedes[2])
 
 void ftestFdWatch1()
 {
-    using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
     Loop_t my_loop;
 
     bool seen1 = false;
@@ -285,7 +285,7 @@ void ftestFdWatch1()
 
 void ftestBidiFdWatch1()
 {
-    using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
     Loop_t my_loop;
 
     bool flags1[3] = { false, false, false };  // in, out, removed
@@ -341,7 +341,7 @@ void ftestBidiFdWatch1()
 
 void ftestBidiFdWatch2()
 {
-    using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
     Loop_t my_loop;
 
     bool flags1[3] = { false, false, false };  // in, out, removed
@@ -409,7 +409,7 @@ void ftestBidiFdWatch2()
 
 void ftestBidiFdWatch3()
 {
-    using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
     Loop_t my_loop;
 
     bool flags1[3] = { false, false, false };  // in, out, removed
@@ -483,7 +483,7 @@ void ftestBidiFdWatch3()
 
 void ftestSigWatch()
 {
-    using Loop_t = dasynq::event_loop<dasynq::NullMutex>;
+    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
     Loop_t my_loop;
 
     bool seen1 = false;

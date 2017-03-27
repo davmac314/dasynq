@@ -309,13 +309,13 @@ namespace dprivate {
         typedef std::condition_variable_any condvar;
     };
 
-    template <> class waitqueue_node<NullMutex>
+    template <> class waitqueue_node<null_mutex>
     {
-        // Specialised waitqueue_node for NullMutex.
-        friend class waitqueue<NullMutex>;
+        // Specialised waitqueue_node for null_mutex.
+        friend class waitqueue<null_mutex>;
         
         public:
-        void wait(std::unique_lock<NullMutex> &ul) { }
+        void wait(std::unique_lock<null_mutex> &ul) { }
         void signal() { }
         
         DASYNQ_EMPTY_BODY;
@@ -339,20 +339,20 @@ namespace dprivate {
         }
     };
 
-    template <> class waitqueue<NullMutex>
+    template <> class waitqueue<null_mutex>
     {
         public:
-        waitqueue_node<NullMutex> * unqueue()
+        waitqueue_node<null_mutex> * unqueue()
         {
             return nullptr;
         }
         
-        waitqueue_node<NullMutex> * getHead()
+        waitqueue_node<null_mutex> * getHead()
         {
             return nullptr;
         }
         
-        bool checkHead(waitqueue_node<NullMutex> &node)
+        bool checkHead(waitqueue_node<null_mutex> &node)
         {
             return true;
         }
@@ -362,7 +362,7 @@ namespace dprivate {
             return true;
         }
         
-        void queue(waitqueue_node<NullMutex> *node)
+        void queue(waitqueue_node<null_mutex> *node)
         {
         }
     };
@@ -1162,7 +1162,7 @@ class event_loop
     }
 };
 
-typedef event_loop<NullMutex> NEventLoop;
+typedef event_loop<null_mutex> NEventLoop;
 typedef event_loop<std::mutex> TEventLoop;
 
 // from dasync.cc:
