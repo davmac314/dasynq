@@ -39,7 +39,7 @@ class CompareTimespec
 using timer_queue_t = NaryHeap<TimerData, struct timespec, CompareTimespec>;
 using timer_handle_t = timer_queue_t::handle_t;
 
-static void init_timer_handle(timer_handle_t &hnd) noexcept
+static inline void init_timer_handle(timer_handle_t &hnd) noexcept
 {
     timer_queue_t::init_handle(hnd);
 }
