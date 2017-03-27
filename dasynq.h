@@ -885,6 +885,11 @@ class event_loop
         loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true, clock);
     }
 
+    void stop_timer(BaseTimerWatcher *callback, clock_type clock)
+    {
+        loop_mech.stop_timer(callback->timer_handle, clock);
+    }
+
     void deregister(BaseTimerWatcher *callback, clock_type clock)
     {
         loop_mech.removeTimer(callback->timer_handle, clock);
@@ -1789,6 +1794,11 @@ class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
         eloop.setTimerRel(this, timeout, interval, base_t::clock);
     }
     
+    void stop_timer(EventLoop &eloop) noexcept
+    {
+        eloop.stop_timer(this, base_t::clock);
+    }
+
     void deregister(EventLoop &eloop) noexcept
     {
         eloop.deregister(this, this->clock);

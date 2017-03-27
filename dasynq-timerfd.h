@@ -163,7 +163,30 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
             DASYNQ_UNREACHABLE;
         }
     }
-    
+
+    void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    {
+        stop_timer_nolock(timer_id, clock);
+    }
+
+    void stop_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    {
+        switch(clock) {
+        case clock_type::SYSTEM:
+            if (wallclock_queue.is_queued(timer_id)) {
+                wallclock_queue.remove(timer_id);
+            }
+            break;
+        case clock_type::MONOTONIC:
+            if (timer_queue.is_queued(timer_id)) {
+                timer_queue.remove(timer_id);
+            }
+            break;
+        default:
+            DASYNQ_UNREACHABLE;
+        }
+    }
+
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
     //   enable: specifies whether to enable reporting of timeouts/intervals
     void setTimer(timer_handle_t & timer_id, struct timespec &timeout, struct timespec &interval,
