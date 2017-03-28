@@ -5,12 +5,8 @@ SANITIZE = -fsanitize=address,null,return,bounds,alignment,object-size
 
 export CXX CXXOPTS THREADOPT SANITIZE
 
-objects = dasynq.o
-
-all: dasynq.o
-
-$(objects): %.o: %.cc   dasynq.h
-	$(CXX) $(CXXOPTS) -c $< -o $@
+all:
+	@echo "This is a header-only library. Use \"make check\" to build and run tests."
 
 check:
 	$(MAKE) -C tests check

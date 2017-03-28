@@ -1167,11 +1167,8 @@ class event_loop
     }
 };
 
-typedef event_loop<null_mutex> NEventLoop;
-typedef event_loop<std::mutex> TEventLoop;
-
-// from dasync.cc:
-TEventLoop & getSystemLoop();
+typedef event_loop<null_mutex> event_loop_n;
+typedef event_loop<std::mutex> event_loop_th;
 
 namespace dprivate {
 

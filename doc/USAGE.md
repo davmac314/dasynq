@@ -8,10 +8,16 @@ Dasynq can be used as a thread-safe event loop in a multi-threaded client, or it
 in a single-threaded client. You can instantiate an event loop of your chosen type with:
 
     #include "dasynq.h"
-    
-    using loop_t = dasynq::event_loop<dasynq::null_mutex>();  // single-threaded
-    using loop_t = dasynq::event_loop<std::mutex>();          // multi-threaded
 
+    using loop_t = dasynq::event_loop_n;    // single-threaded
+    using loop_t = dasynq::event_loop_th;   // multi-threaded
+ 
+ 	// You can also specify a custom mutex implementation. It must
+ 	// support "lock", "try_lock" and "unlock" operations:
+    
+    using loop_t = dasynq::event_loop<my_mutex_type>();
+
+	// instantiate the chosen loop:
     loop_t my_loop();
 
 There are essentially three ways of using an event loop:
@@ -30,7 +36,8 @@ run on threads that call the poll/run methods, during the execution of those met
 The restrictions when using multiple threads mainly concern the activation of callbacks. When an
 event occurs it is (temporarily) disabled while the callback is called. The application must
 ensure that the callback cannot be re-entered while it is active, either by not enabling it or
-by polling the event loop with only a single thread.
+by polling the event loop with only a single thread (and only calling enable/disable from within
+that thread).
 
 
 ## 2. Event Watchers
@@ -53,6 +60,8 @@ create an FdWatcher:
 
     MyFdWatcher my_fd_watcher;
     my_fd_watcher.addWatch(my_loop, fd, IN_EVENTS);
+
+(To watch for output readiness, use OUT_EVENTS instead of IN_EVENTS).
 
 The above may look strange, as it makes use of the _curiously recurring template pattern_ - that
 is, the fd_watcher_impl template class which your watcher derives from is parameterised by the
@@ -99,7 +108,7 @@ To remove a watcher, call deregister:
 The 'watch_removed' callback gets called when the watch has been successfully de-registered. If the
 event callback is currently executing in another thread, the `watch_removed` will _not_ be called
 straight away. You should never `delete` your watcher object until the `watch_removed` callback has
-been called.
+been called. (Often, it will be convenient to `delete` the watcher from _within_ the callback).
 
 
 ## 2.1 File descriptor watches
@@ -146,10 +155,10 @@ It is possible to disarm either the in or out watch if the corresponding handler
 it is not safe to arm them in that case. This is the same rule as for enabling/disabling watchers
 generally, except that the bidi_fd_watcher itself actually constitutes two separate watchers.
 
-Note also that the bidi_fd_watcher channels can be separately removed (by returning rearm::REMOVE
-from the handler). The watch_removed() callback is only called when both channels have been
-removed. You cannot register channels with the event loop separately, and you must remove both
-channels before you register the Bidi_fd_watcher with another (or the same) loop.
+Note also that the `bidi_fd_watcher` channels can be separately removed (by returning
+`rearm::REMOVE` from the handler). The `watch_removed` callback is only called when both channels
+have been removed. You cannot register channels with the event loop separately, and you must
+remove both channels before you register the `bidi_fd_watcher` with another (or the same) loop.
 
 
 ## 2.2 Signal watchers
@@ -173,9 +182,9 @@ channels before you register the Bidi_fd_watcher with another (or the same) loop
     msw.add_watch(my_loop, SIGINT);
 
 Methods available in siginfo_p may vary from platform to platform, but are intended to mirror the
-`siginfo_t` structure of the platform. One standard method is "int get_signo()".
+`siginfo_t` structure of the platform. One standard method is `int get_signo()`.
 
-You should mask the signal (with sigprocmask/pthread_sigmask) in all threads before adding a
+You should mask the signal (with `sigprocmask`/`pthread_sigmask`) in all threads before adding a
 watcher for that signal to an event loop.
 
 
@@ -258,15 +267,31 @@ callback function). To stop a timer, use the "stop_timer" function:
 
     t3.stop_timer(my_loop);
 
+## 3. Polling the event loop
 
-## 3. Error handling
+To check for events and run watcher callbacks, call the `run` function of the event loop:
+
+    my_loop.run();
+
+The run function waits for one or more events, and then notifies the watchers for those events
+before returning. You would generally call it in a loop:
+
+	bool do_exit = false;
+    // do_exit could be set from a callback to cause the loop to terminate
+	
+    while (! do_exit) {
+        my_loop.run();
+    }
+
+
+## 4. Error handling
 
 In general, the only operations that can fail (other than due to program error) are the watch
 registration methods (add_watch). If they fail, they will throw an exception; either a
 `std::bad_alloc` or a `std::system_error`.
 
 
-## 4. Restrictions and limitations
+## 5. Restrictions and limitations
 
 Most of the following limitations carry through from the underlying backend, rather than being
 inherent in the design of Dasynq itself.
