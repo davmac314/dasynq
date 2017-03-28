@@ -220,6 +220,45 @@ Note however that using the fork(...) function largely removes the need to reser
 unwatchable child process never results.
 
 
+## 2.4 Timers
+
+Dasynq supports timers, both "one-shot" and periodic (with a separate initial expiry and interval)
+and against either the system clock (which is supposed to represent the current time as displayed
+on a wall clock, and which may be adjusted while the system is running) or a monotonic clock
+which only increases and should never jump.
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        rearm timer_expiry(loop_t &, int expiry_count)
+        {
+        	return rearm::REARM;
+        }
+    }
+
+Setting a timer is a two-step operation: first you add the timer to the event loop (this can fail)
+and then you arm the timer with a timeout and optional interval period (this cannot fail). The
+clock type (SYSTEM or MONOTONIC) is specified when you register the timer with the event loop.
+    
+    my_timer t1, t2, t3;
+    t1.add_timer(my_loop); // defaults to MONOTONIC clock
+    t2.add_timer(my_loop, clock_type::SYSTEM);
+    t3.add_timer(my_loop, clock_type::MONOTONIC);
+
+    struct timespec timeout = {5 /* seconds */, 0 /* nanoseconds */};
+    t1.arm_timer_rel(my_loop, timeout);  // relative timeout (5 seconds from now)
+
+    t2.arm_timer(my_loop, timeout);  // absolute timeout (5 seconds from beginning of 1970)
+    
+    t3.arm_timer_rel(my_loop, timeout, timeout); // relative, with periodic timeout 
+
+A timer can be stopped or disabled. A stopped timer no longer expires. A disabled timer does not
+issue a callback when it expires, but will do so immediately when re-enabled. Timers are disabled
+when they issue a callback (but are re-enabled by returning rearm::REARM from the "timer_expiry"
+callback function). To stop a timer, use the "stop_timer" function:
+
+    t3.stop_timer(my_loop);
+
+
 ## 3. Error handling
 
 In general, the only operations that can fail (other than due to program error) are the watch
