@@ -10,6 +10,7 @@ in a single-threaded client. You can instantiate an event loop of your chosen ty
     #include "dasynq.h"
 
     using loop_t = dasynq::event_loop_n;    // single-threaded
+              // OR
     using loop_t = dasynq::event_loop_th;   // multi-threaded
  
  	// You can also specify a custom mutex implementation. It must
@@ -58,16 +59,16 @@ create an FdWatcher:
         }
     };
 
-    MyFdWatcher my_fd_watcher;
+    my_fd_watcher my_fd_watcher;
     my_fd_watcher.addWatch(my_loop, fd, IN_EVENTS);
 
 (To watch for output readiness, use OUT_EVENTS instead of IN_EVENTS).
 
 The above may look strange, as it makes use of the _curiously recurring template pattern_ - that
-is, the fd_watcher_impl template class which your watcher derives from is parameterised by the
+is, the `fd_watcher_impl` template class which your watcher derives from is parameterised by the
 type of your watcher itself! Although it may take a little getting used to, this allows the base
-class to call the fd_event(...) callback function directly without requiring it to be declared
-_virtual_, thereby avoiding the cost of a dynamic dispatch. 
+class to call the `fd_event(...)` callback function directly without requiring it to be declared
+`virtual`, thereby avoiding the cost of a dynamic dispatch. 
 
 A watcher is normally disabled during the processing of the callback method (and must not be
 re-enabled until the callback method has finished executing, if there may be other threads polling
@@ -101,7 +102,7 @@ Callback methods usually return a "rearm" value. There are several possible valu
 Note that if multiple threads are polling the event loop, it is difficult to use some of the Rearm
 values correctly; you should generally use only REARM, REMOVE or NOOP in that case. 
 
-To remove a watcher, call deregister:
+To remove a watcher, call `deregister`:
 
     my_fd_watch.deregister(my_loop);
 
@@ -118,10 +119,10 @@ See example above. Not shown there is the `set_enabled` method:
     set_enabled(loop_t &, bool b);
 
 This enables or disables the watcher. You should not enable a watcher that might currently have
-its callback running (unless the event loop is polled by only single thread).
+its callback running (unless the event loop is polled by only a single thread).
 
 Some backends support watching IN_EVENTS | OUT_EVENTS at the same time, but some don't. Use a
-bidi_fd_watcher if you need to do that:
+`bidi_fd_watcher` if you need to do that:
 
     class my_bidi_fd_watcher : public loop_t::bidi_fd_watcher_impl<my_bidi_fd_watcher>
     {
@@ -140,10 +141,10 @@ bidi_fd_watcher if you need to do that:
     my_bidi_watcher.add_watch(my_loop, fd, IN_EVENTS | OUT_EVENTS);
     // use the IN_EVENTS/OUT_EVENTS flags to specify which events you want enabled.
 
-Beware! If the loop is being polled by multiple threads then the "readReady" and "writeReady"
-callbacks may be called simultaneously! bidi_fd_watcher has (protected) methods to enable the input
-and output channels separately. A BidiFdWatcher acts as two separate watchers, which can be
-enabled and disabled separately:
+Beware! If the loop is being polled by multiple threads then the `readReady` and `writeReady`
+callbacks may be called simultaneously! `bidi_fd_watcher` has (protected) methods to enable the
+input and output channels separately. A `bidi_fd_watcher` acts as two separate watchers, which can
+be enabled and disabled separately:
 
     set_in_watch_enabled(loop_t &, bool);
 
@@ -153,7 +154,7 @@ enabled and disabled separately:
 
 It is possible to disarm either the in or out watch if the corresponding handler is active, but
 it is not safe to arm them in that case. This is the same rule as for enabling/disabling watchers
-generally, except that the bidi_fd_watcher itself actually constitutes two separate watchers.
+generally, except that the `bidi_fd_watcher` itself actually constitutes two separate watchers.
 
 Note also that the `bidi_fd_watcher` channels can be separately removed (by returning
 `rearm::REMOVE` from the handler). The `watch_removed` callback is only called when both channels
@@ -165,7 +166,7 @@ remove both channels before you register the `bidi_fd_watcher` with another (or 
 
     class my_signal_watcher : public loop_t::signal_watcher_impl<my_signal_watcher>
     {
-		// SignalWatcher defines type "siginfo_p"
+        // SignalWatcher defines type "siginfo_p"
         rearm received(loop_t &, int signo, siginfo_p siginfo)
         {
             return rearm::REARM;
@@ -225,7 +226,7 @@ second (optional) parameter:
 
     pid_t child_pid = my_child_watcher.fork(my_loop, true);
 
-Note however that using the fork(...) function largely removes the need to reserve watches: an
+Note however that using the `fork(...)` function largely removes the need to reserve watches: an
 unwatchable child process never results.
 
 
@@ -246,7 +247,7 @@ which only increases and should never jump.
 
 Setting a timer is a two-step operation: first you add the timer to the event loop (this can fail)
 and then you arm the timer with a timeout and optional interval period (this cannot fail). The
-clock type (SYSTEM or MONOTONIC) is specified when you register the timer with the event loop.
+clock type (`SYSTEM` or `MONOTONIC`) is specified when you register the timer with the event loop.
     
     my_timer t1, t2, t3;
     t1.add_timer(my_loop); // defaults to MONOTONIC clock
@@ -262,10 +263,11 @@ clock type (SYSTEM or MONOTONIC) is specified when you register the timer with t
 
 A timer can be stopped or disabled. A stopped timer no longer expires. A disabled timer does not
 issue a callback when it expires, but will do so immediately when re-enabled. Timers are disabled
-when they issue a callback (but are re-enabled by returning rearm::REARM from the "timer_expiry"
-callback function). To stop a timer, use the "stop_timer" function:
+when they issue a callback (but are re-enabled by returning `rearm::REARM` from the `timer_expiry`
+callback function). To stop a timer, use the `stop_timer` function:
 
     t3.stop_timer(my_loop);
+
 
 ## 3. Polling the event loop
 
@@ -287,7 +289,7 @@ before returning. You would generally call it in a loop:
 ## 4. Error handling
 
 In general, the only operations that can fail (other than due to program error) are the watch
-registration methods (add_watch). If they fail, they will throw an exception; either a
+registration functions (`add_watch`). If they fail, they will throw an exception; either a
 `std::bad_alloc` or a `std::system_error`.
 
 
@@ -298,7 +300,8 @@ inherent in the design of Dasynq itself.
 
 You cannot generally add two watchers for the same identity (file descriptor, signal, child
 process). (Exception: when using kqueue backend, you can add one fd read watcher and one fd write
-watcher; however, it's better to use a `bidi_fd_watcher` to abstract away platform differences).
+watcher for the same file descriptor; however, it's better to use a `bidi_fd_watcher` to abstract
+away platform differences).
 
 You should fully remove the watcher(s) for a file descriptor *before* you close the file
 descriptor. In a multi-threaded program, failure to do this could cause a watcher to read from
