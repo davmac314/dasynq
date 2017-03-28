@@ -1648,11 +1648,13 @@ class child_proc_watcher : private dprivate::BaseChildWatcher<typename EventLoop
     // Returns:
     // - the child pid in the parent
     // - 0 in the child
-    pid_t fork(EventLoop &eloop)
+    pid_t fork(EventLoop &eloop, bool from_reserved = false)
     {
         if (EventLoop::loop_traits_t::supports_childwatch_reservation) {
             // Reserve a watch, fork, then claim reservation
-            reserve_watch(eloop);
+            if (! from_reserved) {
+                reserve_watch(eloop);
+            }
             
             auto &lock = eloop.getBaseLock();
             lock.lock();

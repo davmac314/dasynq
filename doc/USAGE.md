@@ -211,7 +211,13 @@ watcher is added. So, you should fork using the ChildProcWatcher::fork method:
 
 This "atomically" creates the child process and registers the watcher. (If registration fails the
 child will terminate, or will never be forked). A `std::bad_alloc` or `std::system_error` exception
-is thrown on failure.
+is thrown on failure. If you have reserved a watch using reserve_watch(...), pass "true" as the
+second (optional) parameter:
+
+    pid_t child_pid = my_child_watcher.fork(my_loop, true);
+
+Note however that using the fork(...) function largely removes the need to reserve watches: an
+unwatchable child process never results.
 
 
 ## 3. Error handling
