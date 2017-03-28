@@ -281,6 +281,19 @@ callback function). To stop a timer, use the `stop_timer` function:
 
     t3.stop_timer(my_loop);
 
+You can add and set a timer using a lambda expression:
+
+	struct timespec expiry = {5, 0};
+	struct timespec interval = {5, 0}; // {0, 0} for non-periodic	
+    auto timer = loop_t::timer::add_timer(my_loop, fd, clock_type::MONOTONIC, true /* relative */,
+    		expiry, interval,
+            [](loop_t &eloop, int expiry count) -> rearm {
+        
+        // Process timer expiry here
+
+        return rearm::REARM; // or REMOVE etc
+    });
+
 
 ## 3. Polling the event loop
 

@@ -1838,6 +1838,43 @@ class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
         eloop.deregister(this, this->clock);
     }
 
+    template <typename T>
+    static timer<EventLoop> *add_timer(EventLoop &eloop, clock_type clock, bool relative,
+            struct timespec &timeout, struct timespec &interval, T watchHndlr)
+    {
+        class lambda_timer : public timer_impl<EventLoop, lambda_timer>
+        {
+            private:
+            T watchHndlr;
+
+            public:
+            lambda_timer(T watchHandlr_a) : watchHndlr(watchHandlr_a)
+            {
+                //
+            }
+
+            rearm timer_expiry(EventLoop &eloop, int intervals)
+            {
+                return watchHndlr(eloop, intervals);
+            }
+
+            void watch_removed() noexcept override
+            {
+                delete this;
+            }
+        };
+
+        lambda_timer * lt = new lambda_timer(watchHndlr);
+        lt->add_timer(eloop, clock);
+        if (relative) {
+            lt->arm_timer_rel(eloop, timeout, interval);
+        }
+        else {
+            lt->arm_timer(eloop, timeout, interval);
+        }
+        return lt;
+    }
+
     // Timer expired, and the given number of intervals have elapsed before
     // expiry event was queued. Normally intervals == 1 to indicate no
     // overrun.
