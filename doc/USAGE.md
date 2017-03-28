@@ -161,6 +161,19 @@ Note also that the `bidi_fd_watcher` channels can be separately removed (by retu
 have been removed. You cannot register channels with the event loop separately, and you must
 remove both channels before you register the `bidi_fd_watcher` with another (or the same) loop.
 
+For convenience there is also a lambda-expression version:
+
+    auto watcher = loop_t::bidi_fd_watcher::add_watch(my_loop, fd, IN_EVENTS | OUT_EVENTS,
+            [](loop_t &eloop, int fd, int flags) -> rearm {
+        
+        // Process I/O here
+
+        return rearm::REARM; // or REMOVE etc
+    });
+
+The read-ready and write-notifications will go through the same function in this case; the `flags`
+argument can be used to distinguish them (as `IN_EVENTS` or `OUT_EVENTS`).
+
 
 ## 2.2 Signal watchers
 

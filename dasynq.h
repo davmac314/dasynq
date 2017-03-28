@@ -1522,6 +1522,41 @@ class bidi_fd_watcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::
         eloop.deregister(this, this->watch_fd);
     }
     
+    template <typename T>
+    static bidi_fd_watcher<EventLoop> *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)
+    {
+        class LambdaBidiWatcher : public bidi_fd_watcher_impl<EventLoop, LambdaBidiWatcher>
+        {
+            private:
+            T watchHndlr;
+
+            public:
+            LambdaBidiWatcher(T watchHandlr_a) : watchHndlr(watchHandlr_a)
+            {
+                //
+            }
+
+            rearm read_ready(EventLoop &eloop, int fd)
+            {
+                return watchHndlr(eloop, fd, IN_EVENTS);
+            }
+
+            rearm write_ready(EventLoop &eloop, int fd)
+            {
+                return watchHndlr(eloop, fd, OUT_EVENTS);
+            }
+
+            void watch_removed() noexcept override
+            {
+                delete this;
+            }
+        };
+
+        LambdaBidiWatcher * lfd = new LambdaBidiWatcher(watchHndlr);
+        lfd->add_watch(eloop, fd, flags);
+        return lfd;
+    }
+
     // virtual rearm read_ready(EventLoop &eloop, int fd) noexcept = 0;
     // virtual rearm write_ready(EventLoop &eloop, int fd) noexcept = 0;
 };
