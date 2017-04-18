@@ -17,15 +17,11 @@ template <class Base> class ITimerEvents : public timer_base<Base>
 
     timer_queue_t timer_queue;
     
-#if defined(__APPLE__)
-#define itimerspec itimerval
-#endif
-    
     // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
     // if there are no active timers).
     void set_timer_from_queue()
     {
-        struct itimerspec newtime;
+        struct timespec newtime;
         struct itimerval newalarm;
         if (timer_queue.empty()) {
             newalarm.it_value = {0, 0};
@@ -34,14 +30,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
             return;
         }
 
-#if defined(__APPLE__)
-        auto &rp = timer_queue.get_root_priority();
-        newtime.it_value.tv_sec = rp.tv_sec;
-        newtime.it_value.tv_usec = rp.tv_nsec / 1000;
-#else
-        newtime.it_value = timer_queue.get_root_priority();
-        newtime.it_interval = {0, 0};
-#endif
+        newtime = timer_queue.get_root_priority();
         
         struct timespec curtime;
 #if defined(__APPLE__)
@@ -53,22 +42,15 @@ template <class Base> class ITimerEvents : public timer_base<Base>
         clock_gettime(CLOCK_MONOTONIC, &curtime);
 #endif
         newalarm.it_interval = {0, 0};
-        newalarm.it_value.tv_sec = newtime.it_value.tv_sec - curtime.tv_sec;
-#if defined(__APPLE__)
-        newalarm.it_value.tv_usec = newtime.it_value.tv_usec - curtime.tv_nsec / 1000;
-#else
-        newalarm.it_value.tv_usec = (newtime.it_value.tv_nsec - curtime.tv_nsec) / 1000;
-#endif
+        newalarm.it_value.tv_sec = newtime.tv_sec - curtime.tv_sec;
+        newalarm.it_value.tv_usec = (newtime.tv_nsec - curtime.tv_nsec) / 1000;
+
         if (newalarm.it_value.tv_usec < 0) {
             newalarm.it_value.tv_usec += 1000000;
             newalarm.it_value.tv_sec--;
         }
         setitimer(ITIMER_REAL, &newalarm, nullptr);
     }
-
-#if defined(__APPLE__)
-#undef itimerspec
-#endif
     
     protected:
     
