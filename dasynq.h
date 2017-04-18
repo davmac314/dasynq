@@ -412,7 +412,7 @@ namespace dprivate {
     // This class serves as the base class (mixin) for the AEN mechanism class.
     //
     // The EventDispatch class maintains the queued event data structures. It inserts watchers
-    // into the queue when eventes are received (receiveXXX methods).
+    // into the queue when events are received (receiveXXX methods).
     template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
     {
         template <typename, template <typename> class, typename> friend class dasynq::event_loop;
@@ -438,12 +438,12 @@ namespace dprivate {
             event_queue.insert(bwatcher->heap_handle, bwatcher->priority);
         }
         
-        bool isQueued(BaseWatcher *bwatcher)
+        bool isQueued(BaseWatcher *bwatcher) noexcept
         {
             return event_queue.is_queued(bwatcher->heap_handle);
         }
 
-        void dequeueWatcher(BaseWatcher *bwatcher)
+        void dequeueWatcher(BaseWatcher *bwatcher) noexcept
         {
             if (event_queue.is_queued(bwatcher->heap_handle)) {
                 event_queue.remove(bwatcher->heap_handle);
@@ -451,7 +451,7 @@ namespace dprivate {
         }
         
         // Remove watcher from the queueing system
-        void release_watcher(BaseWatcher *bwatcher)
+        void release_watcher(BaseWatcher *bwatcher) noexcept
         {
             event_queue.deallocate(bwatcher->heap_handle);
         }
@@ -459,11 +459,11 @@ namespace dprivate {
         protected:
         T_Mutex lock;
 
-        template <typename T> void init(T *loop) { }
+        template <typename T> void init(T *loop) noexcept { }
         
         // Receive a signal; return true to disable signal watch or false to leave enabled
         template <typename T>
-        bool receiveSignal(T &loop_mech, typename Traits::SigInfo & siginfo, void * userdata)
+        bool receiveSignal(T &loop_mech, typename Traits::SigInfo & siginfo, void * userdata) noexcept
         {
             BaseSignalWatcher * bwatcher = static_cast<BaseSignalWatcher *>(userdata);
             bwatcher->siginfo = siginfo;
@@ -472,7 +472,7 @@ namespace dprivate {
         }
         
         template <typename T>
-        void receiveFdEvent(T &loop_mech, typename Traits::FD_r fd_r, void * userdata, int flags)
+        void receiveFdEvent(T &loop_mech, typename Traits::FD_r fd_r, void * userdata, int flags) noexcept
         {
             BaseFdWatcher * bfdw = static_cast<BaseFdWatcher *>(userdata);
             
@@ -509,22 +509,22 @@ namespace dprivate {
             }
         }
         
-        void receiveChildStat(pid_t child, int status, void * userdata)
+        void receiveChildStat(pid_t child, int status, void * userdata) noexcept
         {
             BaseChildWatcher * watcher = static_cast<BaseChildWatcher *>(userdata);
             watcher->child_status = status;
             queueWatcher(watcher);
         }
         
-        void receiveTimerExpiry(timer_handle_t & timer_handle, void * userdata, int intervals)
+        void receiveTimerExpiry(timer_handle_t & timer_handle, void * userdata, int intervals) noexcept
         {
             BaseTimerWatcher * watcher = static_cast<BaseTimerWatcher *>(userdata);
             watcher->intervals = intervals;
             queueWatcher(watcher);
         }
         
-        // Pull a single event from the queue
-        BaseWatcher * pullEvent()
+        // Pull a single event from the queue; returns nullptr if the queue is empty.
+        BaseWatcher * pullEvent() noexcept
         {
             if (event_queue.empty()) {
                 return nullptr;
@@ -682,7 +682,7 @@ class event_loop
     waitqueue<T_Mutex> attn_waitqueue;
     waitqueue<T_Mutex> wait_waitqueue;
     
-    T_Mutex &getBaseLock()
+    T_Mutex &getBaseLock() noexcept
     {
         return loop_mech.lock;
     }
@@ -748,7 +748,7 @@ class event_loop
         }
     }
     
-    void setFdEnabled(BaseWatcher *watcher, int fd, int watch_flags, bool enabled)
+    void setFdEnabled(BaseWatcher *watcher, int fd, int watch_flags, bool enabled) noexcept
     {
         if (enabled) {
             loop_mech.enableFdWatch(fd, watcher, watch_flags | ONE_SHOT);
@@ -758,7 +758,7 @@ class event_loop
         }
     }
 
-    void setFdEnabled_nolock(BaseWatcher *watcher, int fd, int watch_flags, bool enabled)
+    void setFdEnabled_nolock(BaseWatcher *watcher, int fd, int watch_flags, bool enabled) noexcept
     {
         if (enabled) {
             loop_mech.enableFdWatch_nolock(fd, watcher, watch_flags | ONE_SHOT);
@@ -768,7 +768,7 @@ class event_loop
         }
     }
     
-    void deregister(BaseFdWatcher *callback, int fd)
+    void deregister(BaseFdWatcher *callback, int fd) noexcept
     {
         loop_mech.removeFdWatch(fd, callback->watch_flags);
         
@@ -781,7 +781,7 @@ class event_loop
         releaseLock(qnode);        
     }
     
-    void deregister(BaseBidiFdWatcher *callback, int fd)
+    void deregister(BaseBidiFdWatcher *callback, int fd) noexcept
     {
         if (LoopTraits::has_separate_rw_fd_watches) {
             loop_mech.removeBidiFdWatch(fd);
@@ -811,7 +811,7 @@ class event_loop
         }
     }
     
-    void unreserve(BaseChildWatcher *callback)
+    void unreserve(BaseChildWatcher *callback) noexcept
     {
         loop_mech.unreserveChildWatch();
         loop_mech.release_watcher(callback);
@@ -839,7 +839,7 @@ class event_loop
         loop_mech.addReservedChildWatch_nolock(child, callBack);
     }
     
-    void deregister(BaseChildWatcher *callback, pid_t child)
+    void deregister(BaseChildWatcher *callback, pid_t child) noexcept
     {
         loop_mech.removeChildWatch(child);
 
@@ -863,34 +863,34 @@ class event_loop
         }
     }
     
-    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, clock_type clock)
+    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, clock_type clock) noexcept
     {
         struct timespec interval {0, 0};
         loop_mech.setTimer(callBack->timer_handle, timeout, interval, true, clock);
     }
     
-    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval, clock_type clock)
+    void setTimer(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval, clock_type clock) noexcept
     {
         loop_mech.setTimer(callBack->timer_handle, timeout, interval, true, clock);
     }
 
-    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, clock_type clock)
+    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, clock_type clock) noexcept
     {
         struct timespec interval {0, 0};
         loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true, clock);
     }
     
-    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval, clock_type clock)
+    void setTimerRel(BaseTimerWatcher *callBack, struct timespec &timeout, struct timespec &interval, clock_type clock) noexcept
     {
         loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true, clock);
     }
 
-    void stop_timer(BaseTimerWatcher *callback, clock_type clock)
+    void stop_timer(BaseTimerWatcher *callback, clock_type clock) noexcept
     {
         loop_mech.stop_timer(callback->timer_handle, clock);
     }
 
-    void deregister(BaseTimerWatcher *callback, clock_type clock)
+    void deregister(BaseTimerWatcher *callback, clock_type clock) noexcept
     {
         loop_mech.removeTimer(callback->timer_handle, clock);
         
@@ -910,7 +910,7 @@ class event_loop
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
     // mechanism).
-    void getAttnLock(waitqueue_node<T_Mutex> &qnode)
+    void getAttnLock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
         attn_waitqueue.queue(&qnode);        
@@ -924,7 +924,7 @@ class event_loop
     
     // Acquire the poll-wait lock (to be held when polling the AEN mechanism; lower
     // priority than the attention lock).
-    void getPollwaitLock(waitqueue_node<T_Mutex> &qnode)
+    void getPollwaitLock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
         if (attn_waitqueue.isEmpty()) {
@@ -941,7 +941,7 @@ class event_loop
     }
     
     // Release the poll-wait/attention lock.
-    void releaseLock(waitqueue_node<T_Mutex> &qnode)
+    void releaseLock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
         waitqueue_node<T_Mutex> * nhead = attn_waitqueue.unqueue();
@@ -958,7 +958,7 @@ class event_loop
         }                
     }
     
-    void processSignalRearm(BaseSignalWatcher * bsw, rearm rearmType)
+    void processSignalRearm(BaseSignalWatcher * bsw, rearm rearmType) noexcept
     {
         // Called with lock held
         if (rearmType == rearm::REARM) {
@@ -970,7 +970,7 @@ class event_loop
     }
 
     // Process rearm return for fd_watcher, including the primary watcher of a bidi_fd_watcher
-    rearm processFdRearm(BaseFdWatcher * bfw, rearm rearmType, bool is_multi_watch)
+    rearm processFdRearm(BaseFdWatcher * bfw, rearm rearmType, bool is_multi_watch) noexcept
     {
         // Called with lock held;
         //   bdfw->event_flags contains only with pending (queued) events
@@ -1034,7 +1034,7 @@ class event_loop
     }
 
     // Process re-arm for the secondary (output) watcher in a Bi-direction Fd watcher.
-    rearm processSecondaryRearm(BaseBidiFdWatcher * bdfw, rearm rearmType)
+    rearm processSecondaryRearm(BaseBidiFdWatcher * bdfw, rearm rearmType) noexcept
     {
         // Called with lock held
         if (rearmType == rearm::REMOVE) {
@@ -1081,7 +1081,7 @@ class event_loop
         return rearmType;
     }
     
-    void processTimerRearm(BaseTimerWatcher *btw, rearm rearmType)
+    void processTimerRearm(BaseTimerWatcher *btw, rearm rearmType) noexcept
     {
         // Called with lock held
         if (rearmType == rearm::REARM) {
@@ -1093,6 +1093,7 @@ class event_loop
         // TODO DISARM?
     }
 
+    // Process all queued events; returns true if any events were processed.
     bool processEvents() noexcept
     {
         EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
