@@ -970,14 +970,13 @@ class event_loop
         else if (rearmType == rearm::REMOVE) {
             loop_mech.removeSignalWatch_nolock(bsw->siginfo.get_signo());
         }
+        // Note that signal watchers cannot (currently) be disarmed
     }
 
     // Process rearm return for fd_watcher, including the primary watcher of a bidi_fd_watcher
     rearm processFdRearm(BaseFdWatcher * bfw, rearm rearmType, bool is_multi_watch) noexcept
     {
-        // Called with lock held;
-        //   bdfw->event_flags contains only with pending (queued) events
-        
+        // Called with lock held
         if (is_multi_watch) {
             BaseBidiFdWatcher * bdfw = static_cast<BaseBidiFdWatcher *>(bfw);
             
@@ -1005,7 +1004,19 @@ class event_loop
                 }
             }
             else if (rearmType == rearm::DISARM) {
-                // TODO should actually disarm.
+                bdfw->watch_flags &= ~IN_EVENTS;
+
+                if (! LoopTraits::has_separate_rw_fd_watches) {
+                    int watch_flags = bdfw->watch_flags;
+                    // without separate r/w watches, enableFdWatch actually sets
+                    // which sides are enabled (i.e. can be used to disable):
+                    loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
+                            static_cast<BaseWatcher *>(bdfw),
+                            (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                }
+                else {
+                    loop_mech.disableFdWatch_nolock(bdfw->watch_fd, IN_EVENTS);
+                }
             }
             else if (rearmType == rearm::REARM) {
                 bdfw->watch_flags |= IN_EVENTS;
@@ -1067,7 +1078,17 @@ class event_loop
             }
         }
         else if (rearmType == rearm::DISARM) {
-            // TODO actually disarm.
+            bdfw->watch_flags &= ~OUT_EVENTS;
+
+            if (! LoopTraits::has_separate_rw_fd_watches) {
+                int watch_flags = bdfw->watch_flags;
+                loop_mech.enableFdWatch_nolock(bdfw->watch_fd,
+                        static_cast<BaseWatcher *>(bdfw),
+                        (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+            }
+            else {
+                loop_mech.disableFdWatch_nolock(bdfw->watch_fd, OUT_EVENTS);
+            }
         }
         else if (rearmType == rearm::REARM) {
             bdfw->watch_flags |= OUT_EVENTS;
@@ -1096,7 +1117,9 @@ class event_loop
         else if (rearmType == rearm::REMOVE) {
             loop_mech.removeTimer_nolock(btw->timer_handle, btw->clock);
         }
-        // TODO DISARM?
+        else if (rearmType == rearm::DISARM) {
+            loop_mech.enableTimer_nolock(btw->timer_handle, false, btw->clock);
+        }
     }
 
     // Process all queued events; returns true if any events were processed.
@@ -1460,14 +1483,6 @@ class bidi_fd_watcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::
     }
     
     public:
-
-    // This should never actually get called:
-    /*
-    rearm fdEvent(EventLoop &eloop, int fd, int flags) final
-    {
-        return rearm::REARM; // should not be reachable.
-    };
-    */
 
     void set_in_watch_enabled(EventLoop &eloop, bool b) noexcept
     {
