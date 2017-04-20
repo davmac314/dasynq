@@ -70,7 +70,7 @@ static int set_prios;
 
 using namespace dasynq;
 
-NEventLoop eloop;
+event_loop_n eloop;
 
 #include <vector>
 
@@ -78,18 +78,18 @@ using namespace std;
 
 
 
-class Pipeio : public NEventLoop::fd_watcher_impl<Pipeio>
+class Pipeio : public event_loop_n::fd_watcher_impl<Pipeio>
 {
     public:
     int idx;
 
-    rearm fd_event(NEventLoop &eloop, int fd, int flags);
+    rearm fd_event(event_loop_n &eloop, int fd, int flags);
 };
 
-class PTimer : public NEventLoop::timer_impl<PTimer>
+class PTimer : public event_loop_n::timer_impl<PTimer>
 {
     public:
-    rearm timer_expiry(NEventLoop &eloop, int intervals)
+    rearm timer_expiry(event_loop_n &eloop, int intervals)
     {
     	return rearm::DISARM;
     }
@@ -99,7 +99,7 @@ class PTimer : public NEventLoop::timer_impl<PTimer>
 static vector<Pipeio> evio;
 static vector<PTimer> evto;
 
-rearm Pipeio::fd_event(NEventLoop &eloop, int fd, int flags)
+rearm Pipeio::fd_event(event_loop_n &eloop, int fd, int flags)
 {
     int widx = idx + 1;
     if (timers) {
