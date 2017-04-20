@@ -77,13 +77,13 @@ int pipe2(int filedes[2], int flags)
     }
 
     if (flags & O_CLOEXEC) {
-	fcntl(filedes[0], F_SETFD, FD_CLOEXEC);
-	fcntl(filedes[1], F_SETFD, FD_CLOEXEC);
+        fcntl(filedes[0], F_SETFD, FD_CLOEXEC);
+        fcntl(filedes[1], F_SETFD, FD_CLOEXEC);
     }
 
     if (flags & O_NONBLOCK) {
-	fcntl(filedes[0], F_SETFL, O_NONBLOCK);
-	fcntl(filedes[1], F_SETFL, O_NONBLOCK);
+        fcntl(filedes[0], F_SETFL, O_NONBLOCK);
+        fcntl(filedes[1], F_SETFL, O_NONBLOCK);
     }
 
     return 0;
@@ -909,7 +909,8 @@ class event_loop
     }
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
-    // mechanism).
+    // mechanism). This can be used to safely remove watches, since it is certain that
+    // notification callbacks won't be run while the attention lock is held.
     void getAttnLock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
@@ -922,8 +923,10 @@ class event_loop
         }
     }
     
-    // Acquire the poll-wait lock (to be held when polling the AEN mechanism; lower
-    // priority than the attention lock).
+    // Acquire the poll-wait lock (to be held when polling the AEN mechanism; lower priority than
+    // the attention lock). The poll-wait lock is used to prevent more than a single thread from
+    // polling the event loop mechanism at a time; if this is not done, it is basically
+    // impossible to safely deregister watches.
     void getPollwaitLock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
@@ -1152,19 +1155,29 @@ class event_loop
 
     void run() noexcept
     {
+        // Poll the mechanism first, in case high-priority events are pending:
+        waitqueue_node<T_Mutex> qnode;
+        getPollwaitLock(qnode);
+        loop_mech.pullEvents(false);
+        releaseLock(qnode);
+
         while (! processEvents()) {
-            waitqueue_node<T_Mutex> qnode;
-            
-            // We only allow one thread to poll the mechanism at any time, since otherwise
-            // removing event watchers is a nightmare beyond comprehension.
-            getPollwaitLock(qnode);
-            
             // Pull events from the AEN mechanism and insert them in our internal queue:
+            getPollwaitLock(qnode);
             loop_mech.pullEvents(true);
-            
-            // Now release the wait lock:
             releaseLock(qnode);
         }
+    }
+
+    void poll() noexcept
+    {
+        // Poll the mechanism first, in case high-priority events are pending:
+        waitqueue_node<T_Mutex> qnode;
+        getPollwaitLock(qnode);
+        loop_mech.pullEvents(false);
+        releaseLock(qnode);
+
+        processEvents();
     }
 };
 
