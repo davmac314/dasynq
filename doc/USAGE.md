@@ -45,7 +45,7 @@ that thread).
 
 Once you have created an event loop instance, you can create watchers for various events, and
 register them with the event loop. For example, to watch for input readiness on a file descriptor,
-create an FdWatcher:
+create an `fd_watcher`:
 
     using rearm = dasynq::rearm;
 
@@ -60,9 +60,9 @@ create an FdWatcher:
     };
 
     my_fd_watcher my_fd_watcher;
-    my_fd_watcher.addWatch(my_loop, fd, IN_EVENTS);
+    my_fd_watcher.add_watch(my_loop, fd, dasynq::IN_EVENTS);
 
-(To watch for output readiness, use OUT_EVENTS instead of IN_EVENTS).
+(To watch for output readiness, use `OUT_EVENTS` instead of `IN_EVENTS`).
 
 The above may look strange, as it makes use of the _curiously recurring template pattern_ - that
 is, the `fd_watcher_impl` template class which your watcher derives from is parameterised by the
