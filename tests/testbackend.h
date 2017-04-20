@@ -149,6 +149,14 @@ template <class Base> class test_loop : public Base, io_receiver
         }
     }
     
+    void disableFdWatch_nolock(int fd_num, int events)
+    {
+        auto srch = fd_data_map.find(fd_num);
+        if (srch != fd_data_map.end()) {
+            srch->second.events = 0;
+        }
+    }
+
     void removeFdWatch(int fd, int events)
     {
         removeFdWatch_nolock(fd, events);

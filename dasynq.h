@@ -1029,6 +1029,9 @@ class event_loop
                 loop_mech.enableFdWatch_nolock(bfw->watch_fd, bfw,
                         (bfw->watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
             }
+            else if (rearmType == rearm::DISARM) {
+                loop_mech.disableFdWatch_nolock(bfw->watch_fd, bfw->watch_flags);
+            }
             else if (rearmType == rearm::REMOVE) {
                 loop_mech.removeFdWatch_nolock(bfw->watch_fd, bfw->watch_flags);
             }

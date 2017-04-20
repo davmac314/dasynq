@@ -94,6 +94,46 @@ void testFdWatch2()
     watcher2->deregister(my_loop);
 }
 
+void testFdWatch3()
+{
+    Loop_t my_loop;
+
+    bool seen1 = false;
+
+    class my_watcher : public Loop_t::fd_watcher_impl<my_watcher>
+    {
+        public:
+        bool &seen1;
+
+        my_watcher(bool &seen) : seen1(seen) { }
+
+        rearm fd_event(Loop_t &eloop, int fd, int flags)
+        {
+            // Process I/O here
+            seen1 = true;
+            set_enabled(eloop, true);
+            return rearm::DISARM;  // disable watcher
+        }
+    };
+
+    my_watcher watcher1(seen1);
+    watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS);
+
+    test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
+    my_loop.run();
+
+    assert(seen1);
+
+    seen1 = false;
+
+    test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
+    my_loop.poll();
+
+    assert(! seen1);
+
+    watcher1.deregister(my_loop);
+}
+
 static void testTimespecDiv()
 {
     using dasynq::divide_timespec;
@@ -584,6 +624,10 @@ int main(int argc, char **argv)
 
     std::cout << "testFdWatch2... ";
     testFdWatch2();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "testFdWatch3... ";
+    testFdWatch3();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "testTimespecDiv... ";
