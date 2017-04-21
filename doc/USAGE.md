@@ -99,8 +99,9 @@ Callback methods usually return a "rearm" value. There are several possible valu
                   Dasynq not to touch the watcher in any way! Necessary if the watcher has been
                   deleted.
 
-Note that if multiple threads are polling the event loop, it is difficult to use some of the Rearm
-values correctly; you should generally use only REARM, REMOVE or NOOP in that case. 
+Note that if multiple threads are polling the event loop, it is difficult to use some of the
+`rearm` values correctly; you should generally use only `REARM`, `REMOVE` or `NOOP` in that
+case. 
 
 To remove a watcher, call `deregister`:
 
@@ -195,11 +196,15 @@ argument can be used to distinguish them (as `IN_EVENTS` or `OUT_EVENTS`).
     my_signal_watcher msw;
     msw.add_watch(my_loop, SIGINT);
 
-Methods available in siginfo_p may vary from platform to platform, but are intended to mirror the
-`siginfo_t` structure of the platform. One standard method is `int get_signo()`.
+Methods available in `siginfo_p` may vary from platform to platform, but are intended to mirror
+the `siginfo_t` structure of the platform. One standard method is `int get_signo()`.
 
 You should mask the signal (with `sigprocmask`/`pthread_sigmask`) in all threads before adding a
 watcher for that signal to an event loop.
+
+Note that the requirement for signals to be masked has implications for spawning child processes,
+since they inherit the signal masks. Often you will want certain signals to be unmasked in the
+child, so you should take care to unmask them specifically after forking.
 
 
 ## 2.3 Child process watchers
@@ -332,6 +337,15 @@ away platform differences).
 You should fully remove the watcher(s) for a file descriptor *before* you close the file
 descriptor. In a multi-threaded program, failure to do this could cause a watcher to read from
 or write to a file descriptor which was re-opened for another purpose in the meantime.
+
+There is a special problem when listening for connections to sockets: accepting a new connection
+requires a process to have not exhausted its file descriptors. If it has, it will be unable to
+accept new connections, but will also be unable to close them; the connections will remain pending
+and will cause the watcher for the socket to be notified continuously (unless it is disabled).
+This problem is not specific to Dasynq and is ultimately due to deficiencies in system APIs
+(POSIX etc). A process that ignores this problem will potentially consume processor resources by
+spinning in a tight loop when the problem occurs; however, there are no very satisfactory
+solutions that do not require significant and intrusive changes to the program.
 
 The event loop may not function correctly in the child process after a fork() operation
 (including a call to child_proc_watcher::fork). It is recommended to re-create the event loop
