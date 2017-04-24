@@ -114,8 +114,9 @@ enum class rearm
     /** Remove the event watcher (and call "removed" callback) */
     REMOVE,
     /** The watcher has been removed - don't touch it! */
-    REMOVED
-// TODO: add a REQUEUE option, which means, "I didn't complete input/output, run me again soon"
+    REMOVED,
+    /** RE-queue the watcher to have its notification called again */
+    REQUEUE
 };
 
 // Forward declarations:
@@ -158,6 +159,8 @@ namespace dprivate {
     {
         template <typename T_Mutex, typename Traits> friend class EventDispatch;
         template <typename T_Mutex, template <typename> class, typename> friend class dasynq::event_loop;
+        friend void basewatcher_set_active(BaseWatcher &watcher, bool active);
+        friend bool basewatcher_get_deleteme(const BaseWatcher &watcher);
         
         protected:
         WatchType watchType;
@@ -201,6 +204,16 @@ namespace dprivate {
         }
     };
     
+    void basewatcher_set_active(BaseWatcher &watcher, bool active)
+    {
+        watcher.active = active;
+    }
+
+    bool basewatcher_get_deleteme(const BaseWatcher &watcher)
+    {
+        return watcher.deleteme;
+    }
+
     // Base signal event - not part of public API
     template <typename T_Mutex, typename Traits>
     class BaseSignalWatcher : public BaseWatcher
@@ -409,6 +422,20 @@ namespace dprivate {
         }
     };
     
+    // Do standard post-dispatch processing for a watcher. This handles the case of removing or
+    // re-queing watchers depending on the rearm type.
+    template <typename Loop> void post_dispatch(Loop &loop, BaseWatcher *watcher, rearm rearmType)
+    {
+        if (rearmType == rearm::REMOVE) {
+            loop.getBaseLock().unlock();
+            watcher->watch_removed();
+            loop.getBaseLock().lock();
+        }
+        else if (rearmType == rearm::REQUEUE) {
+            // XXX
+        }
+    }
+
     // This class serves as the base class (mixin) for the AEN mechanism class.
     //
     // The EventDispatch class maintains the queued event data structures. It inserts watchers
@@ -611,6 +638,9 @@ class event_loop
     friend class dprivate::child_proc_watcher<my_event_loop_t>;
     friend class dprivate::timer<my_event_loop_t>;
     
+    friend void dprivate::post_dispatch<my_event_loop_t>(my_event_loop_t &loop,
+            dprivate::BaseWatcher *watcher, rearm rearmType);
+
     template <typename, typename> friend class dprivate::fd_watcher_impl;
     template <typename, typename> friend class dprivate::bidi_fd_watcher_impl;
     template <typename, typename> friend class dprivate::signal_watcher_impl;
@@ -906,6 +936,11 @@ class event_loop
     void dequeueWatcher(BaseWatcher *watcher) noexcept
     {
         loop_mech.dequeueWatcher(watcher);
+    }
+
+    void requeueWatcher(BaseWatcher *watcher) noexcept
+    {
+        loop_mech.requeueWatcher(watcher);
     }
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
@@ -1296,11 +1331,7 @@ class signal_watcher_impl : public signal_watcher<EventLoop>
 
             loop.processSignalRearm(this, rearmType);
 
-            if (rearmType == rearm::REMOVE) {
-                loop.getBaseLock().unlock();
-                this->watch_removed();
-                loop.getBaseLock().lock();
-            }
+            post_dispatch(loop, this, rearmType);
         }
     }
 };
@@ -1433,11 +1464,7 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
 
             rearmType = loop.processFdRearm(this, rearmType, false);
 
-            if (rearmType == rearm::REMOVE) {
-                loop.getBaseLock().unlock();
-                this->watch_removed();
-                loop.getBaseLock().lock();
-            }
+            post_dispatch(loop, this, rearmType);
         }
     }
 };
@@ -1615,16 +1642,14 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
 
             rearmType = loop.processFdRearm(this, rearmType, true);
 
-            if (rearmType == rearm::REMOVE) {
-                loop.getBaseLock().unlock();
-                this->watch_removed();
-                loop.getBaseLock().lock();
-            }
+            post_dispatch(loop, this, rearmType);
         }
     }
 
     void dispatch_second(void *loop_ptr) noexcept override
     {
+        auto &outwatcher = bidi_fd_watcher<EventLoop>::outWatcher;
+
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.getBaseLock().unlock();
 
@@ -1634,18 +1659,19 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
 
         if (rearmType != rearm::REMOVED) {
             this->event_flags &= ~OUT_EVENTS;
-            this->active = false;
-            if (this->deleteme) {
+            basewatcher_set_active(outwatcher, false);
+            if (basewatcher_get_deleteme(outwatcher)) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
                 rearmType = rearm::REMOVE;
             }
 
             rearmType = loop.processSecondaryRearm(this, rearmType);
 
-            if (rearmType == rearm::REMOVE) {
-                loop.getBaseLock().unlock();
-                this->watch_removed();
-                loop.getBaseLock().lock();
+            if (rearmType == rearm::REQUEUE) {
+                post_dispatch(loop, &outwatcher, rearmType);
+            }
+            else {
+                post_dispatch(loop, this, rearmType);
             }
         }
     }
@@ -1814,12 +1840,7 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
             }
 
             // rearmType = loop.process??;
-
-            if (rearmType == rearm::REMOVE) {
-                loop.getBaseLock().unlock();
-                this->watch_removed();
-                loop.getBaseLock().lock();
-            }
+            post_dispatch(loop, this, rearmType);
         }
     }
 };
@@ -1935,11 +1956,7 @@ class timer_impl : public timer<EventLoop>
 
             loop.processTimerRearm(this, rearmType);
 
-            if (rearmType == rearm::REMOVE) {
-                loop.getBaseLock().unlock();
-                this->watch_removed();
-                loop.getBaseLock().lock();
-            }
+            post_dispatch(loop, this, rearmType);
         }
     }
 };
