@@ -88,16 +88,18 @@ A more convenient way to add a watcher, in many cases, is to use a lambda expres
 
 Callback methods usually return a "rearm" value. There are several possible values:
 
-- rearm::REARM : re-enable the watcher
+- rearm::REARM : re-enable the watcher.
 - rearm::DISARM : disable the watcher (if it has been re-enabled in the meantime, which should
                   only be the case for a single-threaded event loop).
 - rearm::NOOP   : do not change the watcher state (leave it disabled, or enabled if it has been
                   enabled explicitly; the latter is only safe if only one thread polls the event
                   loop).
-- rearm::REMOVE : disable and de-register the watcher
+- rearm::REMOVE : disable and de-register the watcher.
 - rearm::REMOVED : assume the watcher has been removed already and may be invalid. This tells
                   Dasynq not to touch the watcher in any way! Necessary if the watcher has been
                   deleted.
+- rearm::REQUEUE : re-queue the watcher. Use this if further processing is required but you want
+                  other pending events (of suitable priority) to be processed first.
 
 Note that if multiple threads are polling the event loop, it is difficult to use some of the
 `rearm` values correctly; you should generally use only `REARM`, `REMOVE` or `NOOP` in that
