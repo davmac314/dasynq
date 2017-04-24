@@ -432,7 +432,7 @@ namespace dprivate {
             loop.getBaseLock().lock();
         }
         else if (rearmType == rearm::REQUEUE) {
-            // XXX
+            loop.requeueWatcher(watcher);
         }
     }
 
@@ -476,7 +476,7 @@ namespace dprivate {
                 event_queue.remove(bwatcher->heap_handle);
             }
         }
-        
+
         // Remove watcher from the queueing system
         void release_watcher(BaseWatcher *bwatcher) noexcept
         {
@@ -940,7 +940,7 @@ class event_loop
 
     void requeueWatcher(BaseWatcher *watcher) noexcept
     {
-        loop_mech.requeueWatcher(watcher);
+        loop_mech.queueWatcher(watcher);
     }
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
