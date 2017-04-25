@@ -70,7 +70,7 @@ namespace dasynq {
 namespace dasynq {
 
 #ifdef __APPLE__
-int pipe2(int filedes[2], int flags)
+inline int pipe2(int filedes[2], int flags)
 {
     if (pipe(filedes) == -1) {
         return -1;
@@ -159,8 +159,8 @@ namespace dprivate {
     {
         template <typename T_Mutex, typename Traits> friend class EventDispatch;
         template <typename T_Mutex, template <typename> class, typename> friend class dasynq::event_loop;
-        friend void basewatcher_set_active(BaseWatcher &watcher, bool active);
-        friend bool basewatcher_get_deleteme(const BaseWatcher &watcher);
+        friend inline void basewatcher_set_active(BaseWatcher &watcher, bool active);
+        friend inline bool basewatcher_get_deleteme(const BaseWatcher &watcher);
         
         protected:
         WatchType watchType;
@@ -204,12 +204,12 @@ namespace dprivate {
         }
     };
     
-    void basewatcher_set_active(BaseWatcher &watcher, bool active)
+    inline void basewatcher_set_active(BaseWatcher &watcher, bool active)
     {
         watcher.active = active;
     }
 
-    bool basewatcher_get_deleteme(const BaseWatcher &watcher)
+    inline bool basewatcher_get_deleteme(const BaseWatcher &watcher)
     {
         return watcher.deleteme;
     }
