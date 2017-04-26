@@ -18,6 +18,7 @@ class event
 {
     public:
     virtual void fire(io_receiver &) = 0;
+    virtual ~event() { }
 };
 
 class fd_event : public event
@@ -123,11 +124,12 @@ template <class Base> class test_loop : public Base, io_receiver
     
     }
     
-    void addFdWatch(int fd, void * callback, int eventmask, bool enabled)
+    bool addFdWatch(int fd, void * callback, int eventmask, bool enabled, bool emulate = false)
     {
         if (! enabled) eventmask = 0;
         fd_data data = {callback, eventmask};
         fd_data_map.insert({fd, data});
+        return true;
     }
     
     void enableTimer_nolock(timer_handle_t &hnd, bool enable, clock_type clock = clock_type::MONOTONIC)

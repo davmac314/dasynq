@@ -143,8 +143,14 @@ template <class Base> class EpollLoop : public Base
         }
     }
     
-    // flags:  IN_EVENTS | OUT_EVENTS | ONE_SHOT
-    void addFdWatch(int fd, void *userdata, int flags, bool enabled = true)
+    //        fd:  file descriptor to watch
+    //  userdata:  data to associate with descriptor
+    //     flags:  IN_EVENTS | OUT_EVENTS | ONE_SHOT
+    // soft_fail:  true if unsupported file descriptors should fail by returning false instead
+    //             of throwing an exception
+    // returns: true on success; false if file descriptor type isn't supported and soft_fail == true
+    // throws:  std::system_error or std::bad_alloc on failure
+    bool addFdWatch(int fd, void *userdata, int flags, bool enabled = true, bool soft_fail = false)
     {
         struct epoll_event epevent;
         // epevent.data.fd = fd;
@@ -162,8 +168,12 @@ template <class Base> class EpollLoop : public Base
         }
 
         if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &epevent) == -1) {
+            if (soft_fail && errno == EPERM) {
+                return false;
+            }
             throw new std::system_error(errno, std::system_category());        
         }
+        return true;
     }
     
     void addBidiFdWatch(int fd, void *userdata, int flags)
