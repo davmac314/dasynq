@@ -176,7 +176,7 @@ template <class Base> class EpollLoop : public Base
         return true;
     }
     
-    void addBidiFdWatch(int fd, void *userdata, int flags, bool emulate)
+    bool addBidiFdWatch(int fd, void *userdata, int flags, bool emulate)
     {
         // No implementation.
         throw std::system_error(std::make_error_code(std::errc::not_supported));
