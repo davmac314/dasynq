@@ -361,7 +361,7 @@ template <class Base> class KqueueLoop : public Base
 
         struct kevent evt;
         EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ADD, 0, 0, userdata);
-        // TODO use EV_DISPATCH if available (not on OpenBSD)
+        // TODO use EV_DISPATCH if available (not on OpenBSD/OS X)
         
         if (kevent(kqfd, &evt, 1, nullptr, 0, nullptr) == -1) {
             throw new std::system_error(errno, std::system_category());
@@ -397,31 +397,22 @@ template <class Base> class KqueueLoop : public Base
         removeSignalWatch_nolock(signo);
     }
     
-    // If events are pending, process an unspecified number of them.
-    // If no events are pending, wait until one event is received and
-    // process this event (and possibly any other events received
-    // simultaneously).
-    // If processing an event removes a watch, there is a possibility
-    // that the watched event will still be reported (if it has
-    // occurred) before pullEvents() returns.
+    private:
+
+    // We actually need to check pending signals before polling the kqueue, since kqueue can
+    // count signals as they are delivered but the count is cleared when we poll the kqueue,
+    // meaning that signals might still be pending if they were queued multiple times at the
+    // last poll (since we report only one signal delivery at a time and the watch is
+    // automatically disabled each time).
     //
-    //  do_wait - if false, returns immediately if no events are
-    //            pending.
-    void pullEvents(bool do_wait)
+    // The check is not necessary on systems that don't queue signals.
+void pull_signals()
     {
-        // We actually need to check pending signals, since
-        // kqueue can count signals as they are delivered but the count is
-        // cleared when we poll the kqueue, meaning that signals might still
-        // be pending if they were queued multiple times at the last poll.
-        
+#if _POSIX_REALTIME_SIGNALS > 0
         // TODO we should only poll for signals that *have* been reported
         // as being raised more than once prior via kevent, rather than all
-        // signals that have been registered - in many cases that will allow
+        // signals that have been registered - in many cases that may allow
         // us to skip the sigtimedwait call altogether.
-        
-        // The check is not necessary on systems that don't queue signals.
-
-#if _POSIX_REALTIME_SIGNALS > 0
         {
             std::lock_guard<decltype(Base::lock)> guard(Base::lock);
 
@@ -441,6 +432,23 @@ template <class Base> class KqueueLoop : public Base
             }
         }
 #endif
+    }
+
+    public:
+
+    // If events are pending, process an unspecified number of them.
+    // If no events are pending, wait until one event is received and
+    // process this event (and possibly any other events received
+    // simultaneously).
+    // If processing an event removes a watch, there is a possibility
+    // that the watched event will still be reported (if it has
+    // occurred) before pullEvents() returns.
+    //
+    //  do_wait - if false, returns immediately if no events are
+    //            pending.
+    void pullEvents(bool do_wait)
+    {
+        pull_signals();
         
         struct kevent events[16];
         struct timespec ts;
@@ -463,7 +471,8 @@ template <class Base> class KqueueLoop : public Base
     //            pending.    
     void pullOneEvent(bool do_wait)
     {
-        // TODO must check for pending signals as per pullEvents()
+        pull_signals();
+
         struct kevent events[1];
         struct timespec ts;
         ts.tv_sec = 0;
