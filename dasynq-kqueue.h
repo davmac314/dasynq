@@ -241,22 +241,30 @@ template <class Base> class KqueueLoop : public Base
         kevent(kqfd, &kev, 1, nullptr, 0, nullptr);    
     }
     
-    // flags:  IN_EVENTS | OUT_EVENTS
-    void addFdWatch(int fd, void *userdata, int flags, bool enabled = true)
+    //        fd:  file descriptor to watch
+    //  userdata:  data to associate with descriptor
+    //     flags:  IN_EVENTS | OUT_EVENTS | ONE_SHOT
+    //             (only one of IN_EVENTS/OUT_EVENTS can be specified)
+    // soft_fail:  true if unsupported file descriptors should fail by returning false instead
+    //             of throwing an exception
+    // returns: true on success; false if file descriptor type isn't supported and soft_fail == true
+    // throws:  std::system_error or std::bad_alloc on failure
+    bool addFdWatch(int fd, void *userdata, int flags, bool enabled = true, bool emulate = false)
     {
-        // TODO kqueue doesn't support EVFILT_WRITE on file fd's :/
-        // Presumably they cause the kevent call to fail. We could maintain
-        // a separate set and use poll() (urgh).
-        
         short filter = (flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE;
-        
+
         struct kevent kev;
         EV_SET(&kev, fd, filter, EV_ADD | (enabled ? 0 : EV_DISABLE), 0, 0, userdata);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) == -1) {
+            // Note that kqueue supports EVFILE_READ on regular file fd's, but not EVFIL_WRITE.
+            if (filter == EVFILT_WRITE && errno == EINVAL) {
+                return false; // emulate
+            }
             throw new std::system_error(errno, std::system_category());
         }
+        return true;
     }
-    
+
     void addBidiFdWatch(int fd, void *userdata, int flags)
     {
         struct kevent kev[2];
