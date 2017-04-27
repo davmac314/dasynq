@@ -773,17 +773,38 @@ class event_loop
         }
     }
     
-    void registerFd(BaseBidiFdWatcher *callback, int fd, int eventmask)
+    void registerFd(BaseBidiFdWatcher *callback, int fd, int eventmask, bool emulate = false)
     {
         loop_mech.prepare_watcher(callback);
         try {
             loop_mech.prepare_watcher(&callback->outWatcher);
             try {
                 if (LoopTraits::has_separate_rw_fd_watches) {
-                    loop_mech.addBidiFdWatch(fd, callback, eventmask | ONE_SHOT);
+                    int r = loop_mech.addBidiFdWatch(fd, callback, eventmask | ONE_SHOT, emulate);
+                    if (r & IN_EVENTS) {
+                        callback->emulatefd = true;
+                        if (eventmask & IN_EVENTS) {
+                            requeueWatcher(callback);
+                        }
+                    }
+                    if (r & OUT_EVENTS) {
+                        callback->outWatcher.emulatefd = true;
+                        if (eventmask & OUT_EVENTS) {
+                            requeueWatcher(&callback->outWatcher);
+                        }
+                    }
                 }
                 else {
-                    loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT);
+                    if (! loop_mech.addFdWatch(fd, callback, eventmask | ONE_SHOT, true, emulate)) {
+                        callback->emulatefd = true;
+                        callback->outWatcher.emulatefd = true;
+                        if (eventmask & IN_EVENTS) {
+                            requeueWatcher(callback);
+                        }
+                        if (eventmask & OUT_EVENTS) {
+                            requeueWatcher(&callback->outWatcher);
+                        }
+                    }
                 }
             }
             catch (...) {
@@ -1462,6 +1483,15 @@ class fd_watcher : private dprivate::BaseFdWatcher<typename EventLoop::mutex_t>
         this->watch_flags = flags;
         eloop.registerFd(this, fd, flags, enabled, true);
     }
+
+    void add_watch_noemu(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)
+    {
+        BaseWatcher::init();
+        this->priority = prio;
+        this->watch_fd = fd;
+        this->watch_flags = flags;
+        eloop.registerFd(this, fd, flags, enabled, false);
+    }
     
     int get_watched_fd()
     {
@@ -1654,9 +1684,22 @@ class bidi_fd_watcher : private dprivate::BaseBidiFdWatcher<typename EventLoop::
         this->write_removed = false;
         this->priority = inprio;
         this->set_priority(this->outWatcher, outprio);
-        eloop.registerFd(this, fd, flags);
+        eloop.registerFd(this, fd, flags, true);
     }
-    
+
+    void add_watch_noemu(EventLoop &eloop, int fd, int flags, int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)
+    {
+        BaseWatcher::init();
+        this->outWatcher.BaseWatcher::init();
+        this->watch_fd = fd;
+        this->watch_flags = flags | dprivate::multi_watch;
+        this->read_removed = false;
+        this->write_removed = false;
+        this->priority = inprio;
+        this->set_priority(this->outWatcher, outprio);
+        eloop.registerFd(this, fd, flags, false);
+    }
+
     int get_watched_fd()
     {
         return this->watch_fd;

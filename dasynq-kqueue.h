@@ -265,17 +265,47 @@ template <class Base> class KqueueLoop : public Base
         return true;
     }
 
-    void addBidiFdWatch(int fd, void *userdata, int flags)
+    // returns: 0 on success
+    //          IN_EVENTS  if in watch requires emulation
+    //          OUT_EVENTS if out watch requires emulation
+    int addBidiFdWatch(int fd, void *userdata, int flags, bool emulate = false)
     {
         struct kevent kev[2];
-        short rflags = EV_ADD | ((flags & IN_EVENTS) ? 0 : EV_DISABLE);
-        short wflags = EV_ADD | ((flags & OUT_EVENTS) ? 0 : EV_DISABLE);
+        struct kevent kev_r[2];
+        short rflags = EV_ADD | ((flags & IN_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
+        short wflags = EV_ADD | ((flags & OUT_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
         EV_SET(&kev[0], fd, EVFILT_READ, rflags, 0, 0, userdata);
         EV_SET(&kev[1], fd, EVFILT_WRITE, wflags, 0, 0, userdata);
         
-        if (kevent(kqfd, kev, 2, nullptr, 0, nullptr) == -1) {
+        int r = kevent(kqfd, kev, 2, kev_r, 2, nullptr);
+
+        if (r == -1) {
             throw new std::system_error(errno, std::system_category());
-        }        
+        }
+
+        // Some possibilities:
+        // - both ends failed. We'll throw an error rather than allowing emulation.
+        // - read watch failed, write succeeded : should not happen.
+        // - read watch added, write failed: if emulate == true, succeed;
+        //                                   if emulate == false, remove read and fail.
+
+        if (kev_r[0].data != 0) {
+            // read failed
+            throw new std::system_error(kev_r[0].data, std::system_category());
+        }
+
+        if (kev_r[1].data != 0) {
+            if (emulate) {
+                return OUT_EVENTS;
+            }
+            else {
+                // remove read watch
+                // throw exception
+                // XXX
+            }
+        }
+
+        return 0;
     }
     
     // flags specifies which watch to remove; ignored if the loop doesn't support
