@@ -202,11 +202,10 @@ Methods available in `siginfo_p` may vary from platform to platform, but are int
 the `siginfo_t` structure of the platform. One standard method is `int get_signo()`.
 
 You should mask the signal (with `sigprocmask`/`pthread_sigmask`) in all threads before adding a
-watcher for that signal to an event loop.
-
-Note that the requirement for signals to be masked has implications for spawning child processes,
-since they inherit the signal masks. Often you will want certain signals to be unmasked in the
-child, so you should take care to unmask them specifically after forking.
+watcher for that signal to an event loop. The only practical way to do this in mult-threaded
+programs is by masking the signal at program startup, before creating any additional threads.
+Note that signal masks are inherited by child processes; if you mask commonly used signals you
+should generally unmask them after forking a child process.
 
 
 ## 2.3 Child process watchers
@@ -318,15 +317,49 @@ before returning. You would generally call it in a loop:
         my_loop.run();
     }
 
+## 4. Other matters
 
-## 4. Error handling
+### 4.1 Error handling
 
 In general, the only operations that can fail (other than due to program error) are the watch
 registration functions (`add_watch`). If they fail, they will throw an exception; either a
 `std::bad_alloc` or a `std::system_error`.
 
 
-## 5. Restrictions and limitations
+### 4.2 Regular files
+
+Most (all?) event loop mechanisms do not support watching read/write readiness on file descriptors 
+associated with "regular" files (as opposed to sockets/terminals/other devices). Arguably this is
+sensible, since there is no fixed buffer for such file descriptors and the ability to perform a
+non-blocking read or write is not part of any state directly associated with the descriptor itself
+(rather it happens due to buffering at the device level i.e. the disk). The traditonal "select"
+and "poll" calls typically handle this by returning that such file descriptors are always
+available for both read and write operations; when backed by a fast disk, this is practically
+true, although it can be problematic for slow media or network filesystems.  
+
+Unfortunately modern mechanisms do not carry through with support for regular files. The epoll
+mechanism doesn't support them at all, and kqueue supports only read watches, with slightly
+altered semantics: specifically, kqueue indicates that a regular file fd is available for reading
+so long as it is not positioned exactly at the end of the associated file. 
+
+Since it is convenient to be able to handle all file descriptors similarly, Dasynq emulates the
+select/poll style of signalling "always ready" for regular files if they are not handled by the
+underlying event loop mechanism. (Note that if the underlying mechanism is kqueue, you'll get
+kqueue semantics for read watches, and emulated write watches; for epoll, both read and write
+watches will be emulated).
+
+If, for whatever reason, you do not want this emulation enabled for a particular file descriptor
+watch, you can prevent it by using the "noemu" variant of the registration function:
+ 
+    my_fd_watcher.add_watch_noemu(my_loop, fd, dasynq::IN_EVENTS);
+    my_bidi_watcher.add_watch_noemu(my_loop, fd, IN_EVENTS | OUT_EVENTS);
+
+When using the "no emulation" registration functions, an exception will be thrown if the file
+descriptor is associated with a regular file (or is not otherwise supported by the backend
+event loop mechanism).
+
+
+### 4.3 Restrictions and limitations
 
 Most of the following limitations carry through from the underlying backend, rather than being
 inherent in the design of Dasynq itself.
