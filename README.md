@@ -73,4 +73,4 @@ copy the dasynq header files into the source tree of your own program.
 
 Run "make check" to run the test suite. Minor edits to the top-level Makefile may be required.
 
-On OpenBSD, you must use install "eg++"; the standard g++ is too old.
+On OpenBSD, you must install "eg++"; the g++ from the base system is too old.
