@@ -311,8 +311,8 @@ template <class Base> class KqueueLoop : public Base
         // OpenBSD doesn't have EV_RECEIPT: install the watches one at a time
         struct kevent kev[1];
 
-        short rflags = EV_ADD | ((flags & IN_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
-        short wflags = EV_ADD | ((flags & OUT_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
+        short rflags = EV_ADD | ((flags & IN_EVENTS) ? 0 : EV_DISABLE);
+        short wflags = EV_ADD | ((flags & OUT_EVENTS) ? 0 : EV_DISABLE);
         EV_SET(&kev[0], fd, EVFILT_READ, rflags, 0, 0, userdata);
 
         int r = kevent(kqfd, kev, 1, nullptr, 0, nullptr);
