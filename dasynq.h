@@ -1318,6 +1318,8 @@ class event_loop
     template <typename D> using child_proc_watcher_impl = dprivate::child_proc_watcher_impl<my_event_loop_t, D>;
     template <typename D> using timer_impl = dprivate::timer_impl<my_event_loop_t, D>;
 
+    // Poll the event loop and process any pending events. If no events are pending, wait
+    // for and process at least one event.
     void run() noexcept
     {
         // Poll the mechanism first, in case high-priority events are pending:
@@ -1334,9 +1336,9 @@ class event_loop
         }
     }
 
+    // Poll the event loop and process any pending events
     void poll() noexcept
     {
-        // Poll the mechanism first, in case high-priority events are pending:
         waitqueue_node<T_Mutex> qnode;
         getPollwaitLock(qnode);
         loop_mech.pullEvents(false);

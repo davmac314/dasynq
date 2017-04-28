@@ -319,25 +319,10 @@ template <class Base> class EpollLoop : public Base
             return;
         }
     
-        processEvents(events, r);
-    }
-
-    // If events are pending, process one of them.
-    // If no events are pending, wait until one event is received and
-    // process this event.
-    //
-    //  do_wait - if false, returns immediately if no events are
-    //            pending.    
-    void pullOneEvent(bool do_wait)
-    {
-        epoll_event events[1];
-        int r = epoll_wait(epfd, events, 1, do_wait ? -1 : 0);
-        if (r == -1 || r == 0) {
-            // signal or no events
-            return;
-        }
-    
-        processEvents(events, r);    
+        do {
+            processEvents(events, r);
+            r = epoll_wait(epfd, events, 16, 0);
+        } while (r > 0);
     }
 };
 

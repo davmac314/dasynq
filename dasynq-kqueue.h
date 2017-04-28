@@ -492,30 +492,10 @@ void pull_signals()
             return;
         }
         
-        processEvents(events, r);
-    }
-
-    // If events are pending, process one of them.
-    // If no events are pending, wait until one event is received and
-    // process this event.
-    //
-    //  do_wait - if false, returns immediately if no events are
-    //            pending.    
-    void pullOneEvent(bool do_wait)
-    {
-        pull_signals();
-
-        struct kevent events[1];
-        struct timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 0;
-        int r = kevent(kqfd, nullptr, 0, events, 1, do_wait ? nullptr : &ts);
-        if (r == -1 || r == 0) {
-            // signal or no events
-            return;
-        }
-    
-        processEvents(events, r);
+        do {
+            processEvents(events, r);
+            r = kevent(kqfd, nullptr, 0, events, 16, &ts);
+        } while (r > 0);
     }
 };
 
