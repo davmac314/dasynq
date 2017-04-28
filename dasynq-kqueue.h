@@ -270,13 +270,14 @@ template <class Base> class KqueueLoop : public Base
     //          OUT_EVENTS if out watch requires emulation
     int addBidiFdWatch(int fd, void *userdata, int flags, bool emulate = false)
     {
+#ifdef EV_RECEIPT
         struct kevent kev[2];
         struct kevent kev_r[2];
         short rflags = EV_ADD | ((flags & IN_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
         short wflags = EV_ADD | ((flags & OUT_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
         EV_SET(&kev[0], fd, EVFILT_READ, rflags, 0, 0, userdata);
         EV_SET(&kev[1], fd, EVFILT_WRITE, wflags, 0, 0, userdata);
-        
+
         int r = kevent(kqfd, kev, 2, kev_r, 2, nullptr);
 
         if (r == -1) {
@@ -298,14 +299,45 @@ template <class Base> class KqueueLoop : public Base
             if (emulate) {
                 return OUT_EVENTS;
             }
-            else {
-                // remove read watch
-                // throw exception
-                // XXX
-            }
+            // remove read watch
+            EV_SET(&kev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, userdata);
+            kevent(kqfd, kev, 1, nullptr, 0, nullptr);
+            // throw exception
+            throw new std::system_error(kev_r[1].data, std::system_category());
         }
 
         return 0;
+#else
+        // OpenBSD doesn't have EV_RECEIPT: install the watches one at a time
+        struct kevent kev[1];
+
+        short rflags = EV_ADD | ((flags & IN_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
+        short wflags = EV_ADD | ((flags & OUT_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
+        EV_SET(&kev[0], fd, EVFILT_READ, rflags, 0, 0, userdata);
+
+        int r = kevent(kqfd, kev, 1, nullptr, 0, nullptr);
+
+        if (r == -1) {
+            throw new std::system_error(errno, std::system_category());
+        }
+
+        EV_SET(&kev[0], fd, EVFILT_WRITE, wflags, 0, 0, userdata);
+
+        r = kevent(kqfd, kev, 1, nullptr, 0, nullptr);
+
+        if (r == -1) {
+            if (emulate) {
+                return OUT_EVENTS;
+            }
+            // remove read watch
+            EV_SET(&kev[0], fd, EVFILE_READ, EV_DELETE, 0, 0, userdata);
+            kevent(kqfd, kev, 1, nullptr, 0, nullptr);
+            // throw exception
+            throw new std::system_error(errno, std::system_category());
+        }
+
+        return 0;
+#endif
     }
     
     // flags specifies which watch to remove; ignored if the loop doesn't support
