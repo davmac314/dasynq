@@ -303,12 +303,13 @@ You can add and set a timer using a lambda expression:
 
 ## 3. Polling the event loop
 
-To check for events and run watcher callbacks, call the `run` function of the event loop:
+To wait for events and run watcher callbacks, call the `run` function of the event loop:
 
     my_loop.run();
 
-The run function waits for one or more events, and then notifies the watchers for those events
-before returning. You would generally call it in a loop:
+The run function waits for one or more events, puts the events in an internal queue,  and then
+notifies the watchers for those events (i.e. processes the queue) before returning. You would
+generally call it in a loop:
 
 	bool do_exit = false;
     // do_exit could be set from a callback to cause the loop to terminate
@@ -316,6 +317,17 @@ before returning. You would generally call it in a loop:
     while (! do_exit) {
         my_loop.run();
     }
+
+If you want to poll the event loop, that is, check for events without waiting, use the `poll`
+function instead:
+
+    my_loop.poll();
+
+Both `poll` and `run` will process queued events (which have been already been pulled from the
+backend mechanism) if there are any, and return immediately in this case even if there were no
+more events pulled from the backend. This makes the queue largely transparent to the client
+application.
+
 
 ## 4. Other matters
 
