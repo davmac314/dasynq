@@ -256,7 +256,7 @@ template <class Base> class KqueueLoop : public Base
         struct kevent kev;
         EV_SET(&kev, fd, filter, EV_ADD | (enabled ? 0 : EV_DISABLE), 0, 0, userdata);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) == -1) {
-            // Note that kqueue supports EVFILE_READ on regular file fd's, but not EVFIL_WRITE.
+            // Note that kqueue supports EVFILT_READ on regular file fd's, but not EVFIL_WRITE.
             if (filter == EVFILT_WRITE && errno == EINVAL) {
                 return false; // emulate
             }
@@ -330,7 +330,7 @@ template <class Base> class KqueueLoop : public Base
                 return OUT_EVENTS;
             }
             // remove read watch
-            EV_SET(&kev[0], fd, EVFILE_READ, EV_DELETE, 0, 0, userdata);
+            EV_SET(&kev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, userdata);
             kevent(kqfd, kev, 1, nullptr, 0, nullptr);
             // throw exception
             throw new std::system_error(errno, std::system_category());
