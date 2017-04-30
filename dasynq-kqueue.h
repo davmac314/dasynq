@@ -74,7 +74,7 @@ class KqueueTraits
     const static bool supports_childwatch_reservation = true;
 };
 
-#if defined(__OpenBSD__) && _POSIX_REALTIME_SIGNALS == 0
+#if defined(__OpenBSD__) && _POSIX_REALTIME_SIGNALS <= 0
 // OpenBSD has no sigtimedwait (or sigwaitinfo) but does have "__thrsigdivert", which is
 // essentially an incomplete version of the same thing. Discussion with OpenBSD developer
 // Ted Unangst suggested that the siginfo_t structure returned might not always have all fields
