@@ -89,7 +89,9 @@ static inline int sigtimedwait(const sigset_t *ssp, siginfo_t *info, struct time
     timeout->tv_nsec = 1000000001;
     return __thrsigdivert(*ssp, info, timeout);
 }
+#endif
 
+#if defined(__OpenBSD__) || _POSIX_REALTIME_SIGNALS > 0
 static inline void prepare_signal(int signo) { }
 static inline void unprep_signal(int signo) { }
 
@@ -104,8 +106,10 @@ static bool get_siginfo(int signo, siginfo_t *siginfo)
     sigaddset(&mask, signo);
     return (sigtimedwait(&mask, siginfo, &timeout) != -1);
 }
+#else
 
-#elif defined(__APPLE__)
+// If we have no sigtimedwait implementation, we have to retrieve signal data by establishing a
+// signal handler:
 
 static siginfo_t * siginfo_p;
 
