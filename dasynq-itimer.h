@@ -13,8 +13,6 @@ namespace dasynq {
 template <class Base> class ITimerEvents : public timer_base<Base>
 {
     private:
-    int timerfd_fd = -1;
-
     timer_queue_t timer_queue;
     
     // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
@@ -160,7 +158,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
             curtime.tv_nsec -= 1000000000;
             curtime.tv_sec++;
         }
-        setTimer(timer_id, curtime, interval, enable);
+        setTimer(timer_id, curtime, interval, enable, clock);
     }
     
     // Enables or disabling report of timeouts (does not stop timer)
