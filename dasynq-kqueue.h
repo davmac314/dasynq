@@ -462,7 +462,7 @@ void pull_signals()
                     sigdelset(&sigmask, rsigno);
                     // TODO accumulate and disable multiple filters with a single kevents call
                     //      rather than disabling each individually
-                    setFilterEnabled(EVFILT_SIGNAL, rsigno, false);
+                    setFilterEnabled(EVFILT_SIGNAL, rsigno, sigdataMap[rsigno], false);
                 }
                 rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             }
