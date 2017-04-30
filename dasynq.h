@@ -40,10 +40,16 @@
 // Loop and LoopTraits defined already; used for testing
 #elif defined(DASYNQ_HAVE_KQUEUE)
 #include "dasynq-kqueue.h"
+#if _POSIX_TIMERS > 0
+#include "dasynq-posixtimer.h"
+template <typename T> using TimerEvents = PosixTimerEvents<T>;
+#else
 #include "dasynq-itimer.h"
+template <typename T> using TimerEvents = ITimerEvents<T>;
+#endif
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = KqueueLoop<interrupt_channel<ITimerEvents<ChildProcEvents<T>>>>;
+    template <typename T> using Loop = KqueueLoop<interrupt_channel<TimerEvents<ChildProcEvents<T>>>>;
     using LoopTraits = KqueueTraits;
 }
 #elif defined(DASYNQ_HAVE_EPOLL)
