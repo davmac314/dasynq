@@ -8,12 +8,27 @@
 
 namespace dasynq {
 
-// Timer implementation based on the (basically obselete) POSIX itimer interface.
+// Timer implementation based on the (basically obsolete) POSIX itimer interface.
 
 template <class Base> class ITimerEvents : public timer_base<Base>
 {
     private:
     timer_queue_t timer_queue;
+
+#if defined(CLOCK_MONOTONIC)
+    static inline void get_curtime(struct timespec &curtime)
+    {
+        clock_gettime(CLOCK_MONOTONIC, &curtime);
+    }
+#else
+    static inline void get_curtime(struct timespec &curtime)
+    {
+        struct timeval curtime_tv;
+        gettimeofday(&curtime_tv, nullptr);
+        curtime.tv_sec = curtime_tv.tv_sec;
+        curtime.tv_nsec = curtime_tv.tv_usec * 1000;
+    }
+#endif
     
     // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
     // if there are no active timers).
@@ -31,14 +46,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
         newtime = timer_queue.get_root_priority();
         
         struct timespec curtime;
-#if defined(__APPLE__)
-        struct timeval curtime_tv;
-        gettimeofday(&curtime_tv, nullptr);
-        curtime.tv_sec = curtime_tv.tv_sec;
-        curtime.tv_nsec = curtime_tv.tv_usec * 1000;
-#else
-        clock_gettime(CLOCK_MONOTONIC, &curtime);
-#endif
+        get_curtime(curtime);
         newalarm.it_interval = {0, 0};
         newalarm.it_value.tv_sec = newtime.tv_sec - curtime.tv_sec;
         newalarm.it_value.tv_usec = (newtime.tv_nsec - curtime.tv_nsec) / 1000;
@@ -59,15 +67,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
     {
         if (siginfo.get_signo() == SIGALRM) {
             struct timespec curtime;
-#if defined(__APPLE__)
-            struct timeval curtime_tv;
-            gettimeofday(&curtime_tv, nullptr);
-            curtime.tv_sec = curtime_tv.tv_sec;
-            curtime.tv_nsec = curtime_tv.tv_usec * 1000;
-#else
-            clock_gettime(CLOCK_MONOTONIC, &curtime);
-            // should we use the REALTIME clock instead? I have no idea :/
-#endif
+            get_curtime(curtime);
             
             timer_base<Base>::process_timer_queue(timer_queue, curtime);
 
@@ -144,14 +144,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
     {
         // TODO consider caching current time somehow; need to decide then when to update cached value.
         struct timespec curtime;
-#if defined(__APPLE__)
-        struct timeval curtime_tv;
-        gettimeofday(&curtime_tv, nullptr);
-        curtime.tv_sec = curtime_tv.tv_sec;
-        curtime.tv_nsec = curtime_tv.tv_usec * 1000;
-#else
-        clock_gettime(CLOCK_MONOTONIC, &curtime);
-#endif
+        get_curtime(curtime);
         curtime.tv_sec += timeout.tv_sec;
         curtime.tv_nsec += timeout.tv_nsec;
         if (curtime.tv_nsec > 1000000000) {

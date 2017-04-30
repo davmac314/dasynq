@@ -79,7 +79,7 @@ namespace dasynq {
 
 namespace dasynq {
 
-#ifdef __APPLE__
+#if HAVE_PIPE2 == 0
 inline int pipe2(int filedes[2], int flags)
 {
     if (pipe(filedes) == -1) {
