@@ -42,10 +42,14 @@
 #include "dasynq-kqueue.h"
 #if _POSIX_TIMERS > 0
 #include "dasynq-posixtimer.h"
-template <typename T> using TimerEvents = PosixTimerEvents<T>;
+namespace dasynq {
+    template <typename T> using TimerEvents = PosixTimerEvents<T>;
+}
 #else
 #include "dasynq-itimer.h"
-template <typename T> using TimerEvents = ITimerEvents<T>;
+namespace dasynq {
+    template <typename T> using TimerEvents = ITimerEvents<T>;
+}
 #endif
 #include "dasynq-childproc.h"
 namespace dasynq {
