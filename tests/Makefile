@@ -7,7 +7,7 @@ $(objects): %.o: %.cc
 	$(CXX) $(CXXOPTS) $(SANITIZE) -I.. -c $< -o $@
 
 dasynq-test: dasynq-tests.o
-	$(CXX) $(THREADOPT) $(CXXOPTS) $(SANITIZE) dasynq-tests.o -o dasynq-test
+	$(CXX) $(THREADOPT) $(CXXLINKOPTS) $(SANITIZE) dasynq-tests.o -o dasynq-test
 
 clean:
 	rm -f *.o
