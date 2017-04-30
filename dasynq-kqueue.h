@@ -74,13 +74,13 @@ class KqueueTraits
     const static bool supports_childwatch_reservation = true;
 };
 
-#if defined(__OpenBSD__)
+#if defined(__OpenBSD__) && _POSIX_REALTIME_SIGNALS == 0
 // OpenBSD has no sigtimedwait (or sigwaitinfo) but does have "__thrsigdivert", which is
 // essentially an incomplete version of the same thing. Discussion with OpenBSD developer
-// Ted Unangst suggested that the siginfo_t structure returned might not always have all
-// fields set correctly. Furthermore there is a bug such that specifying a zero timeout (or
-// indeed any timeout less than a tick) results in NO timeout. We get around this by instead
-// specifying an *invalid* timeout, which won't error out if a signal is pending.
+// Ted Unangst suggested that the siginfo_t structure returned might not always have all fields
+// set correctly. Furthermore there is a bug (at least in 5.9)  such that specifying a zero
+// timeout (or indeed any timeout less than a tick) results in NO timeout. We get around this by
+// instead specifying an *invalid* timeout, which won't error out if a signal is pending.
 static inline int sigtimedwait(const sigset_t *ssp, siginfo_t *info, struct timespec *timeout)
 {
     // We know that we're only called with a timeout of 0 (which doesn't work properly) and
