@@ -2005,6 +2005,7 @@ class timer : private BaseTimerWatcher<typename EventLoop::mutex_t>
     
     void add_timer(EventLoop &eloop, clock_type clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)
     {
+        BaseWatcher::init();
         this->priority = prio;
         this->clock = clock;
         eloop.registerTimer(this, clock);
