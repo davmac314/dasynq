@@ -11,7 +11,7 @@ The existing backends include **epoll** and **kqueue**, meaning that it works on
 BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X.
 
 *Dasynq is currently in a pre-release state*. The implementation is largely complete but has not been
-widely tested in production. It is distribution under the terms of the Apache License, version 2.0,
+widely tested in production. It is distributed under the terms of the Apache License, version 2.0,
 as found in the LICENSE file. 
 
 
@@ -70,12 +70,12 @@ Other features of Dasynq include:
 
 See doc/USAGE.md for details on how to use the Dasynq API.
 
-To build, edit the Makefile and uncomment the variable settings for the appropriate OS. Run "make check"
-to run the test suite (use "gmake" on BSDs). Run "make install" to install (set "DESTDIR" if you want to
-install to an alternate location for packaging purposes, eg "make DESTDIR=/tmp/dasynq install").
+To build, edit the Makefile and uncomment the variable settings for the appropriate OS. Run `make check`
+to run the test suite (use `gmake` on BSDs). Run `make install` to install (set `DESTDIR` if you want to
+install to an alternate location for packaging purposes, eg `make DESTDIR=/tmp/dasynq install`).
 
 On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too old (4.2 in OpenBSD 6.1;
-4.9+ is required.).
+4.9+ is required).
 
 After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq:
 

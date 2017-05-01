@@ -1,11 +1,67 @@
-Dasynq is in early development, and is not feature complete. With that in mind, here is a quick
-run down on usage:
+Dasynq is an event-loop library, which can be used to listen for and react to multiple types of
+_event_. This document provides an overview of how to use the library in your own programs.
+
+## 1. Basics
+
+In an event loop, you register _events_ that you are interested in, and then you poll the event
+loop to have those events reported. Dasynq runs a callback (a function that you define) when an
+event that you've registered an interest for occurs.
+
+A simple example of initialising an event loop follows:
+
+    #include "dasynq.h"
+
+    using loop_t = dasynq::event_loop_n;    // loop_t = single-threaded event loop
+    
+    loop_t my_loop;
+
+One example of an event that you might want to watch for is readiness on a socket: that is, you
+want to know when data is available on the socket for reading. Once you have an event loop
+instance, you can create a _watcher_ and register it with the event loop. Let's say your socket
+connection file descriptor is stored in a variable `fd`: 
+
+    // create a convenient alias:
+    using rearm = dasynq::rearm;
+
+    // define the watcher/callback:
+    class my_fd_watcher : public loop_t::fd_watcher_impl<my_fd_watcher>
+    {
+        // this is the callback method; for file descriptor watchers, it must be declared
+        // as it is here:
+        
+        rearm fd_event(loop_t &, int fd, int flags)
+        {
+            // Process I/O here
+            //   int r = read(fd, ...) etc
+    
+            return rearm::REARM;  // re-enable watcher (it is disabled when callback runs)
+        }
+    };
+
+    // register the watcher on the event loop:
+    my_fd_watcher my_fd_watcher;
+    my_fd_watcher.add_watch(my_loop, fd, dasynq::IN_EVENTS);
+
+The declaration of the my_fd_watcher class may look a little strange; this will be discussed
+further in a later section.
+
+To actually see events being reported to the watcher's callback, you need to
+poll the event loop:
+
+    while (true) {
+        my_loop.run(); // waits for events, and reports them via callback functions
+    }
+
+Each iteration of the loop waits for the next event or events to be detected, and then emits the
+appropriate callbacks. Of course, you probably would include an exit condition for the loop in a
+real program. 
 
 
-## 1. Selecting model - single threaded or thread-safe
+## 2. Threading model
 
-Dasynq can be used as a thread-safe event loop in a multi-threaded client, or it can be used as
-in a single-threaded client. You can instantiate an event loop of your chosen type with:
+To use Dasynq, you first must decide your threading model. Dasynq can be used as a thread-safe
+event loop in a multi-threaded client, or it can be used as in a single-threaded client. You
+can instantiate an event loop of your chosen type with:
 
     #include "dasynq.h"
 
@@ -21,31 +77,29 @@ in a single-threaded client. You can instantiate an event loop of your chosen ty
 	// instantiate the chosen loop:
     loop_t my_loop();
 
-There are essentially three ways of using an event loop:
+When you poll an event loop, event callbacks will only be run on the threads that performs the
+poll operation. With this in mind, there are essentially three ways of using an event loop:
 
 - Only access the loop from a single thread. You can use a single-threaded event loop for this.
-- Access the loop from multiple threads, but poll it (run callbacks) on only one thread. This
-  requires a thread-safe event loop, and there are some limitations on use of certain methods.
+- Access the loop from multiple threads, but poll it (and therefore run callbacks) on only one
+  thread. This requires a thread-safe event loop, and there are some limitations on use of certain
+  methods.
 - Access the loop from multiple threads, including polling it from multiple threads. This requires
   (obviously) a thread-safe event loop, and places significant (but not necessarily problematic)
   limitations on the use of certain methods.
 
-Once the event loop instance is created, you can register event watchers with it; then you must
-process event callbacks by calling one of the poll/run functions. Event callbacks will only be
-run on threads that call the poll/run methods, during the execution of those methods.
-
 The restrictions when using multiple threads mainly concern the activation of callbacks. When an
-event occurs it is (temporarily) disabled while the callback is called. The application must
-ensure that the callback cannot be re-entered while it is active, either by not enabling it or
-by polling the event loop with only a single thread (and only calling enable/disable from within
+event occurs its watcher is (temporarily) disabled while the callback is running. The application
+must ensure that the callback cannot be re-entered while it is active, either by not enabling it
+or by polling the event loop with only a single thread (and only calling enable/disable from within
 that thread).
 
 
-## 2. Event Watchers
+## 3. Event Watchers
 
-Once you have created an event loop instance, you can create watchers for various events, and
-register them with the event loop. For example, to watch for input readiness on a file descriptor,
-create an `fd_watcher`:
+As already discussed, you can create watchers for various events, and register them with the event
+loop. For example, to watch for input readiness on a file descriptor, create an `fd_watcher`. You
+saw an example earlier:
 
     using rearm = dasynq::rearm;
 
@@ -116,7 +170,7 @@ straight away. You should never `delete` your watcher object until the `watch_re
 been called. (Often, it will be convenient to `delete` the watcher from _within_ the callback).
 
 
-## 2.1 File descriptor watches
+## 3.1 File descriptor watches
 
 See example above. Not shown there is the `set_enabled` method:
 
@@ -183,7 +237,7 @@ The read-ready and write-notifications will go through the same function in this
 argument can be used to distinguish them (as `IN_EVENTS` or `OUT_EVENTS`).
 
 
-## 2.2 Signal watchers
+## 3.2 Signal watchers
 
     class my_signal_watcher : public loop_t::signal_watcher_impl<my_signal_watcher>
     {
@@ -213,7 +267,7 @@ Note that signal masks are inherited by child processes; if you mask commonly us
 should generally unmask them after forking a child process.
 
 
-## 2.3 Child process watchers
+## 3.3 Child process watchers
 
     class my_child_proc_watcher : public loop_t::child_proc_watcher<my_child_proc_watcher>
     {
@@ -258,7 +312,7 @@ process id) before the watch callback is called. If you want to send a signal to
 special care should be taken; see the discussion on prioritising watches in section 4.3.
 
 
-## 2.4 Timers
+## 3.4 Timers
 
 Dasynq supports timers, both "one-shot" and periodic (with a separate initial expiry and interval)
 and against either the system clock (which is supposed to represent the current time as displayed
@@ -310,7 +364,7 @@ You can add and set a timer using a lambda expression:
     });
 
 
-## 3. Polling the event loop
+## 4. Polling the event loop
 
 To wait for events and run watcher callbacks, call the `run` function of the event loop:
 
@@ -338,16 +392,16 @@ more events pulled from the backend. This makes the queue largely transparent to
 application.
 
 
-## 4. Other matters
+## 5. Other matters
 
-### 4.1 Error handling
+### 5.1 Error handling
 
 In general, the only operations that can fail (other than due to program error) are the watch
 registration functions (`add_watch`). If they fail, they will throw an exception; either a
 `std::bad_alloc` or a `std::system_error`.
 
 
-### 4.2 Regular files
+### 5.2 Regular files
 
 Most (all?) event loop mechanisms do not support watching read/write readiness on file descriptors 
 associated with "regular" files (as opposed to sockets/terminals/other devices). Arguably this is
@@ -380,7 +434,7 @@ descriptor is associated with a regular file (or is not otherwise supported by t
 event loop mechanism).
 
 
-### 4.3 Prioritising watches
+### 5.3 Prioritising watches
 
 Watchers can be given a priority level when they are registered, by adding an additional priority
 parameter (type `int`) to the registration function, eg:
@@ -404,7 +458,7 @@ function returns an error; in theory, though, the signal might be sent to the wr
 the process id happens to have been re-used by a new process in the meantime).
 
 
-### 4.4 Restrictions and limitations
+### 5.4 Restrictions and limitations
 
 Most of the following limitations carry through from the underlying backend, rather than being
 inherent in the design of Dasynq itself.
@@ -432,12 +486,12 @@ including Mac OS X up to at least 10.11.6 and OpenBSD up to at least 6.1 - there
 between `MONOTONIC` and `SYSTEM` timers. On these systems you should use only relative timers
 and be aware that timers may not function correctly if the system time is adjusted.
 
-The event loop may not function correctly in the child process after a fork() operation
-(including a call to child_proc_watcher::fork). It is recommended to re-create the event loop
+The event loop may not function correctly in the child process after a `fork()` operation
+(including a call to `child_proc_watcher::fork`). It is recommended to re-create the event loop
 in the child process, if it is needed.
 
-The implementation may use SIGCHLD to detect child process termination. Therefore you should not
-try to watch SIGCHLD independently.
+The implementation may use `SIGCHLD` to detect child process termination. Therefore you should not
+try to watch `SIGCHLD` independently.
 
 Creating two event loop instances in a single application is not likely to work well, or at all.
 (This limitation may be lifted in a future release).
