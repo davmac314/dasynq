@@ -4,7 +4,7 @@ check: dasynq-test
 	./dasynq-test
 
 $(objects): %.o: %.cc
-	$(CXX) $(CXXOPTS) $(SANITIZE) -I.. -c $< -o $@
+	$(CXX) $(CXXOPTS) $(CXXTESTOPTS) $(SANITIZE) -I.. -c $< -o $@
 
 dasynq-test: dasynq-tests.o
 	$(CXX) $(THREADOPT) $(CXXLINKOPTS) $(SANITIZE) dasynq-tests.o -o dasynq-test
