@@ -427,6 +427,11 @@ This problem is not specific to Dasynq and is ultimately due to deficiencies in 
 spinning in a tight loop when the problem occurs; however, there are no very satisfactory
 solutions that do not require significant and intrusive changes to the program.
 
+On systems without a suitable timer interface - in particular, systems without POSIX timers,
+including Mac OS X up to at least 10.11.6 and OpenBSD up to at least 6.1 - there is no distinction
+between `MONOTONIC` and `SYSTEM` timers. On these systems you should use only relative timers
+and be aware that timers may not function correctly if the system time is adjusted.
+
 The event loop may not function correctly in the child process after a fork() operation
 (including a call to child_proc_watcher::fork). It is recommended to re-create the event loop
 in the child process, if it is needed.
