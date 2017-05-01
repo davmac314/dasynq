@@ -1295,7 +1295,10 @@ class event_loop
             if (pqueue->watchType == WatchType::SECONDARYFD) {
                 // construct a pointer to the main watcher:
                 char * rp = (char *)pqueue;
+                _Pragma ("GCC diagnostic push")
+                _Pragma ("GCC diagnostic ignored \"-Winvalid-offsetof\"")
                 rp -= offsetof(BaseBidiFdWatcher, outWatcher);
+                _Pragma ("GCC diagnostic pop")
                 bbfw = (BaseBidiFdWatcher *)rp;
 
                 // issue a secondary dispatch:
@@ -1312,7 +1315,6 @@ class event_loop
         return active;
     }
 
-    
     public:
     using mutex_t = T_Mutex;
     
