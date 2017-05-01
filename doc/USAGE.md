@@ -54,6 +54,7 @@ create an `fd_watcher`:
         rearm fd_event(loop_t &, int fd, int flags)
         {
             // Process I/O here
+            //   int r = read(fd, ...) etc
     
             return rearm::REARM;  // re-enable watcher
         }
@@ -131,11 +132,15 @@ Some backends support watching IN_EVENTS | OUT_EVENTS at the same time, but some
     {
         rearm read_ready(loop_t &, int fd) override
         {
+            // Process input
+            //   int r = read(fd, ...) etc
             return rearm::REARM;
         }
         
         rearm write_ready(loop_t &, int fd) override
         {
+            // Perform output
+            //   int r = write(fd, ...) etc
             return rearm::REARM;
         }
     };
@@ -212,7 +217,7 @@ should generally unmask them after forking a child process.
 
     class my_child_proc_watcher : public loop_t::child_proc_watcher<my_child_proc_watcher>
     {
-        rearm childStatus(loop_t &, pid_t child, int status)
+        rearm status_change(loop_t &, pid_t child, int status)
         {
             return rearm::REARM;
         }
@@ -247,6 +252,10 @@ second (optional) parameter:
 
 Note however that using the `fork(...)` function largely removes the need to reserve watches: an
 unwatchable child process never results.
+
+Also note that establishing a child watch may cause the child process to be reaped (releasing its
+process id) before the watch callback is called. If you want to send a signal to a child process,
+special care should be taken; see the discussion on prioritising watches in section 4.3.
 
 
 ## 2.4 Timers
@@ -371,7 +380,31 @@ descriptor is associated with a regular file (or is not otherwise supported by t
 event loop mechanism).
 
 
-### 4.3 Restrictions and limitations
+### 4.3 Prioritising watches
+
+Watchers can be given a priority level when they are registered, by adding an additional priority
+parameter (type `int`) to the registration function, eg:
+
+    my_fd_watcher.add_watch(my_loop, fd, dasynq::IN_EVENTS, true /* enabled *, 100 /* priority*/);
+    my_bidi_watcher.add_watch(my_loop, fd, IN_EVENTS | OUT_EVENTS, 100 /* priority */);
+    my_signal_watcher.add_watch(my_loop, SIGINT, 100 /* priority */);
+    my_child_watcher.add_watch(my_loop, child_pid, 100 /* priority */);
+    my_child_watcher.fork(my_loop, false /* reserved watch? */, 100 /* priority */);
+    my_timer.add_timer(my_loop, clock_type::MONOTONIC, 100 /* priority */);
+
+A lower priority value corresponds to a higher priority, so that "priority one" (1) is higher
+priority than "priority two". High priority watches will be called before lower priority watches.
+
+If you intend to send signals to child processes, you should always give the child process
+watchers a high priority, since the watcher may cause the child to be reaped before the status
+change is reported to the watcher. For multi-threaded event loop polling, there is currently no
+way to ensure that the child process id is still valid; this will likely be addressed in a future
+release. (Usually, the result of trying to signal a reaped process will be that the `signal`
+function returns an error; in theory, though, the signal might be sent to the wrong process, if
+the process id happens to have been re-used by a new process in the meantime).
+
+
+### 4.4 Restrictions and limitations
 
 Most of the following limitations carry through from the underlying backend, rather than being
 inherent in the design of Dasynq itself.
