@@ -22,7 +22,7 @@ THREADOPT = -pthread
 # For FreeBSD:
 #CXX = clang++
 #CXXOPTS =
-#SANITIZE = address,null,return,bounds,alignment,object-size
+#SANITIZE = -fsanitize=address,null,return,bounds,alignment,object-size
 #CXXTESTOPTS = -std=c++11 -Os -Wall $(SANITIZE)
 #CXXLINKOPTS = -lrt
 #THREADOPT = -pthread
@@ -49,7 +49,7 @@ dasynq.pc:
 
 install: dasynq.pc
 	install -d $(DESTDIR)$(HEADERDIR) $(DESTDIR)$(LIBDIR)/pkgconfig
-	install -m644 -t $(DESTDIR)$(HEADERDIR) dasynq-*.h
+	install -m644 -t $(DESTDIR)$(HEADERDIR) dasynq.h dasynq-*.h
 	install -m644 -t $(DESTDIR)$(LIBDIR)/pkgconfig dasynq.pc
 
 clean:
