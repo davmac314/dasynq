@@ -1,16 +1,18 @@
 # Dasynq
 
+_Version 0.9_
+
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries, it is
 crossplatform / portable. Unlike most other such libraries, it is intended to be completely usable in
 a multi-threaded client program, and it is written in C++; furthermore the API is designed to allow
 the creation of extremely robust clients.
 
 The existing backends include **epoll** and **kqueue**, meaning that it works on Linux and various
-BSDs (in theory - only tested on OpenBSD!) as well as Mac OS X.
+BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X.
 
-*Dasynq is currently in a pre-release state*. The build system and documentation are not yet
-complete. The implementation is largely complete but has not been widely tested in production
-and has some minor known issues.
+*Dasynq is currently in a pre-release state*. The implementation is largely complete but has not been
+widely tested in production. It is distribution under the terms of the Apache License, version 2.0,
+as found in the LICENSE file. 
 
 
 ## Event loops
@@ -66,11 +68,18 @@ Other features of Dasynq include:
 
 ## Using Dasynq
 
-See doc/USAGE.md for details on how to use Dasynq.
+See doc/USAGE.md for details on how to use the Dasynq API.
 
-Note: the build system currently incorporates no installation target; the suggested way to use Dasynq is to
-copy the dasynq header files into the source tree of your own program.
+To build, edit the Makefile and uncomment the variable settings for the appropriate OS. Run "make check"
+to run the test suite (use "gmake" on BSDs). Run "make install" to install (set "DESTDIR" if you want to
+install to an alternate location for packaging purposes, eg "make DESTDIR=/tmp/dasynq install").
 
-Run "make check" to run the test suite. Minor edits to the top-level Makefile may be required.
+On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too old (4.2 in OpenBSD 6.1;
+4.9+ is required.).
 
-On OpenBSD, you must install "eg++"; the g++ from the base system is too old.
+After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq:
+
+    pkg-config --cflags dasynq
+    pkg-config --libs dasynq
+
+It is also possible to simply copy the Dasynq headers directly into your own project.
