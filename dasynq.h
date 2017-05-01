@@ -1890,8 +1890,11 @@ class child_proc_watcher : private dprivate::BaseChildWatcher<typename EventLoop
     // Returns:
     // - the child pid in the parent
     // - 0 in the child
-    pid_t fork(EventLoop &eloop, bool from_reserved = false)
+    pid_t fork(EventLoop &eloop, bool from_reserved = false, int prio = DEFAULT_PRIORITY)
     {
+        BaseWatcher::init();
+        this->priority = prio;
+
         if (EventLoop::loop_traits_t::supports_childwatch_reservation) {
             // Reserve a watch, fork, then claim reservation
             if (! from_reserved) {
@@ -1916,6 +1919,7 @@ class child_proc_watcher : private dprivate::BaseChildWatcher<typename EventLoop
             }
             
             // Register this watcher.
+            this->watch_pid = child;
             eloop.registerReservedChild_nolock(this, child);
             lock.unlock();
             return child;
@@ -1953,6 +1957,7 @@ class child_proc_watcher : private dprivate::BaseChildWatcher<typename EventLoop
             
             // Register this watcher.
             try {
+                this->watch_pid = child;
                 eloop.registerChild(this, child);
                 
                 // Continue in child (it doesn't matter what is written):
@@ -1979,7 +1984,7 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.getBaseLock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->child_status(loop, this->watch_pid, this->child_status);
+        auto rearmType = static_cast<Derived *>(this)->status_change(loop, this->watch_pid, this->child_status);
 
         loop.getBaseLock().lock();
 
