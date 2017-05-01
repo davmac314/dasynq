@@ -616,6 +616,31 @@ void ftestMultiThread1()
     close(pipe2[1]);
 }
 
+// Compilation test only; not called
+void ctest_child_watch()
+{
+    using loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    loop_t my_loop;
+
+    class my_child_proc_watcher : public loop_t::child_proc_watcher_impl<my_child_proc_watcher>
+    {
+        public:
+        rearm status_change(loop_t &, pid_t child, int status)
+        {
+            return rearm::REARM;
+        }
+    };
+
+    pid_t fake_child_pid = 0;
+    my_child_proc_watcher my_child_watcher;
+    my_child_watcher.add_watch(my_loop, fake_child_pid);
+
+    if (my_child_watcher.fork(my_loop, false) == 0) {
+        // child
+        _exit(0);
+    }
+}
+
 int main(int argc, char **argv)
 {
     std::cout << "testFdWatch1... ";
