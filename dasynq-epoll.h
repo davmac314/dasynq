@@ -78,7 +78,7 @@ template <class Base> class EpollLoop : public Base
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
     //          receive*() methods will be called with lock held.
-    //   receiveSignal(SigInfo &, user *) noexcept
+    //   receive_signal(SigInfo &, user *) noexcept
     //   receiveFdEvent(FD_r, user *, int flags) noexcept
     
     using SigInfo = EpollTraits::SigInfo;
@@ -100,7 +100,7 @@ template <class Base> class EpollLoop : public Base
                     auto iter = sigdataMap.find(siginfo.get_signo());
                     if (iter != sigdataMap.end()) {
                         void *userdata = (*iter).second;
-                        if (Base::receiveSignal(*this, siginfo, userdata)) {
+                        if (Base::receive_signal(*this, siginfo, userdata)) {
                             sigdelset(&sigmask, siginfo.get_signo());
                         }
                     }

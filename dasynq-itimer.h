@@ -63,7 +63,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
     using SigInfo = typename Base::SigInfo;
 
     template <typename T>
-    bool receiveSignal(T & loop_mech, SigInfo &siginfo, void *userdata)
+    bool receive_signal(T & loop_mech, SigInfo &siginfo, void *userdata)
     {
         if (siginfo.get_signo() == SIGALRM) {
             struct timespec curtime;
@@ -77,7 +77,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
             return false; // don't disable signal watch
         }
         else {
-            return Base::receiveSignal(loop_mech, siginfo, userdata);
+            return Base::receive_signal(loop_mech, siginfo, userdata);
         }
     }
         

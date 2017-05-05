@@ -182,7 +182,7 @@ template <class Base> class KqueueLoop : public Base
             if (events[i].filter == EVFILT_SIGNAL) {
                 SigInfo siginfo;
                 if (get_siginfo(events[i].ident, &siginfo.info)
-                        && Base::receiveSignal(*this, siginfo, (void *)events[i].udata)) {
+                        && Base::receive_signal(*this, siginfo, (void *)events[i].udata)) {
                     sigdelset(&sigmask, events[i].ident);
                     events[i].flags = EV_DISABLE;
                 }
