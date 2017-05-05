@@ -43,13 +43,40 @@ static std::vector<std::unique_ptr<event>> event_queue;
 
 class test_io_engine
 {
-    
     public:
+
+    struct fd_data
+    {
+        void *userdata;
+        int events;
+        bool emulate;
+    };
+
+    static std::unordered_map<int, fd_data> fd_data_map;
+
+    static void mark_fd_needs_emulation(int fd_num)
+    {
+        auto srch = fd_data_map.find(fd_num);
+        if (srch != fd_data_map.end()) {
+            auto &data = srch->second;
+            data.emulate = true;
+        }
+        else {
+            fd_data data = {nullptr, 0, true};
+            fd_data_map.insert(std::make_pair(fd_num, data));
+        }
+    }
+
+    static void clear_fd_data()
+    {
+        fd_data_map.clear();
+    }
+
     static void trigger_fd_event(int fd_num, int events)
     {
         event_queue.emplace_back(new fd_event(fd_num, events));
     }
-    
+
     static void pull_events(io_receiver &receiver)
     {
         while (! event_queue.empty()) {
@@ -104,13 +131,9 @@ template <class Base> class test_loop : public Base, io_receiver
 {
     using timer_handle_t = timer_queue_t::handle_t;
     
-    struct fd_data
-    {
-        void *userdata;
-        int events;
-    };
+    using fd_data = test_io_engine::fd_data;
     
-    std::unordered_map<int, fd_data> fd_data_map;
+    std::unordered_map<int, fd_data> & fd_data_map = test_io_engine::fd_data_map;
 
     public:    
     
@@ -127,7 +150,20 @@ template <class Base> class test_loop : public Base, io_receiver
     bool addFdWatch(int fd, void * callback, int eventmask, bool enabled, bool emulate = false)
     {
         if (! enabled) eventmask = 0;
-        fd_data data = {callback, eventmask};
+
+        auto srch = fd_data_map.find(fd);
+        if (srch != fd_data_map.end()) {
+            if (srch->second.emulate) {
+                if (emulate) return false;
+                throw new std::system_error(ENOTSUP, std::system_category());
+            }
+            srch->second.events = eventmask;
+            srch->second.userdata = callback;
+            srch->second.emulate = false;
+            return true;
+        }
+
+        fd_data data = {callback, eventmask, false};
         fd_data_map.insert({fd, data});
         return true;
     }
@@ -149,6 +185,9 @@ template <class Base> class test_loop : public Base, io_receiver
             srch->second.events = events;
             srch->second.userdata = userdata;
         }
+        else {
+            throw std::invalid_argument("trying to enable fd that is not watched");
+        }
     }
     
     void disableFdWatch_nolock(int fd_num, int events)
@@ -156,6 +195,9 @@ template <class Base> class test_loop : public Base, io_receiver
         auto srch = fd_data_map.find(fd_num);
         if (srch != fd_data_map.end()) {
             srch->second.events = 0;
+        }
+        else {
+            throw std::invalid_argument("trying to disable fd that is not watched");
         }
     }
 
@@ -180,7 +222,7 @@ template <class Base> class test_loop : public Base, io_receiver
     }
     
     // Receive events from test queue:
-    
+
     void receiveFdEvent(int fd_num, int events)
     {
         auto srch = fd_data_map.find(fd_num);

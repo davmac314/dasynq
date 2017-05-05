@@ -13,10 +13,15 @@ using Loop_t = dasynq::event_loop<dasynq::null_mutex, dasynq::test_loop, dasynq:
 using dasynq::rearm;
 using dasynq::test_io_engine;
 
+namespace dasynq {
+    std::unordered_map<int, test_io_engine::fd_data> test_io_engine::fd_data_map;
+}
+
 // Set up two file descriptor watches on two different descriptors, and make sure the correct handler
 // is triggered when input is available on each.
 void testFdWatch1()
 {
+    test_io_engine::clear_fd_data();
     Loop_t my_loop;
     
     bool seen1 = false;
@@ -56,6 +61,7 @@ void testFdWatch1()
 // Set up a 2nd handler which disarms, and make sure it receives no further events.
 void testFdWatch2()
 {
+    test_io_engine::clear_fd_data();
     Loop_t my_loop;
 
     bool seen1 = false;
@@ -96,6 +102,7 @@ void testFdWatch2()
 
 void testFdWatch3()
 {
+    test_io_engine::clear_fd_data();
     Loop_t my_loop;
 
     bool seen1 = false;
@@ -130,6 +137,54 @@ void testFdWatch3()
     my_loop.poll();
 
     assert(! seen1);
+
+    watcher1.deregister(my_loop);
+}
+
+void testFdEmu()
+{
+    test_io_engine::clear_fd_data();
+    Loop_t my_loop;
+
+    int seen_count = 0;
+
+    class my_watcher : public Loop_t::fd_watcher_impl<my_watcher>
+    {
+        public:
+        int &seen_count;
+
+        my_watcher(int &seen) : seen_count(seen) { }
+
+        rearm fd_event(Loop_t &eloop, int fd, int flags)
+        {
+            // Process I/O here
+            seen_count++;
+            if (seen_count == 10) {
+                return rearm::NOOP; // don't re-enable
+            }
+            else {
+                return rearm::REARM;
+            }
+        }
+    };
+
+    my_watcher watcher1(seen_count);
+
+    test_io_engine::mark_fd_needs_emulation(0);
+
+    watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS);
+
+    // test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
+    my_loop.run();
+
+    assert(seen_count == 10);
+
+    seen_count = 0;
+
+    // test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
+    my_loop.poll();
+
+    assert(seen_count == 0);
 
     watcher1.deregister(my_loop);
 }
@@ -653,6 +708,10 @@ int main(int argc, char **argv)
 
     std::cout << "testFdWatch3... ";
     testFdWatch3();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "testFdEmu... ";
+    testFdEmu();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "testTimespecDiv... ";
