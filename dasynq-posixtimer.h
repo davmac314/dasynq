@@ -109,9 +109,16 @@ template <class Base> class PosixTimerEvents : public timer_base<Base>
         timer_sigevent.sigev_signo = SIGALRM;
         timer_sigevent.sigev_value.sival_int = 0;
 
-        // DAV error check these:
-        timer_create(CLOCK_REALTIME, &timer_sigevent, &real_timer);
-        timer_create(CLOCK_MONOTONIC, &timer_sigevent, &mono_timer);
+        // Create the timers; throw std::system_error if we can't.
+        if (timer_create(CLOCK_REALTIME, &timer_sigevent, &real_timer) == 0) {
+            if (timer_create(CLOCK_MONOTONIC, &timer_sigevent, &mono_timer) != 0) {
+                timer_delete(real_timer);
+                throw std::system_error(errno, std::system_category());
+            }
+        }
+        else {
+            throw std::system_error(errno, std::system_category());
+        }
 
         Base::init(loop_mech);
     }
