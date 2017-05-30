@@ -22,6 +22,18 @@ extern "C" {
 
 #include "dasynq-config.h"
 
+// "kqueue"-based event loop mechanism.
+//
+// kqueue is available on BSDs and Mac OS X, though there are subtle differences from OS to OS.
+//
+// kqueue supports watching file descriptors (input and output as separate watches only),
+// signals, child processes, and timers. Unfortunately support for the latter two is imperfect;
+// it is not possible to reserve process watches in advance; timers can only be active, count
+// down immediately when created, and cannot be reset to another time. For timers especially
+// the problems are significant: we can't allocate timers in advance, and we can't even feasibly
+// manage our own timer queue via a single kqueue-backed timer. Therefore, an alternate timer
+// mechanism must be used together with kqueue.
+
 namespace dasynq {
 
 template <class Base> class KqueueLoop;
