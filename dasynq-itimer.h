@@ -190,6 +190,11 @@ template <class Base> class ITimerEvents : public timer_base<Base>
             }
         }
     }
+
+    void get_time(timespec &ts, clock_type clock, bool force_update) noexcept
+    {
+        get_curtime(ts);
+    }
 };
 
 }

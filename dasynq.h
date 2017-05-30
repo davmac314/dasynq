@@ -1358,6 +1358,17 @@ class event_loop
 
         processEvents();
     }
+
+    // Get the current time corresponding to a specific clock.
+    //   ts - the timespec variable to receive the time
+    //   clock - specifies the clock
+    //   force_update (default = false) - if true, the time returned will be updated from
+    //       the system rather than being a previously cached result. It may be more
+    //       accurate, but note that reading from a system clock may be relatively expensive.
+    void get_time(timespec &ts, clock_type clock, bool force_update = false) noexcept
+    {
+        loop_mech.get_time(ts, clock, force_update);
+    }
 };
 
 typedef event_loop<null_mutex> event_loop_n;

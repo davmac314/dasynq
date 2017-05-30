@@ -363,6 +363,17 @@ You can add and set a timer using a lambda expression:
         return rearm::REARM; // or REMOVE etc
     });
 
+Finally, you can query the current time of a particular clock using the get_time function:
+
+    struct timesepc curtime;
+    my_loop.get_time(curtime, clock_type::MONOTONIC, false);
+
+The third parameter is optional; it specifies whether the time returned must be freshly retrieved
+from the system (which may be relatively expensive). If false, which is the default, a cached time
+may be returned. Dasynq in this case tries to make a reasonable guess about when it needs to
+update its cached time. It's recommended that you do not force updating the cached time unless you
+have a specific need to do so.
+
 
 ## 4. Polling the event loop
 
