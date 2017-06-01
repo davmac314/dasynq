@@ -148,6 +148,7 @@ static inline void unprep_signal(int signo)
 static inline bool get_siginfo(int signo, siginfo_t *siginfo)
 {
     siginfo_p = siginfo;
+    siginfo->si_signo = signo; // at least on MacOS, this won't be set in signal handler
 
     sigset_t mask;
     sigfillset(&mask);
