@@ -669,6 +669,7 @@ class event_loop
 
     public:
     using loop_traits_t = LoopTraits;
+    using time_val = dasynq::time_val;
     
     private:
     template <typename T, typename U> using EventDispatch = dprivate::EventDispatch<T,U>;
@@ -1368,6 +1369,11 @@ class event_loop
     void get_time(timespec &ts, clock_type clock, bool force_update = false) noexcept
     {
         loop_mech.get_time(ts, clock, force_update);
+    }
+
+    void get_time(time_val &tv, clock_type clock, bool force_update = false) noexcept
+    {
+        loop_mech.get_time(tv, clock, force_update);
     }
 };
 

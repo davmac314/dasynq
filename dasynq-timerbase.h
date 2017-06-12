@@ -35,10 +35,13 @@ class time_val
     second_t seconds() const { return time.tv_sec; }
     nsecond_t nseconds() const { return time.tv_nsec; }
 
-    void set_seconds(second_t s) { time.tv_sec = s; }
-    void set_nseconds(nsecond_t ns) { time.tv_nsec = ns; }
-    void dec_seconds() { time.tv_sec--; }
-    void inc_seconds() { time.tv_sec++; }
+    second_t & seconds() { return time.tv_sec; }
+    nsecond_t & nseconds() { return time.tv_nsec; }
+
+    //void set_seconds(second_t s) { time.tv_sec = s; }
+    //void set_nseconds(nsecond_t ns) { time.tv_nsec = ns; }
+    //void dec_seconds() { time.tv_sec--; }
+    //void inc_seconds() { time.tv_sec++; }
 
     operator timespec() const
     {
@@ -49,13 +52,13 @@ class time_val
 inline time_val operator-(const time_val &t1, const time_val &t2)
 {
     time_val diff;
-    diff.set_seconds(t1.seconds() - t2.seconds());
+    diff.seconds() = t1.seconds() - t2.seconds();
     if (t1.nseconds() > t2.nseconds()) {
-        diff.set_nseconds(t1.nseconds() - t2.nseconds());
+        diff.nseconds() = t1.nseconds() - t2.nseconds();
     }
     else {
-        diff.set_nseconds(1000000000 - t2.nseconds() + t1.nseconds());
-        diff.dec_seconds();
+        diff.nseconds() = 1000000000 - t2.nseconds() + t1.nseconds();
+        diff.seconds()--;
     }
     return diff;
 }
@@ -75,12 +78,12 @@ inline time_val operator+(const time_val &t1, const time_val &t2)
 inline time_val &operator+=(time_val &t1, const time_val &t2)
 {
     auto nsum = t1.nseconds() + t2.nseconds();
-    t1.set_seconds(t1.seconds() + t2.seconds());
+    t1.seconds() = t1.seconds() + t2.seconds();
     if (nsum >= 1000000000) {
         nsum -= 1000000000;
-        t1.inc_seconds();
+        t1.seconds()++;
     }
-    t1.set_nseconds(nsum);
+    t1.nseconds() = nsum;
     return t1;
 }
 

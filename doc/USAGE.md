@@ -182,7 +182,7 @@ See example above. Not shown there is the `set_enabled` method:
 This enables or disables the watcher. You should not enable a watcher that might currently have
 its callback running (unless the event loop is polled by only a single thread).
 
-Some backends support watching IN_EVENTS | OUT_EVENTS at the same time, but some don't. Use a
+Some backends support watching `IN_EVENTS | OUT_EVENTS` at the same time, but some don't. Use a
 `bidi_fd_watcher` if you need to do that:
 
     class my_bidi_fd_watcher : public loop_t::bidi_fd_watcher_impl<my_bidi_fd_watcher>
@@ -339,7 +339,7 @@ clock type (`SYSTEM` or `MONOTONIC`) is specified when you register the timer wi
     t2.add_timer(my_loop, clock_type::SYSTEM);
     t3.add_timer(my_loop, clock_type::MONOTONIC);
 
-    struct timespec timeout = {5 /* seconds */, 0 /* nanoseconds */};
+    struct timespec timeout = { .tv_sec = 5 /* seconds */, .tv_nsec = 0 /* nanoseconds */};
     t1.arm_timer_rel(my_loop, timeout);  // relative timeout (5 seconds from now)
 
     t2.arm_timer(my_loop, timeout);  // absolute timeout (5 seconds from beginning of 1970)
@@ -355,8 +355,8 @@ callback function). To stop a timer, use the `stop_timer` function:
 
 You can add and set a timer using a lambda expression:
 
-	struct timespec expiry = {5, 0};
-	struct timespec interval = {5, 0}; // {0, 0} for non-periodic	
+	struct timespec expiry = { .tv_sec = 5, .tv_nsec = 0};
+	struct timespec interval = { .tv_sec = 5, .tv_nsec = 0}; // {0, 0} for non-periodic	
     auto timer = loop_t::timer::add_timer(my_loop, fd, clock_type::MONOTONIC, true /* relative */,
     		expiry, interval,
             [](loop_t &eloop, int expiry count) -> rearm {
@@ -376,6 +376,32 @@ from the system (which may be relatively expensive). If false, which is the defa
 may be returned. Dasynq in this case tries to make a reasonable guess about when it needs to
 update its cached time. It's recommended that you do not force updating the cached time unless you
 have a specific need to do so.
+
+Although the examples above use `struct timespec`, there is a `time_val` wrapper type which is
+usually more convenient:
+
+    using time_val = loop_t::time_val;
+    time_val timeout = { 5 /* seconds */, 0 /* nanoseconds */ };
+    t1.arm_timer_rel(my_loop, timeout);  // works as for timespec timeout
+
+You can use `time_val` in place of `timespec` throughout the API, and conversion between them is
+implicit. `time_val` also has overloaded `+`, `-`, `+=`, and relational operators, which allow
+adding/subtracting and comparing times. Use `seconds()` and `nseconds()` to access the seconds
+and nanosecond components, respectively:
+
+    time_val t1;
+    t1.seconds() = 10;
+    t1.nseconds() = 500000000; // 0.5 seconds
+    auto secs = t1.seconds();
+
+    time_val t2 = {5, 0};
+    time_val t3 = t1 - t2;  // difference: t1 must be greater!
+    t3 += t1; // addition via += 
+
+As can be seen from these examples, the `time_val` type makes dealing with types much simpler.
+
+In the next section, we'll discuss ways to process events that have been received in the event
+loop and dispatch their watcher callbacks. 
 
 
 ## 4. Polling the event loop
