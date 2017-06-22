@@ -276,7 +276,7 @@ should generally unmask them after forking a child process.
     {
         rearm status_change(loop_t &, pid_t child, int status)
         {
-            return rearm::REARM;
+            return rearm::DISARM; // or REMOVE, REMOVED, NOOP
         }
     };
 
@@ -310,9 +310,19 @@ second (optional) parameter:
 Note however that using the `fork(...)` function largely removes the need to reserve watches: an
 unwatchable child process never results.
 
-Also note that establishing a child watch may cause the child process to be reaped (releasing its
-process id) before the watch callback is called. If you want to send a signal to a child process,
-special care should be taken; see the discussion on prioritising watches in section 4.3.
+When a child process watcher callback is run, the watcher is already removed from the event loop
+(you can't keep watching a dead process), but it remains reserved. Returning `rearm::DISARM` (or
+`rearm::REMOVE`) will remove the reservation. Use `stop_watch(...)` to stop watching a child
+from outside the callback function (this is currently not thread-safe however and can be used
+safely only with a single-threaded event loop):
+
+    my_child_watcher.stop_watch(my_loop);
+
+There are some caveats to using child watches. Establishing a child watch may cause the child
+process to be reaped (releasing its process id) before the watch callback is called. If you want
+to send a signal to a child process, special care should be taken; see the discussion on
+prioritising watches in section 5.3. In fact, running an event loop may cause _all_ child
+processes to be reaped, even if they are not being watched.
 
 
 ## 3.4 Timers
