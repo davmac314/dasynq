@@ -37,7 +37,9 @@ class pid_map
     
     void remove(pid_handle_t &hndl)
     {
-        b_map.remove(hndl);
+        if (b_map.is_queued(hndl)) {
+            b_map.remove(hndl);
+        }
     }
 
     // Throws bad_alloc on reservation failure

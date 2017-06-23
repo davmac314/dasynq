@@ -311,10 +311,9 @@ Note however that using the `fork(...)` function largely removes the need to res
 unwatchable child process never results.
 
 When a child process watcher callback is run, the watcher is already removed from the event loop
-(you can't keep watching a dead process), but it remains reserved. Returning `rearm::DISARM` (or
-`rearm::REMOVE`) will remove the reservation. Use `stop_watch(...)` to stop watching a child
-from outside the callback function (this is currently not thread-safe however and can be used
-safely only with a single-threaded event loop):
+(you can't keep watching a dead process), but it remains reserved (returning `rearm::DISARM` or
+`rearm::REMOVE` releases the reservation). Use `stop_watch(...)` to stop watching a child from
+outside the callback function without releasing the reservation:
 
     my_child_watcher.stop_watch(my_loop);
 
