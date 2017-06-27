@@ -50,7 +50,7 @@ template <class Base> class ITimerEvents : public timer_base<Base>
         time_val curtimev = curtime;
 
         newalarm.it_interval = {0, 0};
-        if (curtimev <= newtime) {
+        if (curtimev < newtime) {
             newalarm.it_value.tv_sec = newtime.seconds() - curtime.tv_sec;
             if (curtimev.nseconds() > newtime.nseconds()) {
                 newalarm.it_value.tv_usec = (1000000000 - curtimev.nseconds()
@@ -62,9 +62,13 @@ template <class Base> class ITimerEvents : public timer_base<Base>
             }
         }
         else {
-            // We passed the timeout: set alarm to expire immediately
+            // We passed the timeout: set alarm to expire immediately (we must use {0,1} as
+            // {0,0} disables the timer).
+            // TODO: it would be better if we just processed the appropriate timers here,
+            //       but that is complicated to get right especially if the event loop
+            //       is multi-threaded.
             newalarm.it_value.tv_sec = 0;
-            newalarm.it_value.tv_usec = 0;
+            newalarm.it_value.tv_usec = 1;
         }
 
         setitimer(ITIMER_REAL, &newalarm, nullptr);
@@ -85,7 +89,6 @@ template <class Base> class ITimerEvents : public timer_base<Base>
 
             // arm timerfd with timeout from head of queue
             set_timer_from_queue();
-            // loop_mech.rearmSignalWatch_nolock(SIGALRM);
             return false; // don't disable signal watch
         }
         else {
