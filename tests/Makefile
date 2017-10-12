@@ -4,10 +4,10 @@ check: dasynq-test
 	./dasynq-test
 
 $(objects): %.o: %.cc
-	$(CXX) $(CXXOPTS) $(CXXTESTOPTS) $(SANITIZE) -I.. -c $< -o $@
+	$(CXX) $(CXXTESTOPTS) -I.. -c $< -o $@
 
 dasynq-test: dasynq-tests.o
-	$(CXX) $(THREADOPT) $(CXXLINKOPTS) $(SANITIZE) dasynq-tests.o -o dasynq-test
+	$(CXX) $(THREADOPT) $(CXXTESTLINKOPTS) dasynq-tests.o -o dasynq-test
 
 clean:
 	rm -f *.o

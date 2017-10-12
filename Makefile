@@ -9,6 +9,7 @@ CXXOPTS =
 SANITIZE = -fsanitize=address,null,return,bounds,alignment,object-size
 CXXTESTOPTS = -std=c++11 -Os -Wall $(SANITIZE)
 CXXLINKOPTS =
+CXXTESTLINKOPTS = $(SANITIZE)
 THREADOPT = -pthread
 
 # For OpenBSD:
@@ -17,6 +18,7 @@ THREADOPT = -pthread
 #SANITIZE =
 #CXXTESTOPTS = -std=c++11 -Os -Wall $(SANITIZE)
 #CXXLINKOPTS =
+#CXXTESTLINKOPTS = $(SANITIZE)
 #THREADOPT = -pthread
 
 # For FreeBSD:
@@ -25,9 +27,10 @@ THREADOPT = -pthread
 #SANITIZE = -fsanitize=address,null,return,bounds,alignment,object-size
 #CXXTESTOPTS = -std=c++11 -Os -Wall $(SANITIZE)
 #CXXLINKOPTS = -lrt
+#CXXTESTLINKOPTS = $(SANITIZE)
 #THREADOPT = -pthread
 
-export CXX CXXOPTS CXXLINKOPTS CXXTESTOPTS THREADOPT SANITIZE
+export CXX CXXOPTS CXXLINKOPTS CXXTESTOPTS CXXTESTLINKOPTS THREADOPT SANITIZE
 
 all:
 	@echo "This is a header-only library. Use \"$(MAKE) check\" to build and run tests."
