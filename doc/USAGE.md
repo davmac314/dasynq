@@ -242,6 +242,8 @@ argument can be used to distinguish them (as `IN_EVENTS` or `OUT_EVENTS`).
 
 ## 3.2 Signal watchers
 
+You can watch for POSIX signals (SIGTERM etc) using a signal watcher:
+
     class my_signal_watcher : public loop_t::signal_watcher_impl<my_signal_watcher>
     {
         // SignalWatcher defines type "siginfo_p"
@@ -268,6 +270,9 @@ watcher for that signal to an event loop. The only practical way to do this in m
 programs is by masking the signal at program startup, before creating any additional threads.
 Note that signal masks are inherited by child processes; if you mask commonly used signals you
 should generally unmask them after forking a child process.
+
+On MacOS, at least on version 10.12.6, apperas to have a bug where signals generated using the
+`raise` system call are not seen by the kqueue mechanism and so are undetectable by Dasynq.
 
 
 ## 3.3 Child process watchers

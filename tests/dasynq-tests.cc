@@ -604,8 +604,11 @@ void ftestSigWatch()
         return rearm::REMOVE;
     });
 
-    // test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
-    raise(SIGUSR1);
+    // We avoid using raise(...) since a bug in some versions of MacOS prevents signals generated
+    // using raise from being detected by kqueue (and therefore by Dasynq).
+
+    // raise(SIGUSR1);
+    kill(getpid(), SIGUSR1);
 
     my_loop.run();
 
@@ -614,10 +617,10 @@ void ftestSigWatch()
 
     seen1 = false;
 
-    //test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
-    //test_io_engine::trigger_fd_event(1, dasynq::IN_EVENTS);
-    raise(SIGUSR1);
-    raise(SIGUSR2);
+    //raise(SIGUSR1);
+    //raise(SIGUSR2);
+    kill(getpid(), SIGUSR1);
+    kill(getpid(), SIGUSR2);
 
     my_loop.run();
 
