@@ -1290,7 +1290,7 @@ class event_loop
     }
 
     // Process all queued events; returns true if any events were processed.
-    bool processEvents() noexcept
+    bool process_events() noexcept
     {
         EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.lock.lock();
@@ -1355,13 +1355,13 @@ class event_loop
         // Poll the mechanism first, in case high-priority events are pending:
         waitqueue_node<T_Mutex> qnode;
         get_pollwait_lock(qnode);
-        loop_mech.pullEvents(false);
+        loop_mech.pull_events(false);
         release_lock(qnode);
 
-        while (! processEvents()) {
+        while (! process_events()) {
             // Pull events from the AEN mechanism and insert them in our internal queue:
             get_pollwait_lock(qnode);
-            loop_mech.pullEvents(true);
+            loop_mech.pull_events(true);
             release_lock(qnode);
         }
     }
@@ -1371,10 +1371,10 @@ class event_loop
     {
         waitqueue_node<T_Mutex> qnode;
         get_pollwait_lock(qnode);
-        loop_mech.pullEvents(false);
+        loop_mech.pull_events(false);
         release_lock(qnode);
 
-        processEvents();
+        process_events();
     }
 
     // Get the current time corresponding to a specific clock.

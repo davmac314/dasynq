@@ -196,7 +196,7 @@ template <class Base> class KqueueLoop : public Base
     using SigInfo = KqueueTraits::SigInfo;
     using FD_r = typename KqueueTraits::FD_r;
     
-    void processEvents(struct kevent *events, int r)
+    void process_events(struct kevent *events, int r)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
@@ -252,7 +252,7 @@ template <class Base> class KqueueLoop : public Base
     
     void setFilterEnabled(short filterType, uintptr_t ident, void *udata, bool enable)
     {
-    	// Note, on OpenBSD enabling or disabling filter will not alter the filter parameters (udata etc);
+        // Note, on OpenBSD enabling or disabling filter will not alter the filter parameters (udata etc);
         // on OS X however, it will. Therefore we set udata here (to the same value as it was originally
         // set) in order to work correctly on both kernels.
         struct kevent kev;
@@ -464,7 +464,7 @@ template <class Base> class KqueueLoop : public Base
     // automatically disabled each time).
     //
     // The check is not necessary on systems that don't queue signals.
-void pull_signals()
+    void pull_signals()
     {
 #if _POSIX_REALTIME_SIGNALS > 0
         // TODO we should only poll for signals that *have* been reported
@@ -500,11 +500,11 @@ void pull_signals()
     // simultaneously).
     // If processing an event removes a watch, there is a possibility
     // that the watched event will still be reported (if it has
-    // occurred) before pullEvents() returns.
+    // occurred) before pull_events() returns.
     //
     //  do_wait - if false, returns immediately if no events are
     //            pending.
-    void pullEvents(bool do_wait)
+    void pull_events(bool do_wait)
     {
         pull_signals();
         
@@ -519,7 +519,7 @@ void pull_signals()
         }
         
         do {
-            processEvents(events, r);
+            process_events(events, r);
             r = kevent(kqfd, nullptr, 0, events, 16, &ts);
         } while (r > 0);
     }

@@ -84,7 +84,7 @@ template <class Base> class EpollLoop : public Base
     using SigInfo = EpollTraits::SigInfo;
     using FD_r = typename EpollTraits::FD_r;
     
-    void processEvents(epoll_event *events, int r)
+    void process_events(epoll_event *events, int r)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
@@ -306,11 +306,11 @@ template <class Base> class EpollLoop : public Base
     // simultaneously).
     // If processing an event removes a watch, there is a possibility
     // that the watched event will still be reported (if it has
-    // occurred) before pullEvents() returns.
+    // occurred) before pull_events() returns.
     //
     //  do_wait - if false, returns immediately if no events are
     //            pending.
-    void pullEvents(bool do_wait)
+    void pull_events(bool do_wait)
     {
         epoll_event events[16];
         int r = epoll_wait(epfd, events, 16, do_wait ? -1 : 0);
@@ -320,7 +320,7 @@ template <class Base> class EpollLoop : public Base
         }
     
         do {
-            processEvents(events, r);
+            process_events(events, r);
             r = epoll_wait(epfd, events, 16, 0);
         } while (r > 0);
     }

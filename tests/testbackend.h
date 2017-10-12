@@ -137,7 +137,7 @@ template <class Base> class test_loop : public Base, io_receiver
 
     public:    
     
-    void pullEvents(bool b)
+    void pull_events(bool b)
     {
         test_io_engine::pull_events(*this);
     }
