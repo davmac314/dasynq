@@ -8,11 +8,13 @@ a multi-threaded client program, and it is written in C++; furthermore the API i
 the creation of extremely robust clients.
 
 The existing backends include **epoll** and **kqueue**, meaning that it works on Linux and various
-BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X.
+BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called).
 
 *Dasynq is currently in a pre-release state*. The implementation is largely complete but has not been
 widely tested in production. It is distributed under the terms of the Apache License, version 2.0,
-as found in the LICENSE file. 
+as found in the LICENSE file.
+
+Dasynq is written in C++11, using POSIX functions and some OS-specific system calls.
 
 
 ## Event loops
@@ -20,50 +22,30 @@ as found in the LICENSE file.
 An event loop library provides a means for waiting on events that occur asynchronously. One good
 example is network input/output; in a server with multiple client connections, a mechanism is needed to
 wait until data is available, or until it is possible to write data, to one or more of the current
-connetions (and to be able to identify _which_ connections are ready). An event loop library such as
-Dasynq provides such functionality.
+connections (and to be able to identify _which_ connections are ready). Dasynq is a multi-platform,
+thread-safe C++ library which provides such functionality.
 
-Note that an event loop generally supports managing various different kinds of event. Dasynq currrently
-can be used for sockets and pipes (more generally, for file descriptors which provide suitable semantics,
-which includes various kinds of device handle), as well as for POSIX signals, and for child process
-status notifications (termination etc). It also supports one-shot and periodic timers.
+Note that an event loop generally supports managing various different kinds of event. Dasynq can be used
+for detecting:
+- read/write readiness on sockets, pipes, and certain devices including terminals and serial lines;
+- connections to listening sockets;
+- reception of POSIX signals (such as SIGTERM); and
+- child process status notification (termination etc).
 
-Dasynq is fully multi-threaded, allowing events to be polled and processed on any thread, unlike nearly
-every other event loop library (some of which are thread-safe, but which require that events be polled
+It also supports one-shot and periodic timers, against both a monotonic and adjustable system clock
+(on systems where this is possible).
+
+Dasynq is fully thread-safe, allowing events to be polled and processed on any thread, unlike nearly
+every other event loop library (some of which are thread-safe, but require that events be polled
 from a single thread).
 
 There are _some_ limitations on the use the Dasynq API in a multi-threaded application. However,
 when used in a single-thread application, the API is just about as straight-forward as the API of most
 other event loop libraries.
 
-
-## Distinguishing features
-
-There are a number of other event loop libraries. Dasynq has the following distinguishing features
-when compared to the majority of other libraries:
-
-- Dasynq is written in C++; most other event-loop libraries are in C. The use of C++ allows for a
-  high-quality implementation with a straight-forward API which resolves platform differences mainly by
-  using zero-runtime-cost abstractions. It also allows Dasynq to be implemented as a "header only library".
-- Dasynq provides a *robust* API, usable in system-critical applications. This means that it avoids the
-  possibility of errors (including allocation failures and excession of system resource limits)
-  in places that would be awkward for the client to deal with. Dasynq generally *pre-allocates* resources
-  meaning that many operations (such as enabling/disabling event watchers) cannot fail at run-time. Other
-  libraries do not do this; *libev*, for example, goes to the other extreme and simply aborts the program
-  when it hits a resource limit.
-- Dasynq's multi-threading capabilities surpass many other event libraries. Although various other
-  libraries have some level of multi-thread support, few allow polling for events from multiple threads
-  simultaneously; typically it is necessary to poll in a single thread and dispatch events to other
-  threads in a pool. Dasynq has no such limitation.
-- Dasynq timers can be applied to either a monotonic or system clock, meaning that they can be used for
-  correctly measuring time intervals or for setting wall-clock alarms which will correctly expire even
-  if the system change is changed.
-
-Other features of Dasynq include:
-
-- Support for assigning priorities to events (with an arbitrary range of priority values);
-- Efficient use of modern facilities such as epoll and kqueue, where available;
-- Good performance.
+Dasynq is also intended to allow development of extremely robust client applications. Where possible, it
+allows pre-allocation of resources to prevent allocation failures from occurring at inopportune moments
+during program execution.
 
 
 ## Using Dasynq
