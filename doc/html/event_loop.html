@@ -64,14 +64,17 @@ both input and output events simultaneously</li>
 <p>Instances can be constructed using the default constructor. Only one instance can be active at a time in a
 process; libraries that require event loop functionality are encouraged to allow an
 <i class="code-name">event_loop reference</i> to be passed as a parameter from the application. Construction of
-a second event loop while a first is still active has undefined behaviour.</p>
+a second event loop while a first is still active has undefined behaviour.
+<br><b>Note</b>: This limitation is a consequence of limitations in the backends (signals require handlers to
+be setup on some systems, and child process status requires watching for a signal). </p>
 
-<p>Watchers for events of interest should be registered, and their callbacks will be notified when the events are
-processed. Event processing occurs only during execution of the <i class="code-name">run()</i> and
-<i class="code-name">poll()</i> functions.</p>
+<p>Watchers for events of interest should be registered with the event loop, and their callbacks will be
+notified when the events are processed. Event processing occurs only during execution of the
+<i class="code-name">run()</i> and <i class="code-name">poll()</i> functions.</p>
 
-<p>Most operations involving event watchers, such as adding, removing, enabling, and disabling, are performed via
-the watcher instance; consult the documentation for the various watcher types.</p>
+<p>Most operations involving event watchers, such as registration, removing, enabling, and disabling, are performed via
+the watcher instance; consult the documentation for the various watcher types. In general, watcher operations other
+than registration can not fail and will not throw exceptions.</p>
 
 <p>Event watchers are disabled automatically when the events they watch become pending. They must not be re-enabled
 while pending. While being processed (i.e. during the execution of the corresponding watcher's callback function)

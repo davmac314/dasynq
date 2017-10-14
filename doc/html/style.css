@@ -1,7 +1,8 @@
 body {
-    margin-rigth: 1em;
-    margin-left: 1em;
+    margin-right: auto;
+    margin-left: auto;
     background: #fff8ed;
+    max-width: 60em;
 }
 
 pre {
