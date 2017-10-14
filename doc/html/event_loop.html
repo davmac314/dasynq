@@ -1,0 +1,101 @@
+<html>
+<head><title>Dasynq manual - event_loop</title>
+  <link rel="stylesheet" href="style.css">  
+</head>
+<body>
+<h1>event_loop, event_loop_n, event_loop_th</h1>
+
+<pre>
+#include "dasynq.h"
+
+namespace dasynq {
+    // generic event loop
+    template &lt;typename T_Mutex&gt; class event_loop;
+
+    // non-threadsafe event loop
+    typedef event_loop&lt;null_mutex&gt; event_loop_n;
+    
+    // threadsafe event loop
+    typedef event_loop&lt;std::mutex&gt; event_loop_th;
+}
+</pre>
+
+<p><b>Brief</b>: The <i class="code-name">event_loop</i> templates defines an event loop multiplexor which can be used to
+listen or poll for events. A number of different types of event are handled, including I/O readiness on
+file descriptors, POSIX signals, child process status changes, and timer expiry. To receive an event the
+client first registers a <i>watcher</i> for the event and event source they are interested in, and then calls
+the <i class="code-name">run</i> or <i class="code-name">poll</i> methods of the event loop. The <i>callback</i>
+function of the watcher will be called during event processing to respond to the event.</p>
+
+<h2>Template parameters</h2>
+
+<ul>
+<li><i class="code-name">T_Mutex</i> specifies a mutex class to be used wherever a mutex is required. The
+interface should conform to that of <i class="code-name">std::mutex</i>, with <i class="code-name">lock</i>,
+<i class="code-name">unlock</i> and <i class="code-name">try_lock</i> functions.
+<br><i>Note:</i> it is required
+that the functions of <i class="code-name">T_Mutex</i> do not throw exceptions if used properly. Technically
+<i>std::mutex</i> may throw an exception if a system-level error occurs, but I do not believe this happens in
+real implementations. If it does, it will cause the client application to terminate.</li>
+</ul>
+
+Additional template parameters are implementation internal.
+
+<h2>Public members</h2>
+
+<ul>
+<li><i class="code-name">event_loop()</i> - default constructor; may throw <i class="code-name">std::bad_alloc</i>
+    or <i class="code-name">std::system_error</i>. See details section.</li>
+
+<li><i class="code-name">time_val</i> [type] - for representing time values</li>
+<li><i class="code-name">mutex_t</i> [type] - alias for <i class="code-name">T_Mutex</i></li>
+<li><i class="code-name">fd_watcher</i> [type] - a watcher type for watching file descriptor events</li>
+<li><i class="code-name">bidi_fd_watcher</i> [type] - a watcher type for watching file descriptor events, supporting
+both input and output events simultaneously</li>
+<li><i class="code-name">signal_watcher</i> [type] - a watcher type for watching POSIX signal reception</li>
+<li><i class="code-name">child_proc_watcher</i> [type] - a watcher type for watching child process status changes</li>
+<li><i class="code-name">timer</i> [type] - a timer implementation and watcher for timer expiry</li>
+<li><i class="code-name">void run() noexcept</i> - wait while there are no events pending; process pending events</li>
+<li><i class="code-name">void poll() noexcept</i> - process any currently pending events</li>
+</ul>
+
+<h2>Details and usage</h2>
+
+<p>Instances can be constructed using the default constructor. Only one instance can be active at a time in a
+process; libraries that require event loop functionality are encouraged to allow an
+<i class="code-name">event_loop reference</i> to be passed as a parameter from the application. Construction of
+a second event loop while a first is still active has undefined behaviour.</p>
+
+<p>Watchers for events of interest should be registered, and their callbacks will be notified when the events are
+processed. Event processing occurs only during execution of the <i class="code-name">run()</i> and
+<i class="code-name">poll()</i> functions.</p>
+
+<p>Most operations involving event watchers, such as adding, removing, enabling, and disabling, are performed via
+the watcher instance; consult the documentation for the various watcher types.</p>
+
+<p>Event watchers are disabled automatically when the events they watch become pending. They must not be re-enabled
+while pending. While being processed (i.e. during the execution of the corresponding watcher's callback function)
+they can be re-enabled only if no other thread is processing or will process pending events until after the
+callback completes.</p>
+
+<p>Watcher callbacks can return a <i class="code-name">rearm</i> value to perform various actions, including to re-enable
+the watcher in order to detect future events. Typically, if multiple threads might simultaneously call the
+<i class="code-name">run()</i> or <i class="code-name">poll()</i> function, a watcher should only be enabled by
+returning a suitable <i class="code-name">rearm</i> code from the handler (or at any other time only if it has never
+previously been enabled).</p>
+
+<h3>Removal of watchers</h3>
+
+<p>Watchers can be requested to be removed from an <i class="code-name">event_loop</i>, however removal does not necessarily
+occur immediately (except for non-threadsafe event loops; for threadsafe event loops, any delay is due to the watcher
+currently having its callback executed). All watcher types have a <i class="code-name">watch_removed</i> function:</p>
+
+<pre>
+virtual void watch_removed() noexcept 
+</pre>
+
+<p>This function can be overridden by watch implementations and will be called once the watcher has been removed; at this
+point it is safe to <i class="code-name">delete</i> the watcher. Naturally watcher instances must not end their lifetime
+while they are registered to an event loop.</p> 
+
+</body></html>
