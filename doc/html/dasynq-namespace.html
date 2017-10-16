@@ -1,0 +1,89 @@
+<html>
+<head><title>Dasynq manual - dinit namespace</title>
+  <link rel="stylesheet" href="style.css">  
+</head>
+<body>
+<h1>dasynq namespace</h1>
+
+<pre>
+#include "dasynq.h"
+
+namespace dasynq {
+    // generic event loop
+    template &lt;typename T_Mutex&gt; class <a href="event_loop.html">event_loop</a>;
+    typedef event_loop&lt;null_mutex&gt; sevent_loop_n;
+    typedef event_loop&lt;std::mutex&gt; event_loop_th;
+    
+    // rearm codes
+    enum class rearm
+    {
+        /** Re-arm the event watcher so that it receives further events */
+        REARM,
+        /** Disarm the event watcher so that it receives no further events, until it is re-armed explicitly */
+        DISARM,
+        /** Leave in current armed/disarmed state */
+        NOOP,
+        /** Remove the event watcher (and call "removed" callback) */
+        REMOVE,
+        /** The watcher has been removed - don't touch it! */
+        REMOVED,
+        /** RE-queue the watcher to have its notification called again */
+        REQUEUE
+    };
+    
+    // clock types
+    enum class clock_type
+    {
+        SYSTEM,    // wall-time clock, time may jump if set by user
+        MONOTONIC  // monotonically increasing clock without jumps
+    };
+    
+    // clock time
+    class <a href="#time_val">time_val</a>;
+    
+    time_val operator-(const time_val &t1, const time_val &t2);
+    time_val operator+(const time_val &t1, const time_val &t2);
+    time_val &operator+=(time_val &t1, const time_val &t2);
+    bool operator<(const time_val &t1, const time_val &t2);
+    bool operator==(const time_val &t1, const time_val &t2);
+    bool operator<=(const time_val &t1, const time_val &t2);
+    bool operator!=(const time_val &t1, const time_val &t2);
+    bool operator>(const time_val &t1, const time_val &t2);
+    bool operator>=(const time_val &t1, const time_val &t2);
+    
+    // event watch flags
+    constexpr unsigned int IN_EVENTS;
+    constexpr unsigned int OUT_EVENTS;
+}
+</pre>
+
+<hr><h1 id="time_val">time_val</h1>
+
+<pre>
+#include "dasynq.h"
+
+namespace dasynq {
+    class time_val;
+}
+</pre>
+
+<p><b>Brief</b>: The <i class="code-name">time_val</i> class represents high-precision clock times, and supports
+arithmetic operations on them. Times are represented as a combination of seconds and nanoseconds. In addition to
+the public members listed below, a number of arithmetic and comparison operators are defined as non-member functions.</p>
+
+<h2>Public members</h2>
+
+<ul>
+<li><i class="code-name">time_val()</i> - default constructor; time is unintialised</li>
+<li><i class="code-name">time_val(const struct timespec &t)</i> - construct using specified time from POSIX <i class="code-name">timespec</i></li>
+<li><i class="code-name">time_val(second_t s, nsecond_t ns)</i> - construct using specified time</li>
+<li><i class="code-name">second_t</i> [type] - type used to hold seconds component</li>
+<li><i class="code-name">nsecond_t</i> [type] - type used to hold nanoseconds component</li>
+<li><i class="code-name">second_t seconds() const</i><br>
+    <i class="code-name">second_t & seconds()</i> - access the seconds value</li>
+<li><i class="code-name">nsecond_t nseconds() const</i><br>
+    <i class="code-name">nsecond_t & nseconds()</i> - access the nanoseconds value</li>
+<li><i class="code-name">operator timespec() const</i> - conversion to <i class="code-name">struct timespec</i></li>
+</ul>
+
+</body></html>
