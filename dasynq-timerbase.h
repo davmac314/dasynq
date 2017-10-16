@@ -16,40 +16,35 @@ class time_val
     using second_t = decltype(time.tv_sec);
     using nsecond_t = decltype(time.tv_nsec);
 
-    time_val()
+    time_val() noexcept
     {
         // uninitialised!
     }
 
-    time_val(const struct timespec &t)
+    time_val(const struct timespec &t) noexcept
     {
         time = t;
     }
 
-    time_val(second_t s, nsecond_t ns)
+    time_val(second_t s, nsecond_t ns) noexcept
     {
         time.tv_sec = s;
         time.tv_nsec = ns;
     }
 
-    second_t seconds() const { return time.tv_sec; }
-    nsecond_t nseconds() const { return time.tv_nsec; }
+    second_t seconds() const noexcept{ return time.tv_sec; }
+    nsecond_t nseconds() const noexcept { return time.tv_nsec; }
 
-    second_t & seconds() { return time.tv_sec; }
-    nsecond_t & nseconds() { return time.tv_nsec; }
+    second_t & seconds() noexcept { return time.tv_sec; }
+    nsecond_t & nseconds() noexcept { return time.tv_nsec; }
 
-    //void set_seconds(second_t s) { time.tv_sec = s; }
-    //void set_nseconds(nsecond_t ns) { time.tv_nsec = ns; }
-    //void dec_seconds() { time.tv_sec--; }
-    //void inc_seconds() { time.tv_sec++; }
-
-    operator timespec() const
+    operator timespec() const noexcept
     {
        return time;
     }
 };
 
-inline time_val operator-(const time_val &t1, const time_val &t2)
+inline time_val operator-(const time_val &t1, const time_val &t2) noexcept
 {
     time_val diff;
     diff.seconds() = t1.seconds() - t2.seconds();
@@ -63,7 +58,7 @@ inline time_val operator-(const time_val &t1, const time_val &t2)
     return diff;
 }
 
-inline time_val operator+(const time_val &t1, const time_val &t2)
+inline time_val operator+(const time_val &t1, const time_val &t2) noexcept
 {
     auto ns = t1.nseconds() + t2.nseconds();
     auto s = t1.seconds() + t2.seconds();
@@ -75,7 +70,7 @@ inline time_val operator+(const time_val &t1, const time_val &t2)
     return time_val(s, ns);
 }
 
-inline time_val &operator+=(time_val &t1, const time_val &t2)
+inline time_val &operator+=(time_val &t1, const time_val &t2) noexcept
 {
     auto nsum = t1.nseconds() + t2.nseconds();
     t1.seconds() = t1.seconds() + t2.seconds();
@@ -87,28 +82,42 @@ inline time_val &operator+=(time_val &t1, const time_val &t2)
     return t1;
 }
 
-inline bool operator<(const time_val &t1, const time_val &t2)
+inline time_val &operator-=(time_val &t1, const time_val &t2) noexcept
+{
+    time_val diff;
+    t1.seconds() = t1.seconds() - t2.seconds();
+    if (t1.nseconds() > t2.nseconds()) {
+        t1.nseconds() = t1.nseconds() - t2.nseconds();
+    }
+    else {
+        t1.nseconds() = 1000000000 - t2.nseconds() + t1.nseconds();
+        t1.seconds()--;
+    }
+    return t1;
+}
+
+inline bool operator<(const time_val &t1, const time_val &t2) noexcept
 {
     if (t1.seconds() < t2.seconds()) return true;
     if (t1.seconds() == t2.seconds() && t1.nseconds() < t2.nseconds()) return true;
     return false;
 }
 
-inline bool operator==(const time_val &t1, const time_val &t2)
+inline bool operator==(const time_val &t1, const time_val &t2) noexcept
 {
     return (t1.seconds() == t2.seconds() && t1.nseconds() == t2.nseconds());
 }
 
-inline bool operator<=(const time_val &t1, const time_val &t2)
+inline bool operator<=(const time_val &t1, const time_val &t2) noexcept
 {
     if (t1.seconds() < t2.seconds()) return true;
     if (t1.seconds() == t2.seconds() && t1.nseconds() <= t2.nseconds()) return true;
     return false;
 }
 
-inline bool operator!=(const time_val &t1, const time_val &t2) { return !(t1 == t2); }
-inline bool operator>(const time_val &t1, const time_val &t2) { return t2 < t1; }
-inline bool operator>=(const time_val &t1, const time_val &t2) { return t2 <= t1; }
+inline bool operator!=(const time_val &t1, const time_val &t2) noexcept { return !(t1 == t2); }
+inline bool operator>(const time_val &t1, const time_val &t2) noexcept { return t2 < t1; }
+inline bool operator>=(const time_val &t1, const time_val &t2) noexcept { return t2 <= t1; }
 
 // Data corresponding to a single timer
 class timer_data
@@ -119,7 +128,7 @@ class timer_data
     bool enabled;   // whether timer reports events
     void *userdata;
 
-    timer_data(void *udata = nullptr) : interval_time(0,0), expiry_count(0), enabled(true), userdata(udata)
+    timer_data(void *udata = nullptr) noexcept : interval_time(0,0), expiry_count(0), enabled(true), userdata(udata)
     {
         // constructor
     }
@@ -128,7 +137,7 @@ class timer_data
 class compare_timespec
 {
     public:
-    bool operator()(const struct timespec &a, const struct timespec &b)
+    bool operator()(const struct timespec &a, const struct timespec &b) noexcept
     {
         if (a.tv_sec < b.tv_sec) {
             return true;
@@ -150,7 +159,7 @@ static inline void init_timer_handle(timer_handle_t &hnd) noexcept
     timer_queue_t::init_handle(hnd);
 }
 
-static inline int divide_timespec(const struct timespec &num, const struct timespec &den, struct timespec &rem)
+static inline int divide_timespec(const struct timespec &num, const struct timespec &den, struct timespec &rem) noexcept
 {
     if (num.tv_sec < den.tv_sec) {
         rem = num;
@@ -238,7 +247,7 @@ template <typename Base> class timer_base : public Base
 {
     protected:
 
-    void process_timer_queue(timer_queue_t &queue, const struct timespec &curtime)
+    void process_timer_queue(timer_queue_t &queue, const struct timespec &curtime) noexcept
     {
         // Peek timer queue; calculate difference between current time and timeout
         const struct timespec * timeout = &queue.get_root_priority();
