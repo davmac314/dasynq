@@ -57,6 +57,10 @@ both input and output events simultaneously</li>
 <li><i class="code-name">timer</i> [type] - a timer implementation and watcher for timer expiry</li>
 <li><i class="code-name">void run() noexcept</i> - wait while there are no events pending; process pending events</li>
 <li><i class="code-name">void poll() noexcept</i> - process any currently pending events</li>
+<li><i class="code-name">void get_time(timespec &ts, clock_type clock, bool force_update = false) noexcept</i><br>
+    <i class="code-name">void get_time(time_val &tv, clock_type clock, bool force_update = false) noexcept</i> - get the current
+    time for the specified clock. The clock times may be cached for performance reasons; specify
+    <i class="code-name">force_update</i> as true to avoid using a cached value (in general this should not be necessary).</li>
 </ul>
 
 <h2>Details and usage</h2>
@@ -85,7 +89,8 @@ callback completes.</p>
 the watcher in order to detect future events. Typically, if multiple threads might simultaneously call the
 <i class="code-name">run()</i> or <i class="code-name">poll()</i> function, a watcher should only be enabled by
 returning a suitable <i class="code-name">rearm</i> code from the handler (or at any other time only if it has never
-previously been enabled).</p>
+previously been enabled, or if it has been disabled by returning <i class="code-name">rearm::DISARM</a> from the callback
+and has not since been re-enabled).</p>
 
 <h3>Removal of watchers</h3>
 
