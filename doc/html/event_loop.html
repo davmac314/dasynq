@@ -50,13 +50,21 @@ Additional template parameters are implementation internal.
 <li><i class="code-name">time_val</i> [type] - for representing time values</li>
 <li><i class="code-name">mutex_t</i> [type] - alias for <i class="code-name">T_Mutex</i></li>
 <li><i class="code-name">fd_watcher</i> [type] - a watcher type for watching file descriptor events</li>
+<li><i class="code-name">fd_watcher_impl</i> [template] - a template for implementing <i class="code-name">fd_watcher</i> subclasses</li>
 <li><i class="code-name">bidi_fd_watcher</i> [type] - a watcher type for watching file descriptor events, supporting
 both input and output events simultaneously</li>
+<li><i class="code-name">bidi_fd_watcher_impl</i> [template] - a template for implementing
+    <i class="code-name">bidi_fd_watcher</i> subclasses</li>
 <li><i class="code-name">signal_watcher</i> [type] - a watcher type for watching POSIX signal reception</li>
+<li><i class="code-name">signal_watcher_impl</i> [template] - a template for implementing
+    <i class="code-name">signal_watcher</i> subclasses</li>
 <li><i class="code-name">child_proc_watcher</i> [type] - a watcher type for watching child process status changes</li>
+<li><i class="code-name">child_proc_watcher_impl</i> [template] - a template for implementing
+    <i class="code-name">child_proc_watcher</i> subclasses</li>
 <li><i class="code-name">timer</i> [type] - a timer implementation and watcher for timer expiry</li>
-<li><i class="code-name">void run() noexcept</i> - wait while there are no events pending; process pending events</li>
-<li><i class="code-name">void poll() noexcept</i> - process any currently pending events</li>
+<li><i class="code-name">timer_impl</i> [type] - a template for implementing <i class="code-name">timer</i> subclasses</li>
+<li><i class="code-name">void run() noexcept</i> - wait while there are no events pending; queue and process pending events</li>
+<li><i class="code-name">void poll() noexcept</i> - queue and process any currently pending events</li>
 <li><i class="code-name">void get_time(timespec &ts, clock_type clock, bool force_update = false) noexcept</i><br>
     <i class="code-name">void get_time(time_val &tv, clock_type clock, bool force_update = false) noexcept</i> - get the current
     time for the specified clock. The clock times may be cached for performance reasons; specify
@@ -74,23 +82,32 @@ be setup on some systems, and child process status requires watching for a signa
 
 <p>Watchers for events of interest should be registered with the event loop, and their callbacks will be
 notified when the events are processed. Event processing occurs only during execution of the
-<i class="code-name">run()</i> and <i class="code-name">poll()</i> functions.</p>
+<i class="code-name">run()</i> and <i class="code-name">poll()</i> functions. Watcher callbacks can return a
+<i class="code-name">rearm</i> value to perform various actions, including to re-enable the watcher in order
+to detect future events.</p>
 
 <p>Most operations involving event watchers, such as registration, removing, enabling, and disabling, are performed via
 the watcher instance; consult the documentation for the various watcher types. In general, watcher operations other
 than registration can not fail and will not throw exceptions.</p>
 
-<p>Event watchers are disabled automatically when the events they watch become pending. They must not be re-enabled
-while pending. While being processed (i.e. during the execution of the corresponding watcher's callback function)
-they can be re-enabled only if no other thread is processing or will process pending events until after the
-callback completes.</p>
+<h3>Watcher state cycle</h3>
 
-<p>Watcher callbacks can return a <i class="code-name">rearm</i> value to perform various actions, including to re-enable
-the watcher in order to detect future events. Typically, if multiple threads might simultaneously call the
-<i class="code-name">run()</i> or <i class="code-name">poll()</i> function, a watcher should only be enabled by
-returning a suitable <i class="code-name">rearm</i> code from the handler (or at any other time only if it has never
-previously been enabled, or if it has been disabled by returning <i class="code-name">rearm::DISARM</a> from the callback
-and has not since been re-enabled).</p>
+<p>Watchers are initially in a <i>waiting</i> state once enabled.
+An enabled watcher for which a watched event is detected (during the execution of the <i class="code-name">run</i>
+or <i class="code-name">poll</i> functions) is disabled and becomes <i>queued</i> for notification until its callback
+is run; during execution of the callback, the watcher is in the <i>processing</i> state.</p>
+
+<p>If the event loop may be polled (via <i class="code-name">run</i> or <i class="code-name">poll</i> from another
+thread while a watcher is in the <i>queued</i> or <i>processing</i> states, then the watcher must not be re-enabled
+while in those states (except by returning a suitable <i class="code-name">rearm</i> code from the callback).
+<br><b>Note</b>: Technically, the requirement is that polling must not be performed if an event may be detected
+via an enabled watcher that is not in the <i>waiting</i> state.</p>
+
+<h3>Event batching</h3>
+
+Events are queued in batches before processing. Watchers can be assigned a priority value and processing of
+queued events occurs in priority order. Note however that incoming events currently do not cause additional
+watchers to be queued while in the processing phase.
 
 <h3>Removal of watchers</h3>
 
