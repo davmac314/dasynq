@@ -1,0 +1,85 @@
+<html>
+<head><title>Dasynq manual - fd_watcher</title>
+  <link rel="stylesheet" href="style.css">  
+</head>
+<body>
+<h1>dasynq::fd_watcher</h1>
+
+<pre>
+    // Members of dasynq::event_loop&lt;T&gt; instantiation:
+
+    class fd_watcher;
+
+    template &lt;class Derived&gt; class fd_watcher_impl : public fd_watcher;
+</pre>
+
+<p><b>Brief</b>: <i class="code-name">fd_watcher</i> is a member type of the <a href="event_loop.html"><i class="code-name">event_loop</i></a>
+template class. It represents an event watcher for file-descriptor readiness events; a registered
+<i class="code-name">fd_watcher</i> will receive callbacks when its associated file descriptor is
+ready for reading or writing (or both, if supported by the event loop back-end). The
+<i class="code-name">fd_watcher</i> class should not be subclassed directly; the
+<i class="code-name">fd_watcher_impl</i> template provides a means for subclassing.</p>
+
+<h2>Public members - fd_watcher</h2>
+
+<ul>
+<li><i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i></li>
+<li><i class="code-name">void add_watch_noemu(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i></li>
+<li><i class="code-name">template <typename T>
+     <br>static fd_watcher<EventLoop> *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)</i>
+     - add a dynamically-allocated watch with the specified callback</li>
+<li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i></li>
+<li><i class="code-name">int get_watched_fd()</i></li>
+<li><i class="code-name">void set_enabled(EventLoop &eloop, bool enable) noexcept</i></li>
+</ul>
+
+<h2>Protected members - fd_watcher</h2>
+
+<ul>
+<li><i class="code-name">void set_watch_flags(int newFlags)</i> - set watched event types</li>
+</ul>
+
+<h2>Details and Usage</h2>
+
+<p>A file descriptor often represents an input or output channel (or both) for which I/O <i>readiness</i> is a
+detectable event. For example, a connected network socket becomes ready for input when data is received over
+the network, and ready for output when the output buffer is not full (or is below some threshold) due to
+data being successfully transmitted. An <i class="code-name">fd_watcher</i> implementation receives
+notification of readiness events on a file descriptor.</p>
+
+<p>Some event loop backends support watching for both input and output readiness on the same file descriptor
+using a single watcher (<i>epoll</i> style) and others require separate watchers for input and output (<i>kqueue</i>
+style). To avoid compatibility issues it is recommended to use <i class="code-name">bidi_fd_watcher</i> rather
+than <i class="code-name">fd_watcher</i> in order to watch for both input and output events on a single
+file descriptor.</p>
+
+<p>Note that backends do not generally support more than one watcher on the same file descriptor (or more than
+one watcher for either reading or writing). Attempting to register multiple watchers for the same file
+descriptor has unspecified behaviour if not supported by the backend.</p>
+
+<h3>Subclassing fd_watcher</h3>
+
+<p>To specify callback behaviour, <i class="code-name">fd_watcher</i> can be subclassed &mdash; however, it should
+not be direcetly subclassed; instead, use the <i class="code-name">fd_watcher_impl</i> implementation wrapper
+template.</p>
+
+<h3>Regular files</h3>
+
+<p>In general readiness notification for regular files is not supported by event loop backends, and arguably a
+file is always ready for reading and writing (although the operation may block). However in some cases it is
+convenient to treat such file descriptors as if they were connected to pipes or sockets;
+<i class="code-name">fd_watcher</i> by default supports emulation of readiness events for regular files,
+which assumes they are always ready (though note that some backends do support regular files, and file
+descriptors which are at end-of-file may be seen as not ready for reading).</p>
+
+<h3>Listening sockets</h3>
+
+<p>An <i class="code-name">fd_watcher</i> can be used to detect incoming connections on a listening socket. New
+connections will be signalled as input readiness.</p>
+
+<p>A special problem, not specific to Dasynq, can occur when the process has reached its file descriptor
+limit before a new connection arrives on a listening socket. In this case, it will be impossible to accept
+the new connection and it will remain pending, causing input readiness to be reported repeatedly. There are
+no solutions to this problem that are satisfactory in all cases; it is an issue inherent in the POSIX API.</p> 
+
+</body></html>
