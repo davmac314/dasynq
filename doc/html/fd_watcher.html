@@ -23,14 +23,22 @@ ready for reading or writing (or both, if supported by the event loop back-end).
 <h2>Public members - fd_watcher</h2>
 
 <ul>
-<li><i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i></li>
-<li><i class="code-name">void add_watch_noemu(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i></li>
-<li><i class="code-name">template <typename T>
-     <br>static fd_watcher<EventLoop> *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)</i>
-     - add a dynamically-allocated watch with the specified callback</li>
-<li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i></li>
-<li><i class="code-name">int get_watched_fd()</i></li>
-<li><i class="code-name">void set_enabled(EventLoop &eloop, bool enable) noexcept</i></li>
+<li><i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
+    <br>&mdash; add a watcher. <i class="code-name">flags</i> is a combination of <i class="code-name">dasynq::IN_EVENTS</i> and
+    <i class="code-name">dasynq::OUT_EVENTS</i> (see details section for limitations). May throw
+    <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
+<li><i class="code-name">void add_watch_noemu(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
+    <br>&mdash; add a watcher with no emulation. See <i class="code-name">add_watch</i>(#1). If the backend
+    does not support the specified file descriptor, throws <i class="code-name">std::system_error</i> rather
+    than emulating readiness events (see details section).</li>
+<li><i class="code-name">template &lt;typename T&gt;
+    <br>static fd_watcher&lt;EventLoop&gt; *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)</i>
+    <br>&mdash; add a dynamically-allocated watch with the specified callback. See
+    <i class="code-name">add_watch</i>(#1). The watch is automatically deleted when removed.</li>
+<li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i>
+    <br>&mdash; request removal from the event loop.</li>
+<li><i class="code-name">int get_watched_fd()</i> &mdash; returns the file descriptor associated with this watcher</li>
+<li><i class="code-name">void set_enabled(EventLoop &eloop, bool enable) noexcept</i> &mdash; enable or disable the watcher</li>
 </ul>
 
 <h2>Protected members - fd_watcher</h2>
@@ -47,11 +55,14 @@ the network, and ready for output when the output buffer is not full (or is belo
 data being successfully transmitted. An <i class="code-name">fd_watcher</i> implementation receives
 notification of readiness events on a file descriptor.</p>
 
-<p>Some event loop backends support watching for both input and output readiness on the same file descriptor
-using a single watcher (<i>epoll</i> style) and others require separate watchers for input and output (<i>kqueue</i>
-style). To avoid compatibility issues it is recommended to use <i class="code-name">bidi_fd_watcher</i> rather
-than <i class="code-name">fd_watcher</i> in order to watch for both input and output events on a single
-file descriptor.</p>
+<p>When registering an <i class="code-name">fd_watcher</i> you specify which events you are interested in
+using either of the <i class="code-name">IN_EVENTS</i> and <i class="code-name">OUT_EVENTS</i>
+flags. Some event loop backends support watching for both input and output readiness on the same file descriptor
+using a single watcher (<i>epoll</i> style) &mdash; this is supported by specifying both flags, as
+<i class="code-name">IN_EVENTS | OUT_EVENTS</i> &mdash; and others require separate watchers for input and
+output (<i>kqueue</i> style). To avoid compatibility issues it is recommended to use
+<i class="code-name">bidi_fd_watcher</i> rather than <i class="code-name">fd_watcher</i> in order to watch
+for both input and output events on a single file descriptor.</p>
 
 <p>Note that backends do not generally support more than one watcher on the same file descriptor (or more than
 one watcher for either reading or writing). Attempting to register multiple watchers for the same file
@@ -81,5 +92,28 @@ connections will be signalled as input readiness.</p>
 limit before a new connection arrives on a listening socket. In this case, it will be impossible to accept
 the new connection and it will remain pending, causing input readiness to be reported repeatedly. There are
 no solutions to this problem that are satisfactory in all cases; it is an issue inherent in the POSIX API.</p> 
+
+<h2 id="add_watch_2">add_watch (#2)</h2>
+
+<pre>
+// member of dasynq::event_loop&lt;T&gt;::fd_watcher
+template &lt;typename T&gt;
+static fd_watcher&lt;EventLoop&gt; *add_watch(EventLoop &eloop, int fd, int flags, T watch_hndlr)</i>
+</pre>
+
+<p>This variant of the <i class="code-name">add_watch</i> function can be used to create and register a
+dynamically-allocated <i class="code-name">fd_watcher</i>. The first three parameters are the same as for
+<i class="code-name">add_watch</i>(#1). The <i class="code-name">watch_hndlr</i> parameter is a function
+or lambda of the form:</p>
+
+<pre>
+[](loop_t &eloop, int fd, int flags) -> rearm { ... }
+</pre>
+
+<p>It acts as the callback function for the generated watcher. The watcher will delete itself when it is
+removed from the event loop.</p>
+
+<p>This function can throw <i class="code-name">std::system_error</i> or
+<i class="code-name">std::bad_alloc</i> on failure.</p>
 
 </body></html>
