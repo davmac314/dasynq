@@ -3,22 +3,24 @@
   <link rel="stylesheet" href="style.css">  
 </head>
 <body>
-<h1>dasynq::fd_watcher</h1>
+<h1>fd_watcher, fd_watcher_impl</h1>
 
 <pre>
     // Members of dasynq::event_loop&lt;T&gt; instantiation:
 
     class fd_watcher;
 
-    template &lt;class Derived&gt; class fd_watcher_impl : public fd_watcher;
+    template &lt;class Derived&gt; class <a href="#fd_watcher_impl">fd_watcher_impl</a>; // : public fd_watcher;
 </pre>
+
+<h2>fd_watcher</h2>
 
 <p><b>Brief</b>: <i class="code-name">fd_watcher</i> is a member type of the <a href="event_loop.html"><i class="code-name">event_loop</i></a>
 template class. It represents an event watcher for file-descriptor readiness events; a registered
 <i class="code-name">fd_watcher</i> will receive callbacks when its associated file descriptor is
 ready for reading or writing (or both, if supported by the event loop back-end). The
 <i class="code-name">fd_watcher</i> class should not be subclassed directly; the
-<i class="code-name">fd_watcher_impl</i> template provides a means for subclassing.</p>
+<a href="#fd_watcher_impl"><i class="code-name">fd_watcher_impl</i></a> template provides a means for subclassing.</p>
 
 <h2>Internal types</h2>
 
@@ -30,7 +32,7 @@ ready for reading or writing (or both, if supported by the event loop back-end).
 
 <ul>
 <li><i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
-    <br>&mdash; add a watcher. <i class="code-name">flags</i> is a combination of <i class="code-name">dasynq::IN_EVENTS</i> and
+    <br>&mdash; register a watcher with an event loop. <i class="code-name">flags</i> is a combination of <i class="code-name">dasynq::IN_EVENTS</i> and
     <i class="code-name">dasynq::OUT_EVENTS</i> (see details section for limitations). May throw
     <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
 <li><i class="code-name">void add_watch_noemu(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
@@ -121,5 +123,48 @@ removed from the event loop.</p>
 
 <p>This function can throw <i class="code-name">std::system_error</i> or
 <i class="code-name">std::bad_alloc</i> on failure.</p>
+
+<hr>
+<h2 id="fd_watcher_impl">fd_watcher_impl</h2>
+
+<p><b>Brief</b>: The <i class="code-name">fd_watcher_impl</i> provides a basis for implementing
+<i class="code-name">fd_watcher</i>, using the "curiously recurring template pattern". Instead of
+subclassing <i class="code-name">fd_watcher</i> directly, subclass an instantiation of
+<i class="code-name">fd_watcher_impl</i> with the template parameter specified as the subclass itself.
+For example:</p>
+
+<pre>
+class my_watcher : public fd_watcher_impl<my_watcher>
+{
+    // ...
+}
+</pre>
+
+<h2>Details and Usage</h2>
+
+<p>The callback function must be provided in the subclass and named <i class="code-name">fd_event</i>, with
+a signature compatible with the following (where <i class="code-name">loop_t</i> is an alias to the
+appropriate event loop type):</p>
+
+<pre>
+rearm fd_event(loop_t & loop, int fd, int flags);
+</pre>
+
+<p>The <i class="code-name">fd_event</i> function must be public (or otherwise the
+<i class="code-name">fd_watcher_impl</i> instantiation which is subclassed must be declared as a
+<i class="code-name">friend</i>), but need not be virtual. It will be called with the following parameters:
+
+<ul>
+<li><i class="code-name">loop</i> &mdash; a reference to the event loop.</li>
+<li><i class="code-name">fd</i> &mdash; the file descriptor being watched, as specified at registration.</li>
+<li><i class="code-name">flags</i> &mdash; a combination of flags specifying the event type, possibly
+    including <i class="code-name">dasynq::IN_EVENTS</i> or <i class="code-name">dasynq::OUT_EVENTS</i> or
+    both.</li>
+</ul>
+
+<p>The return value specifies the <a href="dasynq-namespace.html"><i class="code-name">rearm</i></a> action.</p>
+
+<p>An <i class="code-name">fd_watcher_impl</i> instantiation has no public or protected members, other than
+those inherited from <i class="code-name">fd_watcher</i>, which it publicly derives from.</p>
 
 </body></html>

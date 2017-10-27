@@ -35,8 +35,9 @@ interface should conform to that of <i class="code-name">std::mutex</i>, with <i
 <i class="code-name">unlock</i> and <i class="code-name">try_lock</i> functions.
 <br><i>Note:</i> it is required
 that the functions of <i class="code-name">T_Mutex</i> do not throw exceptions if used properly. Technically
-<i>std::mutex</i> may throw an exception if a system-level error occurs, but I do not believe this happens in
-real implementations. If it does, it will cause the client application to terminate.</li>
+<i>std::mutex</i> may throw an exception if a system-level error occurs, but realistically this should only
+occur in the case of application error (memory corruption, double lock etc). If it does, it will cause the
+client application to terminate.</li>
 </ul>
 
 Additional template parameters are implementation internal.
@@ -88,7 +89,8 @@ to detect future events.</p>
 
 <p>Most operations involving event watchers, such as registration, removing, enabling, and disabling, are performed via
 the watcher instance; consult the documentation for the various watcher types. In general, watcher operations other
-than registration can not fail and will not throw exceptions.</p>
+than registration can not fail and will not throw exceptions. This means that critical watchers can be registered early
+and then enabled when needed; resource issues will be identified early, at the time of registration.</p>
 
 <h3>Watcher state cycle</h3>
 
@@ -103,11 +105,13 @@ while in those states (except by returning a suitable <i class="code-name">rearm
 <br><b>Note</b>: Technically, the requirement is that polling must not be performed if an event may be detected
 via an enabled watcher that is not in the <i>waiting</i> state.</p>
 
+<p>Watchers may not be registered with more than one event loop at any time.</p>
+
 <h3>Event batching</h3>
 
-Events are queued in batches before processing. Watchers can be assigned a priority value and processing of
+<p>Events are queued in batches before processing. Watchers can be assigned a priority value and processing of
 queued events occurs in priority order. Note however that incoming events currently do not cause additional
-watchers to be queued while in the processing phase.
+watchers to be queued while in the processing phase.</p>
 
 <h3>Removal of watchers</h3>
 
