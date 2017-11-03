@@ -47,13 +47,13 @@ Additional template parameters are implementation internal.
 <ul>
 <li><i class="code-name">event_loop()</i> - default constructor; may throw <i class="code-name">std::bad_alloc</i>
     or <i class="code-name">std::system_error</i>. See details section.</li>
-<li><i class="code-name">loop_traits_t</i> - loop traits.</li>
+<li><i class="code-name">loop_traits_t</i> [type] - loop traits.</li>
 <li><i class="code-name">time_val</i> [type] - for representing time values</li>
 <li><i class="code-name">mutex_t</i> [type] - alias for <i class="code-name">T_Mutex</i></li>
 <li><i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i> [type] - a watcher type for watching file descriptor events</li>
 <li><i class="code-name">fd_watcher_impl</i> [template] - a template for implementing <i class="code-name">fd_watcher</i> subclasses</li>
-<li><i class="code-name">bidi_fd_watcher</i> [type] - a watcher type for watching file descriptor events, supporting
-both input and output events simultaneously</li>
+<li><i class="code-name"><a href="bidi_fd_watcher.html">bidi_fd_watcher</a></i> [type] - a watcher type for
+    watching file descriptor events, supporting both input and output events simultaneously</li>
 <li><i class="code-name">bidi_fd_watcher_impl</i> [template] - a template for implementing
     <i class="code-name">bidi_fd_watcher</i> subclasses</li>
 <li><i class="code-name">signal_watcher</i> [type] - a watcher type for watching POSIX signal reception</li>

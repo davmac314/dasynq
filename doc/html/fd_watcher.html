@@ -31,22 +31,25 @@ ready for reading or writing (or both, if supported by the event loop back-end).
 <h2>Public members - fd_watcher</h2>
 
 <ul>
-<li><i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
+<li><i class="code-name">fd_watcher()</i> &mdash; default constructor.</li>
+<li>(#1) <i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
     <br>&mdash; register a watcher with an event loop. <i class="code-name">flags</i> is a combination of <i class="code-name">dasynq::IN_EVENTS</i> and
     <i class="code-name">dasynq::OUT_EVENTS</i> (see details section for limitations). May throw
     <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
+<li>(#2) <i class="code-name">template &lt;typename T&gt;
+    <br>static fd_watcher *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)</i>
+    <br>&mdash; add a dynamically-allocated watch with the specified callback. The watch is automatically
+    deleted when removed. See <a href="#add_watch_2">details</a> below.</li>
 <li><i class="code-name">void add_watch_noemu(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
     <br>&mdash; add a watcher with no emulation. See <i class="code-name">add_watch</i>(#1). If the backend
     does not support the specified file descriptor, throws <i class="code-name">std::system_error</i> rather
     than emulating readiness events (see details section).</li>
-<li><i class="code-name">template &lt;typename T&gt;
-    <br>static fd_watcher&lt;EventLoop&gt; *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)</i>
-    <br>&mdash; add a dynamically-allocated watch with the specified callback. See
-    <i class="code-name">add_watch</i>(#1). The watch is automatically deleted when removed.</li>
 <li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i>
     <br>&mdash; request removal from the event loop.</li>
 <li><i class="code-name">int get_watched_fd()</i> &mdash; returns the file descriptor associated with this watcher</li>
 <li><i class="code-name">void set_enabled(EventLoop &eloop, bool enable) noexcept</i> &mdash; enable or disable the watcher</li>
+<li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
+    removed from the event loop.</li>
 </ul>
 
 <h2>Protected members - fd_watcher</h2>
@@ -79,7 +82,7 @@ descriptor has unspecified behaviour if not supported by the backend.</p>
 <h3>Subclassing fd_watcher</h3>
 
 <p>To specify callback behaviour, <i class="code-name">fd_watcher</i> can be subclassed &mdash; however, it should
-not be direcetly subclassed; instead, use the <i class="code-name">fd_watcher_impl</i> implementation wrapper
+not be directly subclassed; instead, use the <i class="code-name">fd_watcher_impl</i> implementation wrapper
 template.</p>
 
 <h3>Regular files</h3>
@@ -100,6 +103,25 @@ connections will be signalled as input readiness.</p>
 limit before a new connection arrives on a listening socket. In this case, it will be impossible to accept
 the new connection and it will remain pending, causing input readiness to be reported repeatedly. There are
 no solutions to this problem that are satisfactory in all cases; it is an issue inherent in the POSIX API.</p> 
+
+<h3>Closing files</h2>
+
+<p>Any watchers for a file descriptor should be removed or disabled before closing the file descriptor. This
+is due to limitations in back-ends.</p>
+
+<p>There are two specific cases which are problematic:</p>
+
+<ul>
+<li>A file is closed, then the file descriptor is re-assigned due to opening another file descriptor. With
+some back-ends this could result in the watcher being issued a callback due to the state of the new file.</li>
+<li>A file descriptor is duplicated (using <i class="code-name">dup()</i> or similar) before the original
+is closed. This may result in the original watcher still receiving callbacks for events on the underlying
+file.
+</ul>
+
+<p>If the above situations can be avoided, it may be safe to close file descriptors before removing their
+watchers. However, it is recommended to avoid this if possible.</p>
+
 
 <h2 id="add_watch_2">add_watch (#2)</h2>
 
