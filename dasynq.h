@@ -31,7 +31,7 @@
 //         Base::init(derived);
 //     }
 //
-// At the base all this is the EventDispatch class, defined below, which receives event notifications and inserts
+// At the base all this is the event_dispatch class, defined below, which receives event notifications and inserts
 // them into a queue for processing. The event_loop class, also below, wraps this (via composition) in an interface
 // which can be used to register/de-regsiter/enable/disable event watchers, and which can process the queued events
 // by calling the watcher callbacks. The event_loop class also provides some synchronisation to ensure thread-safety.
@@ -190,12 +190,12 @@ namespace dprivate {
             return nullptr;
         }
         
-        bool checkHead(waitqueue_node<null_mutex> &node)
+        bool check_head(waitqueue_node<null_mutex> &node)
         {
             return true;
         }
         
-        bool isEmpty()
+        bool is_empty()
         {
             return true;
         }
@@ -225,12 +225,12 @@ namespace dprivate {
             return head;
         }
         
-        bool checkHead(waitqueue_node<T_Mutex> &node)
+        bool check_head(waitqueue_node<T_Mutex> &node)
         {
             return head == &node;
         }
         
-        bool isEmpty()
+        bool is_empty()
         {
             return head == nullptr;
         }
@@ -252,9 +252,9 @@ namespace dprivate {
     template <typename Loop> void post_dispatch(Loop &loop, base_watcher *watcher, rearm rearmType)
     {
         if (rearmType == rearm::REMOVE) {
-            loop.getBaseLock().unlock();
+            loop.get_base_lock().unlock();
             watcher->watch_removed();
-            loop.getBaseLock().lock();
+            loop.get_base_lock().lock();
         }
         else if (rearmType == rearm::REQUEUE) {
             loop.requeue_watcher(watcher);
@@ -263,9 +263,9 @@ namespace dprivate {
 
     // This class serves as the base class (mixin) for the AEN mechanism class.
     //
-    // The EventDispatch class maintains the queued event data structures. It inserts watchers
+    // The event_dispatch class maintains the queued event data structures. It inserts watchers
     // into the queue when events are received (receiveXXX methods).
-    template <typename T_Mutex, typename Traits> class EventDispatch : public Traits
+    template <typename T_Mutex, typename Traits> class event_dispatch : public Traits
     {
         template <typename, template <typename> class, typename> friend class dasynq::event_loop;
 
@@ -477,7 +477,7 @@ class event_loop
     using time_val = dasynq::time_val;
     
     private:
-    template <typename T, typename U> using EventDispatch = dprivate::EventDispatch<T,U>;
+    template <typename T, typename U> using event_dispatch = dprivate::event_dispatch<T,U>;
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
     using BaseWatcher = dprivate::base_watcher;
@@ -488,7 +488,7 @@ class event_loop
     using BaseTimerWatcher = dprivate::base_timer_watcher<T_Mutex>;
     using watch_type_t = dprivate::watch_type_t;
     
-    Loop<EventDispatch<T_Mutex, LoopTraits>> loop_mech;
+    Loop<event_dispatch<T_Mutex, LoopTraits>> loop_mech;
 
     // There is a complex problem with most asynchronous event notification mechanisms
     // when used in a multi-threaded environment. Generally, a file descriptor or other
@@ -538,7 +538,7 @@ class event_loop
     waitqueue<T_Mutex> attn_waitqueue;
     waitqueue<T_Mutex> wait_waitqueue;
     
-    T_Mutex &getBaseLock() noexcept
+    T_Mutex &get_base_lock() noexcept
     {
         return loop_mech.lock;
     }
@@ -562,7 +562,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.issueDelete(callBack);
         
         release_lock(qnode);
@@ -657,7 +657,7 @@ class event_loop
     void deregister(BaseFdWatcher *callback, int fd) noexcept
     {
         if (callback->emulatefd) {
-            auto & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+            auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
             ed.issueDelete(callback);
             return;
         }
@@ -667,7 +667,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        auto & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.issueDelete(callback);
         
         release_lock(qnode);        
@@ -685,7 +685,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.issueDelete(callback);
         
         release_lock(qnode);
@@ -738,7 +738,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.issueDelete(callback);
         
         release_lock(qnode);
@@ -774,16 +774,16 @@ class event_loop
         loop_mech.setTimer(callBack->timer_handle, timeout, interval, true, clock);
     }
 
-    void setTimerRel(BaseTimerWatcher *callBack, const timespec &timeout, clock_type clock) noexcept
+    void set_timer_rel(BaseTimerWatcher *callBack, const timespec &timeout, clock_type clock) noexcept
     {
         struct timespec interval {0, 0};
-        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true, clock);
+        loop_mech.set_timer_rel(callBack->timer_handle, timeout, interval, true, clock);
     }
     
-    void setTimerRel(BaseTimerWatcher *callBack, const timespec &timeout,
+    void set_timer_rel(BaseTimerWatcher *callBack, const timespec &timeout,
             const timespec &interval, clock_type clock) noexcept
     {
-        loop_mech.setTimerRel(callBack->timer_handle, timeout, interval, true, clock);
+        loop_mech.set_timer_rel(callBack->timer_handle, timeout, interval, true, clock);
     }
 
     void stop_timer(BaseTimerWatcher *callback, clock_type clock) noexcept
@@ -798,7 +798,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.issueDelete(callback);
         
         release_lock(qnode);
@@ -821,9 +821,9 @@ class event_loop
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
         attn_waitqueue.queue(&qnode);        
-        if (! attn_waitqueue.checkHead(qnode)) {
+        if (! attn_waitqueue.check_head(qnode)) {
             loop_mech.interrupt_wait();
-            while (! attn_waitqueue.checkHead(qnode)) {
+            while (! attn_waitqueue.check_head(qnode)) {
                 qnode.wait(ulock);
             }
         }
@@ -836,7 +836,7 @@ class event_loop
     void get_pollwait_lock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
-        if (attn_waitqueue.isEmpty()) {
+        if (attn_waitqueue.is_empty()) {
             // Queue is completely empty:
             attn_waitqueue.queue(&qnode);
         }
@@ -844,7 +844,7 @@ class event_loop
             wait_waitqueue.queue(&qnode);
         }
         
-        while (! attn_waitqueue.checkHead(qnode)) {
+        while (! attn_waitqueue.check_head(qnode)) {
             qnode.wait(ulock);
         }    
     }
@@ -858,7 +858,7 @@ class event_loop
             nhead->signal();
         }
         else {
-            if (! wait_waitqueue.isEmpty()) {
+            if (! wait_waitqueue.is_empty()) {
                 auto nhead = wait_waitqueue.getHead();
                 wait_waitqueue.unqueue();
                 attn_waitqueue.queue(nhead);
@@ -1079,7 +1079,7 @@ class event_loop
         }
     }
 
-    void processTimerRearm(BaseTimerWatcher *btw, rearm rearmType) noexcept
+    void process_timer_rearm(BaseTimerWatcher *btw, rearm rearmType) noexcept
     {
         // Called with lock held
         if (rearmType == rearm::REARM) {
@@ -1096,7 +1096,7 @@ class event_loop
     // Process all queued events; returns true if any events were processed.
     bool process_events() noexcept
     {
-        EventDispatch<T_Mutex, LoopTraits> & ed = (EventDispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.lock.lock();
         
         // So this pulls *all* currently pending events and processes them in the current thread.
@@ -1271,11 +1271,11 @@ class signal_watcher_impl : public signal_watcher<EventLoop>
     void dispatch(void *loop_ptr) noexcept override
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.getBaseLock().unlock();
+        loop.get_base_lock().unlock();
 
         auto rearmType = static_cast<Derived *>(this)->received(loop, this->siginfo.get_signo(), this->siginfo);
 
-        loop.getBaseLock().lock();
+        loop.get_base_lock().lock();
 
         if (rearmType != rearm::REMOVED) {
 
@@ -1365,7 +1365,7 @@ class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t
     
     void set_enabled(EventLoop &eloop, bool enable) noexcept
     {
-        std::lock_guard<T_Mutex> guard(eloop.getBaseLock());
+        std::lock_guard<T_Mutex> guard(eloop.get_base_lock());
         if (this->emulatefd) {
             this->emulate_enabled = enable;
         }
@@ -1422,11 +1422,11 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
         // In case emulating, clear enabled here; REARM or explicit set_enabled will re-enable.
         this->emulate_enabled = false;
 
-        loop.getBaseLock().unlock();
+        loop.get_base_lock().unlock();
 
         auto rearmType = static_cast<Derived *>(this)->fd_event(loop, this->watch_fd, this->event_flags);
 
-        loop.getBaseLock().lock();
+        loop.get_base_lock().lock();
 
         if (rearmType != rearm::REMOVED) {
             this->event_flags = 0;
@@ -1488,16 +1488,16 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
 
     void set_in_watch_enabled(EventLoop &eloop, bool b) noexcept
     {
-        eloop.getBaseLock().lock();
+        eloop.get_base_lock().lock();
         set_watch_enabled(eloop, true, b);
-        eloop.getBaseLock().unlock();
+        eloop.get_base_lock().unlock();
     }
     
     void set_out_watch_enabled(EventLoop &eloop, bool b) noexcept
     {
-        eloop.getBaseLock().lock();
+        eloop.get_base_lock().lock();
         set_watch_enabled(eloop, false, b);
-        eloop.getBaseLock().unlock();
+        eloop.get_base_lock().unlock();
     }
     
     // Set the watch flags, which enables/disables both the in-watch and the out-watch accordingly.
@@ -1508,9 +1508,9 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
     // (i.e. it is ok to call setWatchFlags from within the readReady/writeReady handlers if no other
     //  thread will poll the event loop; it is always ok to *dis*able a watcher that might be active,
     //  though the re-arm action returned by the callback may undo the effect).
-    void set_watches(EventLoop &eloop, int newFlags)
+    void set_watches(EventLoop &eloop, int newFlags) noexcept
     {
-        std::lock_guard<T_Mutex> guard(eloop.getBaseLock());
+        std::lock_guard<T_Mutex> guard(eloop.get_base_lock());
         bool use_emulation = this->emulatefd || basewatcher_get_emulatefd(this->outWatcher);
         if (use_emulation || EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
             set_watch_enabled(eloop, true, (newFlags & IN_EVENTS) != 0);
@@ -1616,11 +1616,11 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         this->emulate_enabled = false;
-        loop.getBaseLock().unlock();
+        loop.get_base_lock().unlock();
 
         auto rearmType = static_cast<Derived *>(this)->read_ready(loop, this->watch_fd);
 
-        loop.getBaseLock().lock();
+        loop.get_base_lock().lock();
 
         if (rearmType != rearm::REMOVED) {
             this->event_flags &= ~IN_EVENTS;
@@ -1641,11 +1641,11 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
         auto &outwatcher = bidi_fd_watcher<EventLoop>::outWatcher;
 
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.getBaseLock().unlock();
+        loop.get_base_lock().unlock();
 
         auto rearmType = static_cast<Derived *>(this)->write_ready(loop, this->watch_fd);
 
-        loop.getBaseLock().lock();
+        loop.get_base_lock().lock();
 
         if (rearmType != rearm::REMOVED) {
             this->event_flags &= ~OUT_EVENTS;
@@ -1745,7 +1745,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
                 reserve_watch(eloop);
             }
             
-            auto &lock = eloop.getBaseLock();
+            auto &lock = eloop.get_base_lock();
             lock.lock();
             
             pid_t child = ::fork();
@@ -1774,7 +1774,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
                 throw std::system_error(errno, std::system_category());
             }
             
-            std::lock_guard<T_Mutex> guard(eloop.getBaseLock());
+            std::lock_guard<T_Mutex> guard(eloop.get_base_lock());
             
             pid_t child = ::fork();
             if (child == -1) {
@@ -1826,11 +1826,11 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
     void dispatch(void *loop_ptr) noexcept override
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.getBaseLock().unlock();
+        loop.get_base_lock().unlock();
 
         auto rearmType = static_cast<Derived *>(this)->status_change(loop, this->watch_pid, this->child_status);
 
-        loop.getBaseLock().lock();
+        loop.get_base_lock().lock();
 
         if (rearmType != rearm::REMOVED) {
 
@@ -1877,13 +1877,13 @@ class timer : private base_timer_watcher<typename EventLoop::mutex_t>
     // Arm timer, relative to now:
     void arm_timer_rel(EventLoop &eloop, const timespec &timeout) noexcept
     {
-        eloop.setTimerRel(this, timeout, base_t::clock);
+        eloop.set_timer_rel(this, timeout, base_t::clock);
     }
     
     void arm_timer_rel(EventLoop &eloop, const timespec &timeout,
             const timespec &interval) noexcept
     {
-        eloop.setTimerRel(this, timeout, interval, base_t::clock);
+        eloop.set_timer_rel(this, timeout, interval, base_t::clock);
     }
     
     void stop_timer(EventLoop &eloop) noexcept
@@ -1945,11 +1945,11 @@ class timer_impl : public timer<EventLoop>
     void dispatch(void *loop_ptr) noexcept override
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.getBaseLock().unlock();
+        loop.get_base_lock().unlock();
 
         auto rearmType = static_cast<Derived *>(this)->timer_expiry(loop, this->intervals);
 
-        loop.getBaseLock().lock();
+        loop.get_base_lock().lock();
 
         if (rearmType != rearm::REMOVED) {
 
@@ -1959,7 +1959,7 @@ class timer_impl : public timer<EventLoop>
                 rearmType = rearm::REMOVE;
             }
 
-            loop.processTimerRearm(this, rearmType);
+            loop.process_timer_rearm(this, rearmType);
 
             post_dispatch(loop, this, rearmType);
         }
