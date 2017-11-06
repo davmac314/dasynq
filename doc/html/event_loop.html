@@ -127,4 +127,16 @@ virtual void watch_removed() noexcept
 point it is safe to <i class="code-name">delete</i> the watcher. Naturally watcher instances must not end their lifetime
 while they are registered to an event loop.</p> 
 
+<h3>Forking processes</h3>
+
+<p>The event loop state in the child process after forking is unspecified. The event loop should be destroyed and
+reconstructed in the child before it is used again.</p>
+
+<h3>Signals</h3>
+
+<p>The event loop may internally use certain signals, including <i class="code-name">SIGCHLD</i> and
+<i class="code-name">SIGALRM</i>. Blocking or installing handlers for these signals may interfere with the
+function of the event loop. Other signals should be safe for application use, although these can be handled
+easily using the event loop's support via signal watchers.</p>  
+
 </body></html>
