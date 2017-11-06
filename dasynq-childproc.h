@@ -78,7 +78,7 @@ inline void sigchld_handler(int signum)
 
 using pid_watch_handle_t = pid_map::pid_handle_t;
 
-template <class Base> class ChildProcEvents : public Base
+template <class Base> class child_proc_events : public Base
 {
     private:
     pid_map child_waiters;
@@ -106,36 +106,36 @@ template <class Base> class ChildProcEvents : public Base
     }
     
     public:
-    void reserveChildWatch(pid_watch_handle_t &handle)
+    void reserve_child_watch(pid_watch_handle_t &handle)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         child_waiters.reserve(handle);
     }
     
-    void unreserveChildWatch(pid_watch_handle_t &handle) noexcept
+    void unreserve_child_watch(pid_watch_handle_t &handle) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        unreserveChildWatch_nolock(handle);
+        unreserve_child_watch_nolock(handle);
     }
     
-    void unreserveChildWatch_nolock(pid_watch_handle_t &handle) noexcept
+    void unreserve_child_watch_nolock(pid_watch_handle_t &handle) noexcept
     {
         child_waiters.unreserve(handle);
     }
 
-    void addChildWatch(pid_watch_handle_t &handle, pid_t child, void *val)
+    void add_child_watch(pid_watch_handle_t &handle, pid_t child, void *val)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         child_waiters.add(handle, child, val);
     }
     
-    void addReservedChildWatch(pid_watch_handle_t &handle, pid_t child, void *val) noexcept
+    void add_reserved_child_watch(pid_watch_handle_t &handle, pid_t child, void *val) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         child_waiters.add_from_reserve(handle, child, val);
     }
 
-    void addReservedChildWatch_nolock(pid_watch_handle_t &handle, pid_t child, void *val) noexcept
+    void add_reserved_child_watch_nolock(pid_watch_handle_t &handle, pid_t child, void *val) noexcept
     {
         child_waiters.add_from_reserve(handle, child, val);
     }
@@ -147,13 +147,13 @@ template <class Base> class ChildProcEvents : public Base
         child_waiters.remove(handle);
     }
 
-    void removeChildWatch(pid_watch_handle_t &handle) noexcept
+    void remove_child_watch(pid_watch_handle_t &handle) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        removeChildWatch_nolock(handle);
+        remove_child_watch_nolock(handle);
     }
 
-    void removeChildWatch_nolock(pid_watch_handle_t &handle) noexcept
+    void remove_child_watch_nolock(pid_watch_handle_t &handle) noexcept
     {
         child_waiters.remove(handle);
         child_waiters.unreserve(handle);

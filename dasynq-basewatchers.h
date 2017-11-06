@@ -16,7 +16,7 @@ namespace dprivate {
     // (non-public API)
 
     class base_watcher;
-    using PrioQueue = NaryHeap<dprivate::base_watcher *, int>;
+    using prio_queue = NaryHeap<dprivate::base_watcher *, int>;
 
     template <typename T_Loop> class fd_watcher;
     template <typename T_Loop> class bidi_fd_watcher;
@@ -62,7 +62,7 @@ namespace dprivate {
         int emulatefd : 1; // emulate file watch (by re-queueing)
         int emulate_enabled : 1;   // whether an emulated watch is enabled
 
-        PrioQueue::handle_t heap_handle;
+        prio_queue::handle_t heap_handle;
         int priority;
 
         static void set_priority(base_watcher &p, int prio)
@@ -79,7 +79,7 @@ namespace dprivate {
             deleteme = false;
             emulatefd = false;
             emulate_enabled = false;
-            PrioQueue::init_handle(heap_handle);
+            prio_queue::init_handle(heap_handle);
             priority = DEFAULT_PRIORITY;
         }
 
@@ -165,7 +165,7 @@ namespace dprivate {
 
         // The main instance is the "input" watcher only; we keep a secondary watcher
         // with a secondary set of flags for the "output" watcher:
-        base_watcher outWatcher {watch_type_t::SECONDARYFD};
+        base_watcher out_watcher {watch_type_t::SECONDARYFD};
 
         int read_removed : 1; // read watch removed?
         int write_removed : 1; // write watch removed?

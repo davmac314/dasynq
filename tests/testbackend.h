@@ -11,7 +11,7 @@ namespace dasynq {
 class io_receiver
 {
     public:
-    virtual void receiveFdEvent(int fd_num, int events) = 0;
+    virtual void receive_fd_event(int fd_num, int events) = 0;
 };
 
 class event
@@ -35,7 +35,7 @@ class fd_event : public event
 
     void fire(io_receiver &r) override
     {
-        r.receiveFdEvent(fd, events);
+        r.receive_fd_event(fd, events);
     }
 };
 
@@ -223,7 +223,7 @@ template <class Base> class test_loop : public Base, io_receiver
     
     // Receive events from test queue:
 
-    void receiveFdEvent(int fd_num, int events)
+    void receive_fd_event(int fd_num, int events)
     {
         auto srch = fd_data_map.find(fd_num);
         if (srch != fd_data_map.end()) {
@@ -233,7 +233,7 @@ template <class Base> class test_loop : public Base, io_receiver
                 if (data.events & ONE_SHOT) {
                     data.events &= ~IN_EVENTS & ~OUT_EVENTS;
                 }
-                Base::receiveFdEvent(*this, test_loop_traits::FD_r(), data.userdata, rep_events);
+                Base::receive_fd_event(*this, test_loop_traits::FD_r(), data.userdata, rep_events);
             }
         }
     }

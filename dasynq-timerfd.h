@@ -17,7 +17,7 @@ namespace dasynq {
 // we are given a handle; we need to use this to modify the watch. We delegate the
 // process of allocating a handle to a priority heap implementation (BinaryHeap).
 
-template <class Base> class TimerFdEvents : public timer_base<Base>
+template <class Base> class timer_fd_events : public timer_base<Base>
 {
     private:
     int timerfd_fd = -1;
@@ -62,7 +62,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
         set_timer_from_queue(fd, queue);
     }
 
-    void setTimer(timer_handle_t & timer_id, const time_val &timeouttv, const time_val &intervaltv,
+    void set_timer(timer_handle_t & timer_id, const time_val &timeouttv, const time_val &intervaltv,
             timer_queue_t &queue, int fd, bool enable) noexcept
     {
         timespec timeout = timeouttv;
@@ -102,7 +102,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
 
     public:
     template <typename T>
-    void receiveFdEvent(T &loop_mech, typename Base::FD_r fd_r, void * userdata, int flags)
+    void receive_fd_event(T &loop_mech, typename Base::FD_r fd_r, void * userdata, int flags)
     {
         if (userdata == &timerfd_fd) {
             process_timer(clock_type::MONOTONIC, timerfd_fd, timer_queue);
@@ -111,7 +111,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
             process_timer(clock_type::SYSTEM, systemtime_fd, wallclock_queue);
         }
         else {
-            Base::receiveFdEvent(loop_mech, fd_r, userdata, flags);
+            Base::receive_fd_event(loop_mech, fd_r, userdata, flags);
         }
     }
 
@@ -140,20 +140,20 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
     }
 
     // Add timer, store into given handle
-    void addTimer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
+    void add_timer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         timer_queue_t & queue = get_queue(clock);
         queue.allocate(h, userdata);
     }
     
-    void removeTimer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    void remove_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        removeTimer_nolock(timer_id, clock);
+        remove_timer_nolock(timer_id, clock);
     }
     
-    void removeTimer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    void remove_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         stop_timer_nolock(timer_id, clock);
         timer_queue_t & queue = get_queue(clock);
@@ -181,7 +181,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
 
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
     //   enable: specifies whether to enable reporting of timeouts/intervals
-    void setTimer(timer_handle_t & timer_id, const time_val &timeouttv, const time_val &intervaltv,
+    void set_timer(timer_handle_t & timer_id, const time_val &timeouttv, const time_val &intervaltv,
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         timespec timeout = timeouttv;
@@ -189,10 +189,10 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
 
         switch (clock) {
         case clock_type::SYSTEM:
-            setTimer(timer_id, timeout, interval, wallclock_queue, systemtime_fd, enable);
+            set_timer(timer_id, timeout, interval, wallclock_queue, systemtime_fd, enable);
             break;
         case clock_type::MONOTONIC:
-            setTimer(timer_id, timeout, interval, timer_queue, timerfd_fd, enable);
+            set_timer(timer_id, timeout, interval, timer_queue, timerfd_fd, enable);
             break;
         default:
             DASYNQ_UNREACHABLE;
@@ -200,7 +200,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
     }
 
     // Set timer relative to current time:    
-    void setTimerRel(timer_handle_t & timer_id, const time_val &timeouttv, const time_val &intervaltv,
+    void set_timer_rel(timer_handle_t & timer_id, const time_val &timeouttv, const time_val &intervaltv,
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         timespec timeout = timeouttv;
@@ -228,7 +228,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
             curtime.tv_sec++;
         }
 
-        setTimer(timer_id, curtime, interval, enable, clock);
+        set_timer(timer_id, curtime, interval, enable, clock);
     }
     
     // Enables or disabling report of timeouts (does not stop timer)
@@ -266,7 +266,7 @@ template <class Base> class TimerFdEvents : public timer_base<Base>
         clock_gettime(posix_clock_id, &ts);
     }
 
-    ~TimerFdEvents()
+    ~timer_fd_events()
     {
         close(timerfd_fd);
         close(systemtime_fd);

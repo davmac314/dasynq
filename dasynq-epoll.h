@@ -14,17 +14,17 @@
 
 namespace dasynq {
 
-template <class Base> class EpollLoop;
+template <class Base> class epoll_loop;
 
 class EpollTraits
 {
-    template <class Base> friend class EpollLoop;
+    template <class Base> friend class epoll_loop;
 
     public:
 
     class SigInfo
     {
-        template <class Base> friend class EpollLoop;
+        template <class Base> friend class epoll_loop;
         
         struct signalfd_siginfo info;
         
@@ -67,7 +67,7 @@ class EpollTraits
 };
 
 
-template <class Base> class EpollLoop : public Base
+template <class Base> class epoll_loop : public Base
 {
     int epfd; // epoll fd
     int sigfd; // signalfd fd; -1 if not initialised
@@ -79,7 +79,7 @@ template <class Base> class EpollLoop : public Base
     //   lock - a lock that can be used to protect internal structure.
     //          receive*() methods will be called with lock held.
     //   receive_signal(SigInfo &, user *) noexcept
-    //   receiveFdEvent(FD_r, user *, int flags) noexcept
+    //   receive_fd_event(FD_r, user *, int flags) noexcept
     
     using SigInfo = EpollTraits::SigInfo;
     using FD_r = typename EpollTraits::FD_r;
@@ -113,7 +113,7 @@ template <class Base> class EpollLoop : public Base
                 (events[i].events & EPOLLHUP) && (flags |= IN_EVENTS);
                 (events[i].events & EPOLLOUT) && (flags |= OUT_EVENTS);
                 (events[i].events & EPOLLERR) && (flags |= IN_EVENTS | OUT_EVENTS | ERR_EVENTS);
-                Base::receiveFdEvent(*this, FD_r(), ptr, flags);
+                Base::receive_fd_event(*this, FD_r(), ptr, flags);
             }            
         }
     }
@@ -121,11 +121,11 @@ template <class Base> class EpollLoop : public Base
     public:
     
     /**
-     * EpollLoop constructor.
+     * epoll_loop constructor.
      *
      * Throws std::system_error or std::bad_alloc if the event loop cannot be initialised.
      */
-    EpollLoop() : sigfd(-1)
+    epoll_loop() : sigfd(-1)
     {
         epfd = epoll_create1(EPOLL_CLOEXEC);
         if (epfd == -1) {
@@ -135,7 +135,7 @@ template <class Base> class EpollLoop : public Base
         Base::init(this);
     }
     
-    ~EpollLoop()
+    ~epoll_loop()
     {
         close(epfd);
         if (sigfd != -1) {

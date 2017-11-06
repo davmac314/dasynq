@@ -36,17 +36,17 @@ extern "C" {
 
 namespace dasynq {
 
-template <class Base> class KqueueLoop;
+template <class Base> class kqueue_loop;
 
 class KqueueTraits
 {
-    template <class Base> friend class KqueueLoop;
+    template <class Base> friend class kqueue_loop;
 
     public:
 
     class SigInfo
     {
-        template <class Base> friend class KqueueLoop;
+        template <class Base> friend class kqueue_loop;
         
         siginfo_t info;
         
@@ -168,7 +168,7 @@ inline bool get_siginfo(int signo, siginfo_t *siginfo)
 
 #endif
 
-template <class Base> class KqueueLoop : public Base
+template <class Base> class kqueue_loop : public Base
 {
     int kqfd; // kqueue fd
     sigset_t sigmask; // enabled signal watch mask
@@ -190,8 +190,8 @@ template <class Base> class KqueueLoop : public Base
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
     //          receive*() methods will be called with lock held.
-    //   receiveSignal(SigInfo &, user *) noexcept
-    //   receiveFdEvent(FD_r, user *, int flags) noexcept
+    //   receive_signal(SigInfo &, user *) noexcept
+    //   receive_fd_event(FD_r, user *, int flags) noexcept
     
     using SigInfo = KqueueTraits::SigInfo;
     using FD_r = typename KqueueTraits::FD_r;
@@ -214,7 +214,7 @@ template <class Base> class KqueueLoop : public Base
             }
             else if (events[i].filter == EVFILT_READ || events[i].filter == EVFILT_WRITE) {
                 int flags = events[i].filter == EVFILT_READ ? IN_EVENTS : OUT_EVENTS;
-                Base::receiveFdEvent(*this, FD_r(events[i].ident), events[i].udata, flags);
+                Base::receive_fd_event(*this, FD_r(events[i].ident), events[i].udata, flags);
                 events[i].flags = EV_DISABLE | EV_CLEAR;
                 // we use EV_CLEAR to clear the EOF status of fifos/pipes (and wait for
                 // another connection).
@@ -231,11 +231,11 @@ template <class Base> class KqueueLoop : public Base
     public:
     
     /**
-     * KqueueLoop constructor.
+     * kqueue_loop constructor.
      *
      * Throws std::system_error or std::bad_alloc if the event loop cannot be initialised.
      */
-    KqueueLoop()
+    kqueue_loop()
     {
         kqfd = kqueue();
         if (kqfd == -1) {
@@ -245,7 +245,7 @@ template <class Base> class KqueueLoop : public Base
         Base::init(this);
     }
     
-    ~KqueueLoop()
+    ~kqueue_loop()
     {
         close(kqfd);
     }

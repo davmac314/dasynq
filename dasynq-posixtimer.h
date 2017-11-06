@@ -13,7 +13,7 @@ namespace dasynq {
 // Timer implementation based on POSIX create_timer et al.
 // May require linking with -lrt
 
-template <class Base> class PosixTimerEvents : public timer_base<Base>
+template <class Base> class posix_timer_events : public timer_base<Base>
 {
     private:
     timer_queue_t real_timer_queue;
@@ -123,19 +123,19 @@ template <class Base> class PosixTimerEvents : public timer_base<Base>
         Base::init(loop_mech);
     }
 
-    void addTimer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
+    void add_timer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         queue_for_clock(clock).allocate(h, userdata);
     }
 
-    void removeTimer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    void remove_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        removeTimer_nolock(timer_id, clock);
+        remove_timer_nolock(timer_id, clock);
     }
 
-    void removeTimer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    void remove_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         timer_queue_t &timer_queue = queue_for_clock(clock);
 
@@ -147,7 +147,7 @@ template <class Base> class PosixTimerEvents : public timer_base<Base>
 
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
     //   enable: specifies whether to enable reporting of timeouts/intervals
-    void setTimer(timer_handle_t &timer_id, time_val &timeouttv, struct timespec &interval,
+    void set_timer(timer_handle_t &timer_id, time_val &timeouttv, struct timespec &interval,
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         timespec timeout = timeouttv;
@@ -176,7 +176,7 @@ template <class Base> class PosixTimerEvents : public timer_base<Base>
     }
 
     // Set timer relative to current time:
-    void setTimerRel(timer_handle_t &timer_id, const time_val &timeouttv, const time_val &intervaltv,
+    void set_timer_rel(timer_handle_t &timer_id, const time_val &timeouttv, const time_val &intervaltv,
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         timespec timeout = timeouttv;
@@ -192,7 +192,7 @@ template <class Base> class PosixTimerEvents : public timer_base<Base>
             curtime.tv_nsec -= 1000000000;
             curtime.tv_sec++;
         }
-        setTimer(timer_id, curtime, interval, enable, clock);
+        set_timer(timer_id, curtime, interval, enable, clock);
     }
 
     // Enables or disabling report of timeouts (does not stop timer)
@@ -250,7 +250,7 @@ template <class Base> class PosixTimerEvents : public timer_base<Base>
         clock_gettime(posix_clock_id, &ts);
     }
 
-    ~PosixTimerEvents()
+    ~posix_timer_events()
     {
         timer_delete(mono_timer);
         timer_delete(real_timer);
