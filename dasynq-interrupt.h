@@ -6,6 +6,7 @@
 
 #include "dasynq-config.h"
 #include "dasynq-mutex.h"
+#include "dasynq-util.h"
 
 /*
  * Mechanism for interrupting an event loop wait.
@@ -27,24 +28,10 @@ template <typename Base> class interrupt_channel<Base, null_mutex> : public Base
 
 template <typename Base, typename Mutex> class interrupt_channel : public Base
 {
-#ifdef HAVE_PIPE2
-    int create_pipe(int filedes[2])
+    static inline int create_pipe(int filedes[2])
     {
         return pipe2(filedes, O_CLOEXEC | O_NONBLOCK);
     }
-#else
-    int create_pipe(int filedes[2])
-    {
-        int r = pipe(filedes);
-        if (r != -1) {
-            fcntl(filedes[0], F_SETFD, O_CLOEXEC);
-            fcntl(filedes[1], F_SETFD, O_CLOEXEC);
-            fcntl(filedes[0], F_SETFL, O_NONBLOCK);
-            fcntl(filedes[1], F_SETFL, O_NONBLOCK);
-        }
-        return r;
-    }
-#endif
 
     int pipe_r_fd;
     int pipe_w_fd;

@@ -6,6 +6,7 @@
 #include "dasynq-flags.h"
 #include "dasynq-naryheap.h"
 #include "dasynq-interrupt.h"
+#include "dasynq-util.h"
 
 // Dasynq uses a "mix-in" pattern to produce an event loop implementation incorporating selectable implementations of
 // various components (main backend, timers, child process watch mechanism etc). In C++ this can be achieved by
@@ -80,27 +81,6 @@ namespace dasynq {
 #include "dasynq-basewatchers.h"
 
 namespace dasynq {
-
-#if HAVE_PIPE2 == 0
-inline int pipe2(int filedes[2], int flags)
-{
-    if (pipe(filedes) == -1) {
-        return -1;
-    }
-
-    if (flags & O_CLOEXEC) {
-        fcntl(filedes[0], F_SETFD, FD_CLOEXEC);
-        fcntl(filedes[1], F_SETFD, FD_CLOEXEC);
-    }
-
-    if (flags & O_NONBLOCK) {
-        fcntl(filedes[0], F_SETFL, O_NONBLOCK);
-        fcntl(filedes[1], F_SETFL, O_NONBLOCK);
-    }
-
-    return 0;
-}
-#endif
 
 /**
  * Values for rearm/disarm return from event handlers
