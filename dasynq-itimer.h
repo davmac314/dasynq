@@ -10,6 +10,9 @@ namespace dasynq {
 
 // Timer implementation based on the (basically obsolete) POSIX itimer interface.
 
+// With this timer implementation, we only use one clock, and allow no distinction between the
+// monotonic and system time.
+
 template <class Base> class itimer_events : public timer_base<Base>
 {
     private:
@@ -30,7 +33,7 @@ template <class Base> class itimer_events : public timer_base<Base>
     }
 #endif
     
-    // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
+    // Set the aalrm timeout to match the first timer in the queue (disable the timerfd
     // if there are no active timers).
     void set_timer_from_queue()
     {

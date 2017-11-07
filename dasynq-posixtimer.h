@@ -237,19 +237,6 @@ template <class Base> class posix_timer_events : public timer_base<Base>
         }
     }
 
-    void get_time(timeval &tv, clock_type clock, bool force_update) noexcept
-    {
-        timespec ts;
-        get_time(ts, clock, force_update);
-        tv = ts;
-    }
-
-    void get_time(timespec &ts, clock_type clock, bool force_update) noexcept
-    {
-        int posix_clock_id = (clock == clock_type::MONOTONIC) ? CLOCK_MONOTONIC : CLOCK_REALTIME;
-        clock_gettime(posix_clock_id, &ts);
-    }
-
     ~posix_timer_events()
     {
         timer_delete(mono_timer);

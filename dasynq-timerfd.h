@@ -8,6 +8,8 @@
 
 namespace dasynq {
 
+// Timer implementation based on Linux's "timerfd".
+
 // We could use one timerfd per timer, but then we need to differentiate timer
 // descriptors from regular file descriptors when events are reported by the loop
 // mechanism so that we can correctly report a timer event or fd event.
@@ -251,19 +253,6 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         else {
             queue.node_data(timer_id).enabled = enable;
         }
-    }
-
-    void get_time(time_val &tv, clock_type clock, bool force_update) noexcept
-    {
-        timespec ts;
-        get_time(ts, clock, force_update);
-        tv = ts;
-    }
-
-    void get_time(timespec &ts, clock_type clock, bool force_update) noexcept
-    {
-        int posix_clock_id = (clock == clock_type::MONOTONIC) ? CLOCK_MONOTONIC : CLOCK_REALTIME;
-        clock_gettime(posix_clock_id, &ts);
     }
 
     ~timer_fd_events()

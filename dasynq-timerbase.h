@@ -296,6 +296,33 @@ template <typename Base> class timer_base : public Base
             timeout = &queue.get_root_priority();
         }
     }
+
+    public:
+
+    void get_time(time_val &tv, clock_type clock, bool force_update) noexcept
+    {
+        timespec ts;
+        get_time(ts, clock, force_update);
+        tv = ts;
+    }
+
+#ifdef CLOCK_MONOTONIC
+    void get_time(timespec &ts, clock_type clock, bool force_update) noexcept
+    {
+        int posix_clock_id = (clock == clock_type::MONOTONIC) ? CLOCK_MONOTONIC : CLOCK_REALTIME;
+        clock_gettime(posix_clock_id, &ts);
+    }
+#else
+    // If CLOCK_MONOTONIC is not defined, assume we only have gettimeofday():
+    void get_time(timespec &ts, clock_type clock, bool force_update) noexcept
+    {
+        struct timeval curtime_tv;
+        gettimeofday(&curtime_tv, nullptr);
+        ts.tv_sec = curtime_tv.tv_sec;
+        ts.tv_nsec = curtime_tv.tv_usec * 1000;
+    }
+#endif
+
 };
 
 }
