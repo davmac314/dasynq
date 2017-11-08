@@ -1682,6 +1682,13 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
         return kill(this->watch_pid, signo);
     }
 
+    // Reap a process after it has terminated. Some implementations may do this when the process
+    // termination is detected; in that case this will be a no-op.
+    int reap() noexcept
+    {
+        // nothing to do with this implementation.
+    }
+
     // Reserve resources for a child watcher with the given event loop.
     // Reservation can fail with std::bad_alloc. Some backends do not support
     // reservation (it will always fail) - check LoopTraits::supports_childwatch_reservation.

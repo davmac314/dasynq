@@ -281,6 +281,7 @@ On MacOS, at least on version 10.12.6, apperas to have a bug where signals gener
     {
         rearm status_change(loop_t &, pid_t child, int status)
         {
+            reap(); // make certain child process has been reaped
             return rearm::DISARM; // or REMOVE, REMOVED, NOOP
         }
     };
