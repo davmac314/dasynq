@@ -88,7 +88,7 @@ poll operation. With this in mind, there are essentially three ways of using an 
   thread. This requires a thread-safe event loop, and there are some limitations on use of certain
   methods.
 - Access the loop from multiple threads, including polling it from multiple threads. This requires
-  (obviously) a thread-safe event loop, and places significant (but not necessarily problematic)
+  (obviously) a thread-safe event loop, and places significant - but not necessarily problematic -
   limitations on the use of certain methods.
 
 The restrictions when using multiple threads mainly concern the activation of callbacks. When an
@@ -322,11 +322,25 @@ outside the callback function without releasing the reservation:
 
     my_child_watcher.stop_watch(my_loop);
 
-There are some caveats to using child watches. Establishing a child watch may cause the child
-process to be reaped (releasing its process id) before the watch callback is called. If you want
-to send a signal to a child process, special care should be taken; see the discussion on
-prioritising watches in section 5.3. In fact, running an event loop may cause _all_ child
-processes to be reaped, even if they are not being watched.
+There are some caveats to using child watches. The event loop may reap child processes (even
+processes which are not specifically being watched), and the callback may or may not be issued
+with the child process already having been reaped. Sending signals to processes in such an
+environment is prone to a race condition: since processes are identified by a numerical id, and
+process ids may be used, sending a signal to a process which may already have been reaped can
+theoretically actually deliver the signal to an unrelated process. To avoid that, use the
+`send_signal` function:
+
+    my_child_watcher.send_signal(SIGTERM);
+
+The return from this function is the same as for the POSIX kill() function, except that if the
+child has already been reaped, it will return -1 with `errno` set to `ESRCH`.
+
+To ensure that a child process is reaped, call the `reap` function from the callback:
+
+    my_child_watcher.reap();
+ 
+Note that for some implementations, where children are reaped by event loop procesing, the `reap`
+function may do nothing.
 
 
 ## 3.4 Timers
@@ -503,13 +517,9 @@ parameter (type `int`) to the registration function, eg:
 A lower priority value corresponds to a higher priority, so that "priority one" (1) is higher
 priority than "priority two". High priority watches will be called before lower priority watches.
 
-If you intend to send signals to child processes, you should always give the child process
-watchers a high priority, since the watcher may cause the child to be reaped before the status
-change is reported to the watcher. For multi-threaded event loop polling, there is currently no
-way to ensure that the child process id is still valid; this will likely be addressed in a future
-release. (Usually, the result of trying to signal a reaped process will be that the `signal`
-function returns an error; in theory, though, the signal might be sent to the wrong process, if
-the process id happens to have been re-used by a new process in the meantime).
+Due to events being processed in small batches in between pulling new events from the backend
+event loop mechanism, events may occasionally be processed out of priority order if the lower
+priority event was generated slightly earlier than a higher priority event.
 
 
 ### 5.4 Restrictions and limitations
@@ -536,7 +546,7 @@ spinning in a tight loop when the problem occurs; however, there are no very sat
 solutions that do not require significant and intrusive changes to the program.
 
 On systems without a suitable timer interface - in particular, systems without POSIX timers,
-including Mac OS X up to at least 10.11.6 and OpenBSD up to at least 6.1 - there is no distinction
+including Mac OS X up to at least 10.12 and OpenBSD up to at least 6.1 - there is no distinction
 between `MONOTONIC` and `SYSTEM` timers. On these systems you should use only relative timers
 and be aware that timers may not function correctly if the system time is adjusted.
 
@@ -545,9 +555,10 @@ The event loop may not function correctly in the child process after a `fork()` 
 in the child process, if it is needed.
 
 The implementation may use `SIGCHLD` to detect child process termination. Therefore you should not
-try to watch `SIGCHLD` independently.
+try to watch `SIGCHLD` independently, and should not try to add a watch for the `SIGCHLD` signal.
 
 Creating two event loop instances in a single application is not likely to work well, or at all.
 (This limitation may be lifted in a future release).
 
-You must not register a watcher with an event loop while it is currently registered.
+Watchers can be registered with only one event loop at any given time. You must not attempt to
+register and already-registered watcher with the same or another event loop.
