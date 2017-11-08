@@ -229,14 +229,14 @@ namespace dprivate {
     
     // Do standard post-dispatch processing for a watcher. This handles the case of removing or
     // re-queing watchers depending on the rearm type.
-    template <typename Loop> void post_dispatch(Loop &loop, base_watcher *watcher, rearm rearmType)
+    template <typename Loop> void post_dispatch(Loop &loop, base_watcher *watcher, rearm rearm_type)
     {
-        if (rearmType == rearm::REMOVE) {
+        if (rearm_type == rearm::REMOVE) {
             loop.get_base_lock().unlock();
             watcher->watch_removed();
             loop.get_base_lock().lock();
         }
-        else if (rearmType == rearm::REQUEUE) {
+        else if (rearm_type == rearm::REQUEUE) {
             loop.requeue_watcher(watcher);
         }
     }
@@ -248,6 +248,11 @@ namespace dprivate {
     template <typename T_Mutex, typename Traits> class event_dispatch : public Traits
     {
         template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+
+        public:
+        using mutex_t = T_Mutex;
+
+        private:
 
         // queue data structure/pointer
         prio_queue event_queue;
@@ -284,7 +289,7 @@ namespace dprivate {
         }
         
         protected:
-        T_Mutex lock;
+        mutex_t lock;
 
         template <typename T> void init(T *loop) noexcept { }
         
@@ -336,7 +341,7 @@ namespace dprivate {
             }
         }
         
-        void receiveChildStat(pid_t child, int status, void * userdata) noexcept
+        void receive_child_stat(pid_t child, int status, void * userdata) noexcept
         {
             base_child_watcher * watcher = static_cast<base_child_watcher *>(userdata);
             watcher->child_status = status;
@@ -344,7 +349,7 @@ namespace dprivate {
             queue_watcher(watcher);
         }
         
-        void receiveTimerExpiry(timer_handle_t & timer_handle, void * userdata, int intervals) noexcept
+        void receive_timer_expiry(timer_handle_t & timer_handle, void * userdata, int intervals) noexcept
         {
             base_timer_watcher * watcher = static_cast<base_timer_watcher *>(userdata);
             watcher->intervals = intervals;
@@ -352,7 +357,7 @@ namespace dprivate {
         }
         
         // Pull a single event from the queue; returns nullptr if the queue is empty.
-        base_watcher * pullEvent() noexcept
+        base_watcher * pull_event() noexcept
         {
             if (event_queue.empty()) {
                 return nullptr;
@@ -364,7 +369,7 @@ namespace dprivate {
             return r;
         }
         
-        void issueDelete(base_watcher *watcher) noexcept
+        void issue_delete(base_watcher *watcher) noexcept
         {
             // This is only called when the attention lock is held, so if the watcher is not
             // active/queued now, it cannot become active (and will not be reported with an event)
@@ -389,7 +394,7 @@ namespace dprivate {
             }
         }
         
-        void issueDelete(base_bidi_fd_watcher *watcher) noexcept
+        void issue_delete(base_bidi_fd_watcher *watcher) noexcept
         {
             lock.lock();
             
@@ -422,9 +427,6 @@ namespace dprivate {
                 lock.unlock();
             }
         }
-
-        public:
-        using mutex_t = T_Mutex;
     };
 }
 
@@ -548,7 +550,7 @@ class event_loop
         get_attn_lock(qnode);
         
         event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
-        ed.issueDelete(callBack);
+        ed.issue_delete(callBack);
         
         release_lock(qnode);
     }
@@ -643,7 +645,7 @@ class event_loop
     {
         if (callback->emulatefd) {
             auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
-            ed.issueDelete(callback);
+            ed.issue_delete(callback);
             return;
         }
         
@@ -653,7 +655,7 @@ class event_loop
         get_attn_lock(qnode);
         
         auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
-        ed.issueDelete(callback);
+        ed.issue_delete(callback);
         
         release_lock(qnode);        
     }
@@ -671,7 +673,7 @@ class event_loop
         get_attn_lock(qnode);
         
         event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
-        ed.issueDelete(callback);
+        ed.issue_delete(callback);
         
         release_lock(qnode);
     }
@@ -724,7 +726,7 @@ class event_loop
         get_attn_lock(qnode);
         
         event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
-        ed.issueDelete(callback);
+        ed.issue_delete(callback);
         
         release_lock(qnode);
     }
@@ -784,7 +786,7 @@ class event_loop
         get_attn_lock(qnode);
         
         event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
-        ed.issueDelete(callback);
+        ed.issue_delete(callback);
         
         release_lock(qnode);
     }
@@ -1087,7 +1089,7 @@ class event_loop
         // So this pulls *all* currently pending events and processes them in the current thread.
         // That's probably good for throughput, but maybe the behaviour should be configurable.
         
-        base_watcher * pqueue = ed.pullEvent();
+        base_watcher * pqueue = ed.pull_event();
         bool active = false;
         
         while (pqueue != nullptr) {
@@ -1110,12 +1112,12 @@ class event_loop
 
                 // issue a secondary dispatch:
                 bbfw->dispatch_second(this);
-                pqueue = ed.pullEvent();
+                pqueue = ed.pull_event();
                 continue;
             }
 
             pqueue->dispatch(this);
-            pqueue = ed.pullEvent();
+            pqueue = ed.pull_event();
         }
         
         ed.lock.unlock();

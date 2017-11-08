@@ -264,7 +264,7 @@ template <typename Base> class timer_base : public Base
                     data.enabled = false;
                     int expiry_count = data.expiry_count;
                     data.expiry_count = 0;
-                    Base::receiveTimerExpiry(thandle, data.userdata, expiry_count);
+                    Base::receive_timer_expiry(thandle, data.userdata, expiry_count);
                 }
                 if (queue.empty()) {
                     break;
@@ -288,7 +288,7 @@ template <typename Base> class timer_base : public Base
                     data.enabled = false;
                     int expiry_count = data.expiry_count;
                     data.expiry_count = 0;
-                    Base::receiveTimerExpiry(thandle, data.userdata, expiry_count);
+                    Base::receive_timer_expiry(thandle, data.userdata, expiry_count);
                 }
             }
 
@@ -309,7 +309,7 @@ template <typename Base> class timer_base : public Base
 #ifdef CLOCK_MONOTONIC
     void get_time(timespec &ts, clock_type clock, bool force_update) noexcept
     {
-        int posix_clock_id = (clock == clock_type::MONOTONIC) ? CLOCK_MONOTONIC : CLOCK_REALTIME;
+        clockid_t posix_clock_id = (clock == clock_type::MONOTONIC) ? CLOCK_MONOTONIC : CLOCK_REALTIME;
         clock_gettime(posix_clock_id, &ts);
     }
 #else

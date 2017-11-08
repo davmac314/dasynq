@@ -100,7 +100,7 @@ template <class Base> class child_proc_events : public Base
             while ((child = waitpid(-1, &status, WNOHANG)) > 0) {
                 pid_map::entry ent = child_waiters.remove(child);
                 if (ent.first) {
-                    Base::receiveChildStat(child, status, ent.second);
+                    Base::receive_child_stat(child, status, ent.second);
                 }
             }
             reaper_lock.unlock();

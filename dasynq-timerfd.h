@@ -248,7 +248,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         auto expiry_count = node_data.expiry_count;
         if (expiry_count != 0) {
             node_data.expiry_count = 0;
-            Base::receiveTimerExpiry(timer_id, node_data.userdata, expiry_count);
+            Base::receive_timer_expiry(timer_id, node_data.userdata, expiry_count);
         }
         else {
             queue.node_data(timer_id).enabled = enable;

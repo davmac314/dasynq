@@ -247,7 +247,7 @@ static void test_timer_base_processing()
         public:
         std::vector<void *> received_expirations;
 
-        void receiveTimerExpiry(dasynq::timer_handle_t & thandle, void *userdata, int expiry_count)
+        void receive_timer_expiry(dasynq::timer_handle_t & thandle, void *userdata, int expiry_count)
         {
             received_expirations.push_back(userdata);
         }
