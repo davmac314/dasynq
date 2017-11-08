@@ -2,8 +2,10 @@
 #include <memory>
 #include <unordered_map>
 
+#include "dasynq-config.h"
 #include "dasynq-flags.h"
 #include "dasynq-timerbase.h"
+#include "dasynq-mutex.h"
 
 namespace dasynq {
 
@@ -137,6 +139,8 @@ template <class Base> class test_loop : public Base, io_receiver
 
     public:    
     
+    using reaper_mutex_t = null_mutex;
+
     void pull_events(bool b)
     {
         test_io_engine::pull_events(*this);

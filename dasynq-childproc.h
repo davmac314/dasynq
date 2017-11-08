@@ -80,8 +80,12 @@ using pid_watch_handle_t = pid_map::pid_handle_t;
 
 template <class Base> class child_proc_events : public Base
 {
+    public:
+    using reaper_mutex_t = typename Base::mutex_t;
+
     private:
     pid_map child_waiters;
+    reaper_mutex_t reaper_lock; // used to prevent reaping while trying to signal a process
     
     protected:
     using SigInfo = typename Base::SigInfo;
@@ -92,12 +96,14 @@ template <class Base> class child_proc_events : public Base
         if (siginfo.get_signo() == SIGCHLD) {
             int status;
             pid_t child;
+            reaper_lock.lock();
             while ((child = waitpid(-1, &status, WNOHANG)) > 0) {
                 pid_map::entry ent = child_waiters.remove(child);
                 if (ent.first) {
                     Base::receiveChildStat(child, status, ent.second);
                 }
             }
+            reaper_lock.unlock();
             return false; // leave signal watch enabled
         }
         else {
@@ -159,6 +165,13 @@ template <class Base> class child_proc_events : public Base
         child_waiters.unreserve(handle);
     }
     
+    // Get the reaper lock, which can be used to ensure that a process is not reaped while attempting to
+    // signal it.
+    reaper_mutex_t &get_reaper_lock() noexcept
+    {
+        return reaper_lock;
+    }
+
     template <typename T> void init(T *loop_mech)
     {
         struct sigaction chld_action;

@@ -61,6 +61,7 @@ namespace dprivate {
         int deleteme : 1;  // delete when handler finished?
         int emulatefd : 1; // emulate file watch (by re-queueing)
         int emulate_enabled : 1;   // whether an emulated watch is enabled
+        int child_termd : 1;  // child process has terminated
 
         prio_queue::handle_t heap_handle;
         int priority;
@@ -79,6 +80,7 @@ namespace dprivate {
             deleteme = false;
             emulatefd = false;
             emulate_enabled = false;
+            child_termd = false;
             prio_queue::init_handle(heap_handle);
             priority = DEFAULT_PRIORITY;
         }

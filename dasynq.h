@@ -340,6 +340,7 @@ namespace dprivate {
         {
             base_child_watcher * watcher = static_cast<base_child_watcher *>(userdata);
             watcher->child_status = status;
+            watcher->child_termd = true;
             queue_watcher(watcher);
         }
         
@@ -450,6 +451,7 @@ class event_loop
     public:
     using loop_traits_t = LoopTraits;
     using time_val = dasynq::time_val;
+    using mutex_t = T_Mutex;
     
     private:
     template <typename T, typename U> using event_dispatch = dprivate::event_dispatch<T,U>;
@@ -463,7 +465,10 @@ class event_loop
     using base_timer_watcher = dprivate::base_timer_watcher<T_Mutex>;
     using watch_type_t = dprivate::watch_type_t;
     
-    Loop<event_dispatch<T_Mutex, LoopTraits>> loop_mech;
+    using loop_mech_t = Loop<event_dispatch<T_Mutex, LoopTraits>>;
+    using reaper_mutex_t = typename loop_mech_t::reaper_mutex_t;
+
+    loop_mech_t loop_mech;
 
     // There is a complex problem with most asynchronous event notification mechanisms
     // when used in a multi-threaded environment. Generally, a file descriptor or other
@@ -508,16 +513,21 @@ class event_loop
     // - The mutex only protects manipulation of the wait queues, and so should not
     //   be highly contended.
     
-    T_Mutex wait_lock;  // wait lock, used to prevent multiple threads from waiting
+    mutex_t wait_lock;  // wait lock, used to prevent multiple threads from waiting
                         // on the event queue simultaneously.
-    waitqueue<T_Mutex> attn_waitqueue;
-    waitqueue<T_Mutex> wait_waitqueue;
+    waitqueue<mutex_t> attn_waitqueue;
+    waitqueue<mutex_t> wait_waitqueue;
     
-    T_Mutex &get_base_lock() noexcept
+    mutex_t &get_base_lock() noexcept
     {
         return loop_mech.lock;
     }
     
+    reaper_mutex_t &get_reaper_lock() noexcept
+    {
+        return loop_mech.get_reaper_lock();
+    }
+
     void registerSignal(base_signal_watcher *callBack, int signo)
     {
         loop_mech.prepare_watcher(callBack);
@@ -1113,7 +1123,6 @@ class event_loop
     }
 
     public:
-    using mutex_t = T_Mutex;
     
     using fd_watcher = dprivate::fd_watcher<my_event_loop_t>;
     using bidi_fd_watcher = dprivate::bidi_fd_watcher<my_event_loop_t>;
@@ -1652,6 +1661,25 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
     using T_Mutex = typename EventLoop::mutex_t;
 
     public:
+
+    using event_loop_t = EventLoop;
+
+    // send a signal to this process, if it is still running, in a race-free manner.
+    // return is as for POSIX kill(); return is -1 with errno=ESRCH if process has
+    // already terminated.
+    int send_signal(event_loop_t &loop, int signo) noexcept
+    {
+        auto reaper_mutex = loop.get_reaper_mutex();
+        std::lock_guard<decltype(reaper_mutex)> guard(reaper_mutex);
+
+        if (this->child_termd) {
+            errno = ESRCH;
+            return -1;
+        }
+
+        return kill(this->watch_pid, signo);
+    }
+
     // Reserve resources for a child watcher with the given event loop.
     // Reservation can fail with std::bad_alloc. Some backends do not support
     // reservation (it will always fail) - check LoopTraits::supports_childwatch_reservation.
