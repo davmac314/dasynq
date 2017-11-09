@@ -88,10 +88,10 @@ template <class Base> class child_proc_events : public Base
     reaper_mutex_t reaper_lock; // used to prevent reaping while trying to signal a process
     
     protected:
-    using SigInfo = typename Base::SigInfo;
+    using sigdata_t = typename Base::sigdata_t;
     
     template <typename T>
-    bool receive_signal(T & loop_mech, SigInfo &siginfo, void *userdata)
+    bool receive_signal(T & loop_mech, sigdata_t &siginfo, void *userdata)
     {
         if (siginfo.get_signo() == SIGCHLD) {
             int status;
@@ -179,7 +179,7 @@ template <class Base> class child_proc_events : public Base
         sigemptyset(&chld_action.sa_mask);
         chld_action.sa_flags = 0;
         sigaction(SIGCHLD, &chld_action, nullptr);
-        loop_mech->addSignalWatch(SIGCHLD, nullptr);
+        loop_mech->add_signal_watch(SIGCHLD, nullptr);
         Base::init(loop_mech);
     }
 };

@@ -94,7 +94,7 @@ class test_io_engine
 class test_loop_traits
 {
     public:
-    class SigInfo
+    class sigdata_t
     {
         public:
         int get_signo()
@@ -105,12 +105,12 @@ class test_loop_traits
     
     constexpr static bool has_separate_rw_fd_watches = false;
     
-    class FD_r;
+    class fd_r;
 
     // File descriptor optional storage. If the mechanism can return the file descriptor, this
     // class will be empty, otherwise it can hold a file descriptor.
-    class FD_s {
-        friend class FD_r;
+    class fd_s {
+        friend class fd_r;
         
         // Epoll doesn't return the file descriptor (it can, but it can't return both file
         // descriptor and user data).
@@ -119,10 +119,10 @@ class test_loop_traits
 
     // File descriptor reference (passed to event callback). If the mechanism can return the
     // file descriptor, this class holds the file descriptor. Otherwise, the file descriptor
-    // must be stored in an FD_s instance.
-    class FD_r {
+    // must be stored in an fd_s instance.
+    class fd_r {
         public:
-        int getFd(FD_s ss)
+        int getFd(fd_s ss)
         {
             return ss.fd;
         }
@@ -151,7 +151,7 @@ template <class Base> class test_loop : public Base, io_receiver
     
     }
     
-    bool addFdWatch(int fd, void * callback, int eventmask, bool enabled, bool emulate = false)
+    bool add_fd_watch(int fd, void * callback, int eventmask, bool enabled, bool emulate = false)
     {
         if (! enabled) eventmask = 0;
 
@@ -182,7 +182,7 @@ template <class Base> class test_loop : public Base, io_receiver
         // TODO
     }
     
-    void enableFdWatch_nolock(int fd_num, void *userdata, int events)
+    void enable_fd_watch_nolock(int fd_num, void *userdata, int events)
     {
         auto srch = fd_data_map.find(fd_num);
         if (srch != fd_data_map.end()) {
@@ -194,7 +194,7 @@ template <class Base> class test_loop : public Base, io_receiver
         }
     }
     
-    void disableFdWatch_nolock(int fd_num, int events)
+    void disable_fd_watch_nolock(int fd_num, int events)
     {
         auto srch = fd_data_map.find(fd_num);
         if (srch != fd_data_map.end()) {
@@ -205,22 +205,22 @@ template <class Base> class test_loop : public Base, io_receiver
         }
     }
 
-    void removeFdWatch(int fd, int events)
+    void remove_fd_watch(int fd, int events)
     {
-        removeFdWatch_nolock(fd, events);
+        remove_fd_watch_nolock(fd, events);
     }
     
-    void removeFdWatch_nolock(int fd, int events)
+    void remove_fd_watch_nolock(int fd, int events)
     {
         fd_data_map.erase(fd);
     }
     
-    void rearmSignalWatch_nolock(int signo)
+    void rearm_signal_watch_nolock(int signo)
     {
         // TODO
     }
      
-    void removeSignalWatch_nolock(int signo)
+    void remove_signal_watch_nolock(int signo)
     {
         // TODO
     }
@@ -237,7 +237,7 @@ template <class Base> class test_loop : public Base, io_receiver
                 if (data.events & ONE_SHOT) {
                     data.events &= ~IN_EVENTS & ~OUT_EVENTS;
                 }
-                Base::receive_fd_event(*this, test_loop_traits::FD_r(), data.userdata, rep_events);
+                Base::receive_fd_event(*this, test_loop_traits::fd_r(), data.userdata, rep_events);
             }
         }
     }

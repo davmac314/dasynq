@@ -22,7 +22,7 @@ class EpollTraits
 
     public:
 
-    class SigInfo
+    class sigdata_t
     {
         template <class Base> friend class epoll_loop;
         
@@ -38,12 +38,12 @@ class EpollTraits
         void set_signo(int signo) { info.ssi_signo = signo; }
     };    
 
-    class FD_r;
+    class fd_r;
 
     // File descriptor optional storage. If the mechanism can return the file descriptor, this
     // class will be empty, otherwise it can hold a file descriptor.
-    class FD_s {
-        friend class FD_r;
+    class fd_s {
+        friend class fd_r;
         
         // Epoll doesn't return the file descriptor (it can, but it can't return both file
         // descriptor and user data).
@@ -52,10 +52,10 @@ class EpollTraits
 
     // File descriptor reference (passed to event callback). If the mechanism can return the
     // file descriptor, this class holds the file descriptor. Otherwise, the file descriptor
-    // must be stored in an FD_s instance.
-    class FD_r {
+    // must be stored in an fd_s instance.
+    class fd_r {
         public:
-        int getFd(FD_s ss)
+        int getFd(fd_s ss)
         {
             return ss.fd;
         }
@@ -78,11 +78,11 @@ template <class Base> class epoll_loop : public Base
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
     //          receive*() methods will be called with lock held.
-    //   receive_signal(SigInfo &, user *) noexcept
-    //   receive_fd_event(FD_r, user *, int flags) noexcept
+    //   receive_signal(sigdata_t &, user *) noexcept
+    //   receive_fd_event(fd_r, user *, int flags) noexcept
     
-    using SigInfo = EpollTraits::SigInfo;
-    using FD_r = typename EpollTraits::FD_r;
+    using sigdata_t = EpollTraits::sigdata_t;
+    using fd_r = typename EpollTraits::fd_r;
     
     void process_events(epoll_event *events, int r)
     {
@@ -93,7 +93,7 @@ template <class Base> class epoll_loop : public Base
             
             if (ptr == &sigfd) {
                 // Signal
-                SigInfo siginfo;
+                sigdata_t siginfo;
                 while (true) {
                     int r = read(sigfd, &siginfo.info, sizeof(siginfo.info));
                     if (r == -1) break;
@@ -113,7 +113,7 @@ template <class Base> class epoll_loop : public Base
                 (events[i].events & EPOLLHUP) && (flags |= IN_EVENTS);
                 (events[i].events & EPOLLOUT) && (flags |= OUT_EVENTS);
                 (events[i].events & EPOLLERR) && (flags |= IN_EVENTS | OUT_EVENTS | ERR_EVENTS);
-                Base::receive_fd_event(*this, FD_r(), ptr, flags);
+                Base::receive_fd_event(*this, fd_r(), ptr, flags);
             }            
         }
     }
@@ -150,7 +150,7 @@ template <class Base> class epoll_loop : public Base
     //             of throwing an exception
     // returns: true on success; false if file descriptor type isn't supported and soft_fail == true
     // throws:  std::system_error or std::bad_alloc on failure
-    bool addFdWatch(int fd, void *userdata, int flags, bool enabled = true, bool soft_fail = false)
+    bool add_fd_watch(int fd, void *userdata, int flags, bool enabled = true, bool soft_fail = false)
     {
         struct epoll_event epevent;
         // epevent.data.fd = fd;
@@ -176,7 +176,7 @@ template <class Base> class epoll_loop : public Base
         return true;
     }
     
-    bool addBidiFdWatch(int fd, void *userdata, int flags, bool emulate)
+    bool add_bidi_fd_watch(int fd, void *userdata, int flags, bool emulate)
     {
         // No implementation.
         throw std::system_error(std::make_error_code(std::errc::not_supported));
@@ -184,25 +184,25 @@ template <class Base> class epoll_loop : public Base
     
     // flags specifies which watch to remove; ignored if the loop doesn't support
     // separate read/write watches.
-    void removeFdWatch(int fd, int flags) noexcept
+    void remove_fd_watch(int fd, int flags) noexcept
     {
         epoll_ctl(epfd, EPOLL_CTL_DEL, fd, nullptr);
     }
     
-    void removeFdWatch_nolock(int fd, int flags) noexcept
+    void remove_fd_watch_nolock(int fd, int flags) noexcept
     {
-        removeFdWatch(fd, flags);
+        remove_fd_watch(fd, flags);
     }
     
-    void removeBidiFdWatch(int fd) noexcept
+    void remove_bidi_fd_watch(int fd) noexcept
     {
         // Shouldn't be called for epoll.
-        removeFdWatch(fd, IN_EVENTS | OUT_EVENTS);
+        remove_fd_watch(fd, IN_EVENTS | OUT_EVENTS);
     }
     
     // Note this will *replace* the old flags with the new, that is,
     // it can enable *or disable* read/write events.
-    void enableFdWatch(int fd, void *userdata, int flags) noexcept
+    void enable_fd_watch(int fd, void *userdata, int flags) noexcept
     {
         struct epoll_event epevent;
         // epevent.data.fd = fd;
@@ -225,12 +225,12 @@ template <class Base> class epoll_loop : public Base
         }
     }
     
-    void enableFdWatch_nolock(int fd, void *userdata, int flags)
+    void enable_fd_watch_nolock(int fd, void *userdata, int flags)
     {
-        enableFdWatch(fd, userdata, flags);
+        enable_fd_watch(fd, userdata, flags);
     }
     
-    void disableFdWatch(int fd, int flags) noexcept
+    void disable_fd_watch(int fd, int flags) noexcept
     {
         struct epoll_event epevent;
         // epevent.data.fd = fd;
@@ -246,13 +246,13 @@ template <class Base> class epoll_loop : public Base
         }
     }
     
-    void disableFdWatch_nolock(int fd, int flags) noexcept
+    void disable_fd_watch_nolock(int fd, int flags) noexcept
     {
-        disableFdWatch(fd, flags);
+        disable_fd_watch(fd, flags);
     }
     
     // Note signal should be masked before call.
-    void addSignalWatch(int signo, void *userdata)
+    void add_signal_watch(int signo, void *userdata)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
 
@@ -282,22 +282,22 @@ template <class Base> class epoll_loop : public Base
     }
     
     // Note, called with lock held:
-    void rearmSignalWatch_nolock(int signo) noexcept
+    void rearm_signal_watch_nolock(int signo) noexcept
     {
         sigaddset(&sigmask, signo);
         signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
     }
     
-    void removeSignalWatch_nolock(int signo) noexcept
+    void remove_signal_watch_nolock(int signo) noexcept
     {
         sigdelset(&sigmask, signo);
         signalfd(sigfd, &sigmask, 0);
     }
 
-    void removeSignalWatch(int signo) noexcept
+    void remove_signal_watch(int signo) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        removeSignalWatch_nolock(signo);
+        remove_signal_watch_nolock(signo);
     }
     
     // If events are pending, process an unspecified number of them.

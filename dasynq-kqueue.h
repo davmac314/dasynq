@@ -38,13 +38,13 @@ namespace dasynq {
 
 template <class Base> class kqueue_loop;
 
-class KqueueTraits
+class kqueue_traits
 {
     template <class Base> friend class kqueue_loop;
 
     public:
 
-    class SigInfo
+    class sigdata_t
     {
         template <class Base> friend class kqueue_loop;
         
@@ -58,25 +58,25 @@ class KqueueTraits
         void set_signo(int signo) { info.si_signo = signo; }
     };    
 
-    class FD_r;
+    class fd_r;
 
     // File descriptor optional storage. If the mechanism can return the file descriptor, this
     // class will be empty, otherwise it can hold a file descriptor.
-    class FD_s {
+    class fd_s {
         DASYNQ_EMPTY_BODY
     };
 
     // File descriptor reference (passed to event callback). If the mechanism can return the
     // file descriptor, this class holds the file descriptor. Otherwise, the file descriptor
-    // must be stored in an FD_s instance.
-    class FD_r {
+    // must be stored in an fd_s instance.
+    class fd_r {
         int fd;
         public:
-        int getFd(FD_s ss)
+        int getFd(fd_s ss)
         {
             return fd;
         }
-        FD_r(int nfd) : fd(nfd)
+        fd_r(int nfd) : fd(nfd)
         {
         }
     };
@@ -185,16 +185,16 @@ template <class Base> class kqueue_loop : public Base
     //  3) no more deliveries of the same signal have been attempted in the meantime.
     // Of course, if kqueue doesn't report the signal, then it doesn't give us the data associated
     // with the event, so we need to maintain that separately too:
-    std::unordered_map<int, void *> sigdataMap;
+    std::unordered_map<int, void *> sigdata_map;
     
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
     //          receive*() methods will be called with lock held.
-    //   receive_signal(SigInfo &, user *) noexcept
-    //   receive_fd_event(FD_r, user *, int flags) noexcept
+    //   receive_signal(sigdata_t &, user *) noexcept
+    //   receive_fd_event(fd_r, user *, int flags) noexcept
     
-    using SigInfo = KqueueTraits::SigInfo;
-    using FD_r = typename KqueueTraits::FD_r;
+    using sigdata_t = kqueue_traits::sigdata_t;
+    using fd_r = typename kqueue_traits::fd_r;
     
     void process_events(struct kevent *events, int r)
     {
@@ -202,7 +202,7 @@ template <class Base> class kqueue_loop : public Base
         
         for (int i = 0; i < r; i++) {
             if (events[i].filter == EVFILT_SIGNAL) {
-                SigInfo siginfo;
+                sigdata_t siginfo;
                 if (get_siginfo(events[i].ident, &siginfo.info)
                         && Base::receive_signal(*this, siginfo, (void *)events[i].udata)) {
                     sigdelset(&sigmask, events[i].ident);
@@ -214,7 +214,7 @@ template <class Base> class kqueue_loop : public Base
             }
             else if (events[i].filter == EVFILT_READ || events[i].filter == EVFILT_WRITE) {
                 int flags = events[i].filter == EVFILT_READ ? IN_EVENTS : OUT_EVENTS;
-                Base::receive_fd_event(*this, FD_r(events[i].ident), events[i].udata, flags);
+                Base::receive_fd_event(*this, fd_r(events[i].ident), events[i].udata, flags);
                 events[i].flags = EV_DISABLE | EV_CLEAR;
                 // we use EV_CLEAR to clear the EOF status of fifos/pipes (and wait for
                 // another connection).
@@ -250,7 +250,7 @@ template <class Base> class kqueue_loop : public Base
         close(kqfd);
     }
     
-    void setFilterEnabled(short filterType, uintptr_t ident, void *udata, bool enable)
+    void set_filter_enabled(short filterType, uintptr_t ident, void *udata, bool enable)
     {
         // Note, on OpenBSD enabling or disabling filter will not alter the filter parameters (udata etc);
         // on OS X however, it will. Therefore we set udata here (to the same value as it was originally
@@ -260,7 +260,7 @@ template <class Base> class kqueue_loop : public Base
         kevent(kqfd, &kev, 1, nullptr, 0, nullptr);
     }
     
-    void removeFilter(short filterType, uintptr_t ident)
+    void remove_filter(short filterType, uintptr_t ident)
     {
         struct kevent kev;
         EV_SET(&kev, ident, filterType, EV_DELETE, 0, 0, 0);
@@ -275,7 +275,7 @@ template <class Base> class kqueue_loop : public Base
     //             of throwing an exception
     // returns: true on success; false if file descriptor type isn't supported and soft_fail == true
     // throws:  std::system_error or std::bad_alloc on failure
-    bool addFdWatch(int fd, void *userdata, int flags, bool enabled = true, bool emulate = false)
+    bool add_fd_watch(int fd, void *userdata, int flags, bool enabled = true, bool emulate = false)
     {
         short filter = (flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE;
 
@@ -294,7 +294,7 @@ template <class Base> class kqueue_loop : public Base
     // returns: 0 on success
     //          IN_EVENTS  if in watch requires emulation
     //          OUT_EVENTS if out watch requires emulation
-    int addBidiFdWatch(int fd, void *userdata, int flags, bool emulate = false)
+    int add_bidi_fd_watch(int fd, void *userdata, int flags, bool emulate = false)
     {
 #ifdef EV_RECEIPT
         struct kevent kev[2];
@@ -368,17 +368,17 @@ template <class Base> class kqueue_loop : public Base
     
     // flags specifies which watch to remove; ignored if the loop doesn't support
     // separate read/write watches.
-    void removeFdWatch(int fd, int flags)
+    void remove_fd_watch(int fd, int flags)
     {        
-        removeFilter((flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE, fd);
+        remove_filter((flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE, fd);
     }
     
-    void removeFdWatch_nolock(int fd, int flags)
+    void remove_fd_watch_nolock(int fd, int flags)
     {
-        removeFdWatch(fd, flags);
+        remove_fd_watch(fd, flags);
     }
 
-    void removeBidiFdWatch(int fd) noexcept
+    void remove_bidi_fd_watch(int fd) noexcept
     {
         struct kevent kev[2];
         EV_SET(&kev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, nullptr);
@@ -387,32 +387,32 @@ template <class Base> class kqueue_loop : public Base
         kevent(kqfd, kev, 2, nullptr, 0, nullptr);
     }
     
-    void enableFdWatch(int fd, void *userdata, int flags)
+    void enable_fd_watch(int fd, void *userdata, int flags)
     {
-        setFilterEnabled((flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE, fd, userdata, true);
+        set_filter_enabled((flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE, fd, userdata, true);
     }
     
-    void enableFdWatch_nolock(int fd, void *userdata, int flags)
+    void enable_fd_watch_nolock(int fd, void *userdata, int flags)
     {
-        enableFdWatch(fd, userdata, flags);
+        enable_fd_watch(fd, userdata, flags);
     }
     
-    void disableFdWatch(int fd, int flags)
+    void disable_fd_watch(int fd, int flags)
     {
-        setFilterEnabled((flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE, fd, nullptr, false);
+        set_filter_enabled((flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE, fd, nullptr, false);
     }
     
-    void disableFdWatch_nolock(int fd, int flags)
+    void disable_fd_watch_nolock(int fd, int flags)
     {
-        disableFdWatch(fd, flags);
+        disable_fd_watch(fd, flags);
     }
     
     // Note signal should be masked before call.
-    void addSignalWatch(int signo, void *userdata)
+    void add_signal_watch(int signo, void *userdata)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
-        sigdataMap[signo] = userdata;
+        sigdata_map[signo] = userdata;
         sigaddset(&sigmask, signo);
         
         prepare_signal(signo);
@@ -427,7 +427,7 @@ template <class Base> class kqueue_loop : public Base
     }
     
     // Note, called with lock held:
-    void rearmSignalWatch_nolock(int signo) noexcept
+    void rearm_signal_watch_nolock(int signo) noexcept
     {
         sigaddset(&sigmask, signo);
         
@@ -438,7 +438,7 @@ template <class Base> class kqueue_loop : public Base
         kevent(kqfd, &evt, 1, nullptr, 0, nullptr);
     }
     
-    void removeSignalWatch_nolock(int signo) noexcept
+    void remove_signal_watch_nolock(int signo) noexcept
     {
         unprep_signal(signo);
         sigdelset(&sigmask, signo);
@@ -449,10 +449,10 @@ template <class Base> class kqueue_loop : public Base
         kevent(kqfd, &evt, 1, nullptr, 0, nullptr);
     }
 
-    void removeSignalWatch(int signo) noexcept
+    void remove_signal_watch(int signo) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        removeSignalWatch_nolock(signo);
+        remove_signal_watch_nolock(signo);
     }
     
     private:
@@ -477,14 +477,14 @@ template <class Base> class kqueue_loop : public Base
             struct timespec timeout;
             timeout.tv_sec = 0;
             timeout.tv_nsec = 0;
-            SigInfo siginfo;
+            sigdata_t siginfo;
             int rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             while (rsigno > 0) {
-                if (Base::receiveSignal(*this, siginfo, sigdataMap[rsigno])) {
+                if (Base::receive_signal(*this, siginfo, sigdata_map[rsigno])) {
                     sigdelset(&sigmask, rsigno);
                     // TODO accumulate and disable multiple filters with a single kevents call
                     //      rather than disabling each individually
-                    setFilterEnabled(EVFILT_SIGNAL, rsigno, sigdataMap[rsigno], false);
+                    set_filter_enabled(EVFILT_SIGNAL, rsigno, sigdata_map[rsigno], false);
                 }
                 rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
             }

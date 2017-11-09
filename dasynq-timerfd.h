@@ -104,7 +104,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
 
     public:
     template <typename T>
-    void receive_fd_event(T &loop_mech, typename Base::FD_r fd_r, void * userdata, int flags)
+    void receive_fd_event(T &loop_mech, typename Base::fd_r fd_r_a, void * userdata, int flags)
     {
         if (userdata == &timerfd_fd) {
             process_timer(clock_type::MONOTONIC, timerfd_fd, timer_queue);
@@ -113,7 +113,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
             process_timer(clock_type::SYSTEM, systemtime_fd, wallclock_queue);
         }
         else {
-            Base::receive_fd_event(loop_mech, fd_r, userdata, flags);
+            Base::receive_fd_event(loop_mech, fd_r_a, userdata, flags);
         }
     }
 
@@ -130,8 +130,8 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         }
 
         try {
-            loop_mech->addFdWatch(timerfd_fd, &timerfd_fd, IN_EVENTS);
-            loop_mech->addFdWatch(systemtime_fd, &systemtime_fd, IN_EVENTS);
+            loop_mech->add_fd_watch(timerfd_fd, &timerfd_fd, IN_EVENTS);
+            loop_mech->add_fd_watch(systemtime_fd, &systemtime_fd, IN_EVENTS);
             Base::init(loop_mech);
         }
         catch (...) {

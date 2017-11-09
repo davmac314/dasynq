@@ -79,10 +79,10 @@ template <class Base> class itimer_events : public timer_base<Base>
     
     protected:
     
-    using SigInfo = typename Base::SigInfo;
+    using sigdata_t = typename Base::sigdata_t;
 
     template <typename T>
-    bool receive_signal(T & loop_mech, SigInfo &siginfo, void *userdata)
+    bool receive_signal(T & loop_mech, sigdata_t &siginfo, void *userdata)
     {
         if (siginfo.get_signo() == SIGALRM) {
             struct timespec curtime;
@@ -107,7 +107,7 @@ template <class Base> class itimer_events : public timer_base<Base>
         sigprocmask(SIG_UNBLOCK, nullptr, &sigmask);
         sigaddset(&sigmask, SIGALRM);
         sigprocmask(SIG_SETMASK, &sigmask, nullptr);
-        loop_mech->addSignalWatch(SIGALRM, nullptr);
+        loop_mech->add_signal_watch(SIGALRM, nullptr);
         Base::init(loop_mech);
     }
 

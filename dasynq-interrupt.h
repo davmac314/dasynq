@@ -49,7 +49,7 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
         pipe_w_fd = pipedes[1];
 
         try {
-            loop_mech->addFdWatch(pipe_r_fd, &pipe_r_fd, IN_EVENTS);
+            loop_mech->add_fd_watch(pipe_r_fd, &pipe_r_fd, IN_EVENTS);
         }
         catch (...) {
             close (pipe_r_fd);
@@ -61,7 +61,7 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
     }
 
     template <typename T>
-    void receive_fd_event(T &loop_mech, typename Base::FD_r fd_r, void * userdata, int flags)
+    void receive_fd_event(T &loop_mech, typename Base::fd_r fd_r_a, void * userdata, int flags)
     {
         if (userdata == &pipe_r_fd) {
             // try to clear the pipe
@@ -69,7 +69,7 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
             read(pipe_r_fd, buf, 64);
         }
         else {
-            Base::receive_fd_event(loop_mech, fd_r, userdata, flags);
+            Base::receive_fd_event(loop_mech, fd_r_a, userdata, flags);
         }
     }
 

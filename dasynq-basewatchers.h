@@ -128,11 +128,11 @@ namespace dprivate {
         template <typename, template <typename> class, typename> friend class dasynq::event_loop;
 
         protected:
-        typename Traits::SigInfo siginfo;
+        typename Traits::sigdata_t siginfo;
         base_signal_watcher() : base_watcher(watch_type_t::SIGNAL) { }
 
         public:
-        using siginfo_t = typename Traits::SigInfo;
+        using siginfo_t = typename Traits::sigdata_t;
         typedef siginfo_t &siginfo_p;
     };
 
