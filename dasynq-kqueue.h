@@ -16,6 +16,7 @@ extern "C" {
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -196,6 +197,18 @@ template <class Base> class kqueue_loop : public Base
     using sigdata_t = kqueue_traits::sigdata_t;
     using fd_r = typename kqueue_traits::fd_r;
     
+    // The flag to specify poll() semantics for regular file readiness: that is, we want
+    // ready-for-read to be returned even at end of file:
+#if defined(NOTE_FILE_POLL)
+    // FreeBSD:
+    constexpr static int POLL_SEMANTICS = NOTE_FILE_POLL;
+#else
+    // Note that macOS has an "EV_POLL" defined that looks like it should give poll semantics
+    // when passed as a flag. However, it is filtered at the syscall entry so we cannot use it in
+    // kqueue. (The kernel uses it internally to implement poll()).
+    constexpr static int POLL_SEMANTICS = 0;
+#endif
+
     void process_events(struct kevent *events, int r)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
@@ -256,7 +269,8 @@ template <class Base> class kqueue_loop : public Base
         // on OS X however, it will. Therefore we set udata here (to the same value as it was originally
         // set) in order to work correctly on both kernels.
         struct kevent kev;
-        EV_SET(&kev, ident, filterType, enable ? EV_ENABLE : EV_DISABLE, 0, 0, udata);
+        int fflags = (filterType == EVFILT_READ) ? POLL_SEMANTICS : 0;
+        EV_SET(&kev, ident, filterType, enable ? EV_ENABLE : EV_DISABLE, fflags, 0, udata);
         kevent(kqfd, &kev, 1, nullptr, 0, nullptr);
     }
     
@@ -273,17 +287,31 @@ template <class Base> class kqueue_loop : public Base
     //             (only one of IN_EVENTS/OUT_EVENTS can be specified)
     // soft_fail:  true if unsupported file descriptors should fail by returning false instead
     //             of throwing an exception
-    // returns: true on success; false if file descriptor type isn't supported and soft_fail == true
+    // returns: true on success; false if file descriptor type isn't supported and emulate == true
     // throws:  std::system_error or std::bad_alloc on failure
     bool add_fd_watch(int fd, void *userdata, int flags, bool enabled = true, bool emulate = false)
     {
         short filter = (flags & IN_EVENTS) ? EVFILT_READ : EVFILT_WRITE;
 
+        if (filter == EVFILT_READ && POLL_SEMANTICS == 0 && emulate) {
+            // We can't request poll semantics, so check for regular file:
+            struct stat statbuf;
+            if (fstat(fd, &statbuf) == -1) {
+                throw new std::system_error(errno, std::system_category());
+            }
+            if ((statbuf.st_mode & S_IFMT) == S_IFREG) {
+                // Regular file: emulation required
+                return false;
+            }
+        }
+
+        int fflags = (filter == EVFILT_READ) ? POLL_SEMANTICS : 0;
+
         struct kevent kev;
-        EV_SET(&kev, fd, filter, EV_ADD | (enabled ? 0 : EV_DISABLE), 0, 0, userdata);
+        EV_SET(&kev, fd, filter, EV_ADD | (enabled ? 0 : EV_DISABLE), fflags, 0, userdata);
         if (kevent(kqfd, &kev, 1, nullptr, 0, nullptr) == -1) {
-            // Note that kqueue supports EVFILT_READ on regular file fd's, but not EVFIL_WRITE.
-            if (filter == EVFILT_WRITE && errno == EINVAL) {
+            // Note that kqueue supports EVFILT_READ on regular file fd's, but not EVFILT_WRITE.
+            if (filter == EVFILT_WRITE && errno == EINVAL && emulate) {
                 return false; // emulate
             }
             throw new std::system_error(errno, std::system_category());
@@ -301,7 +329,7 @@ template <class Base> class kqueue_loop : public Base
         struct kevent kev_r[2];
         short rflags = EV_ADD | ((flags & IN_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
         short wflags = EV_ADD | ((flags & OUT_EVENTS) ? 0 : EV_DISABLE) | EV_RECEIPT;
-        EV_SET(&kev[0], fd, EVFILT_READ, rflags, 0, 0, userdata);
+        EV_SET(&kev[0], fd, EVFILT_READ, rflags, POLL_SEMANTICS, 0, userdata);
         EV_SET(&kev[1], fd, EVFILT_WRITE, wflags, 0, 0, userdata);
 
         int r = kevent(kqfd, kev, 2, kev_r, 2, nullptr);
@@ -323,7 +351,16 @@ template <class Base> class kqueue_loop : public Base
 
         if (kev_r[1].data != 0) {
             if (emulate) {
-                return OUT_EVENTS;
+                // We can emulate, but, do we have correct semantics?
+                if (POLL_SEMANTICS != 0) {
+                    return OUT_EVENTS;
+                }
+
+                // if we can't get poll semantics, emulate for read as well:
+                // first remove read watch:
+                EV_SET(&kev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, userdata);
+                kevent(kqfd, kev, 1, nullptr, 0, nullptr);
+                return IN_EVENTS | OUT_EVENTS;
             }
             // remove read watch
             EV_SET(&kev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, userdata);
