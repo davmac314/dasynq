@@ -293,7 +293,8 @@ namespace dprivate {
 
         template <typename T> void init(T *loop) noexcept { }
         
-        // Receive a signal; return true to disable signal watch or false to leave enabled
+        // Receive a signal; return true to disable signal watch or false to leave enabled.
+        // Called with lock held.
         template <typename T>
         bool receive_signal(T &loop_mech, typename Traits::sigdata_t & siginfo, void * userdata) noexcept
         {
