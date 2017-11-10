@@ -271,7 +271,7 @@ programs is by masking the signal at program startup, before creating any additi
 Note that signal masks are inherited by child processes; if you mask commonly used signals you
 should generally unmask them after forking a child process.
 
-On MacOS, at least on version 10.12.6, apperas to have a bug where signals generated using the
+MacOS, at least on version 10.12.6, appears to have a bug where signals generated using the
 `raise` system call are not seen by the kqueue mechanism and so are undetectable by Dasynq.
 
 
@@ -476,7 +476,7 @@ Most (all?) event loop mechanisms do not support watching read/write readiness o
 associated with "regular" files (as opposed to sockets/terminals/other devices). Arguably this is
 sensible, since there is no fixed buffer for such file descriptors and the ability to perform a
 non-blocking read or write is not part of any state directly associated with the descriptor itself
-(rather it happens due to buffering at the device level i.e. the disk). The traditonal "select"
+(rather it happens due to buffering at the device level i.e. the disk). The traditional "select"
 and "poll" calls typically handle this by returning that such file descriptors are always
 available for both read and write operations; when backed by a fast disk, this is practically
 true, although it can be problematic for slow media or network filesystems.  
@@ -484,13 +484,12 @@ true, although it can be problematic for slow media or network filesystems.
 Unfortunately modern mechanisms do not carry through with support for regular files. The epoll
 mechanism doesn't support them at all, and kqueue supports only read watches, with slightly
 altered semantics: specifically, kqueue indicates that a regular file fd is available for reading
-so long as it is not positioned exactly at the end of the associated file. 
+so long as it is not positioned exactly at the end of the associated file (FreeBSD provides an
+option to support read watches with the poll semantics but OpenBSD and MacOS do not).
 
 Since it is convenient to be able to handle all file descriptors similarly, Dasynq emulates the
 select/poll style of signalling "always ready" for regular files if they are not handled by the
-underlying event loop mechanism. (Note that if the underlying mechanism is kqueue, you'll get
-kqueue semantics for read watches, and emulated write watches; for epoll, both read and write
-watches will be emulated).
+underlying event loop mechanism.
 
 If, for whatever reason, you do not want this emulation enabled for a particular file descriptor
 watch, you can prevent it by using the "noemu" variant of the registration function:

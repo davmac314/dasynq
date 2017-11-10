@@ -91,8 +91,14 @@ template.</p>
 file is always ready for reading and writing (although the operation may block). However in some cases it is
 convenient to treat such file descriptors as if they were connected to pipes or sockets;
 <i class="code-name">fd_watcher</i> by default supports emulation of readiness events for regular files,
-which assumes they are always ready (though note that some backends do support regular files, and file
-descriptors which are at end-of-file may be seen as not ready for reading).</p>
+which assumes they are always ready; this can be prevented using the "noemu" variant of the watch
+registration functions.</p>
+
+<p>Note that some backends do support regular files. In particular, kqueue supports read but not write
+watches on regular files, though with slightly modified semantics: at end-of-file, the file descriptor
+no longer reports as being ready-for-read. On FreeBSD, kqueue also directly supports the preferred semantics
+where a file is always considered ready for reading. Portable code should not rely on any particular
+semantics for the end-of-file condition if emulation is disabled.</p>
 
 <h3>Listening sockets</h3>
 
