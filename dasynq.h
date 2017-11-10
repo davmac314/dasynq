@@ -799,6 +799,17 @@ class event_loop
     void requeue_watcher(base_watcher *watcher) noexcept
     {
         loop_mech.queue_watcher(watcher);
+
+        // We need to signal any thread that is currently waiting on the loop mechanism, so that it wakes
+        // and processes the newly queued watcher:
+
+        wait_lock.lock();
+        bool attn_q_empty = attn_waitqueue.is_empty();
+        wait_lock.unlock();
+
+        if (! attn_q_empty) {
+            loop_mech.interrupt_wait();
+        }
     }
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
