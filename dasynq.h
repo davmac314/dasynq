@@ -1468,7 +1468,7 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
 
         if (! basewatcher_get_emulatefd(*watcher)) {
             if (EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
-                eloop.setFdEnabled_nolock(watcher, this->watch_fd, events | ONE_SHOT, b);
+                eloop.setFdEnabled_nolock(this, this->watch_fd, events | ONE_SHOT, b);
             }
             else {
                 eloop.setFdEnabled_nolock(this, this->watch_fd,
