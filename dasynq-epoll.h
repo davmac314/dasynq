@@ -282,7 +282,7 @@ template <class Base> class epoll_loop : public Base
     }
     
     // Note, called with lock held:
-    void rearm_signal_watch_nolock(int signo) noexcept
+    void rearm_signal_watch_nolock(int signo, void *userdata) noexcept
     {
         sigaddset(&sigmask, signo);
         signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);

@@ -870,7 +870,7 @@ class event_loop
     {
         // Called with lock held
         if (rearmType == rearm::REARM) {
-            loop_mech.rearm_signal_watch_nolock(bsw->siginfo.get_signo());
+            loop_mech.rearm_signal_watch_nolock(bsw->siginfo.get_signo(), bsw);
         }
         else if (rearmType == rearm::REMOVE) {
             loop_mech.remove_signal_watch_nolock(bsw->siginfo.get_signo());
@@ -1696,7 +1696,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
 
     // Reap a process after it has terminated. Some implementations may do this when the process
     // termination is detected; in that case this will be a no-op.
-    int reap() noexcept
+    void reap() noexcept
     {
         // nothing to do with this implementation.
     }

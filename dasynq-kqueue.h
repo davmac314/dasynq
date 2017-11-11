@@ -192,10 +192,6 @@ template <class Base> class kqueue_loop : public Base
     // Ultimately, this means we need to check for pending signals independently of what kqueue
     // tells us.
 
-    // Of course, if kqueue doesn't report the signal, then it doesn't give us the data
-    // associated with the event, so we need to maintain that separately too:
-    std::unordered_map<int, void *> sigdata_map;
-    
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
     //          receive*() methods will be called with lock held.
@@ -223,7 +219,7 @@ template <class Base> class kqueue_loop : public Base
         
         for (int i = 0; i < r; i++) {
             if (events[i].filter == EVFILT_SIGNAL) {
-                bool reenable = pull_signal(events[i].ident);
+                bool reenable = pull_signal(events[i].ident, events[i].udata);
                 events[i].flags = reenable ? EV_ENABLE : EV_DISABLE;
             }
             else if (events[i].filter == EVFILT_READ || events[i].filter == EVFILT_WRITE) {
@@ -245,7 +241,7 @@ template <class Base> class kqueue_loop : public Base
     // Pull a signal from pending, and report it, until it is no longer pending or the watch
     // should be disabled. Call with lock held.
     // Returns:  true if watcher should be enabled, false if disabled.
-    bool pull_signal(int signo)
+    bool pull_signal(int signo, void *userdata)
     {
         bool enable_filt = true;
         sigdata_t siginfo;
@@ -257,12 +253,12 @@ template <class Base> class kqueue_loop : public Base
         sigaddset(&sigw_mask, signo);
         int rsigno = sigtimedwait(&sigw_mask, &siginfo.info, &timeout);
         while (rsigno > 0) {
-            if (Base::receive_signal(*this, siginfo, sigdata_map[rsigno])) {
+            if (Base::receive_signal(*this, siginfo, userdata)) {
                 sigdelset(&sigmask, rsigno);
                 enable_filt = false;
                 break;
             }
-            rsigno = sigtimedwait(&sigmask, &siginfo.info, &timeout);
+            rsigno = sigtimedwait(&sigw_mask, &siginfo.info, &timeout);
         }
 #else
         // we have no sigtimedwait.
@@ -270,7 +266,7 @@ template <class Base> class kqueue_loop : public Base
         sigpending(&pending_sigs);
         while (sigismember(&pending_sigs, signo)) {
             get_siginfo(signo, &siginfo.info);
-            if (Base::receive_signal(*this, siginfo, sigdata_map[signo])) {
+            if (Base::receive_signal(*this, siginfo, userdata)) {
                 sigdelset(&sigmask, signo);
                 enable_filt = false;
                 break;
@@ -489,9 +485,7 @@ template <class Base> class kqueue_loop : public Base
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
-        sigdata_map[signo] = userdata;
         sigaddset(&sigmask, signo);
-        
         prepare_signal(signo);
 
         // We need to register the filter with the kqueue early, to avoid a race where we miss
@@ -507,7 +501,7 @@ template <class Base> class kqueue_loop : public Base
         // it immediately (note that it might be pending multiple times, so we need to re-check once signal
         // processing finishes if it is re-armed).
 
-        bool enable_filt = pull_signal(signo);
+        bool enable_filt = pull_signal(signo, userdata);
 
         if (enable_filt) {
             evt.flags = EV_ENABLE;
@@ -518,11 +512,11 @@ template <class Base> class kqueue_loop : public Base
     }
     
     // Note, called with lock held:
-    void rearm_signal_watch_nolock(int signo) noexcept
+    void rearm_signal_watch_nolock(int signo, void *userdata) noexcept
     {
         sigaddset(&sigmask, signo);
-        
-        if (pull_signal(signo)) {
+
+        if (pull_signal(signo, userdata)) {
             struct kevent evt;
             EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ENABLE, 0, 0, 0);
             // TODO use EV_DISPATCH if available (not on OpenBSD)

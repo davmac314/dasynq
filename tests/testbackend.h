@@ -215,7 +215,7 @@ template <class Base> class test_loop : public Base, io_receiver
         fd_data_map.erase(fd);
     }
     
-    void rearm_signal_watch_nolock(int signo)
+    void rearm_signal_watch_nolock(int signo, void *userdata)
     {
         // TODO
     }
