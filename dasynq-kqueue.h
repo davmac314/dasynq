@@ -251,9 +251,10 @@ template <class Base> class kqueue_loop : public Base
         sigdata_t siginfo;
 
 #if defined(__OpenBSD__) || _POSIX_REALTIME_SIGNALS > 0
+        struct timespec timeout = {0, 0};
         sigset_t sigw_mask;
         sigemptyset(&sigw_mask);
-        sigaddset(&sigw_mask, signo)
+        sigaddset(&sigw_mask, signo);
         int rsigno = sigtimedwait(&sigw_mask, &siginfo.info, &timeout);
         while (rsigno > 0) {
             if (Base::receive_signal(*this, siginfo, sigdata_map[rsigno])) {
