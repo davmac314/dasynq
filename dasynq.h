@@ -358,6 +358,7 @@ namespace dprivate {
         }
         
         // Pull a single event from the queue; returns nullptr if the queue is empty.
+        // Call with lock held.
         base_watcher * pull_event() noexcept
         {
             if (event_queue.empty()) {
@@ -533,6 +534,9 @@ class event_loop
 
     void registerSignal(base_signal_watcher *callBack, int signo)
     {
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        std::lock_guard<mutex_t> guard(ed.lock);
+
         loop_mech.prepare_watcher(callBack);
         try {
             loop_mech.add_signal_watch(signo, callBack);
@@ -558,7 +562,11 @@ class event_loop
 
     void register_fd(base_fd_watcher *callback, int fd, int eventmask, bool enabled, bool emulate = false)
     {
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        std::lock_guard<mutex_t> guard(ed.lock);
+
         loop_mech.prepare_watcher(callback);
+
         try {
             if (! loop_mech.add_fd_watch(fd, callback, eventmask | ONE_SHOT, enabled, emulate)) {
                 callback->emulatefd = true;
@@ -579,6 +587,9 @@ class event_loop
     
     void register_fd(base_bidi_fd_watcher *callback, int fd, int eventmask, bool emulate = false)
     {
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        std::lock_guard<mutex_t> guard(ed.lock);
+
         loop_mech.prepare_watcher(callback);
         try {
             loop_mech.prepare_watcher(&callback->out_watcher);
@@ -681,6 +692,9 @@ class event_loop
     
     void reserve_child_watch(base_child_watcher *callback)
     {
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        std::lock_guard<mutex_t> guard(ed.lock);
+
         loop_mech.prepare_watcher(callback);
         try {
             loop_mech.reserve_child_watch(callback->watch_handle);
@@ -693,12 +707,18 @@ class event_loop
     
     void unreserve(base_child_watcher *callback) noexcept
     {
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        std::lock_guard<mutex_t> guard(ed.lock);
+
         loop_mech.unreserve_child_watch(callback->watch_handle);
         loop_mech.release_watcher(callback);
     }
     
     void register_child(base_child_watcher *callback, pid_t child)
     {
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        std::lock_guard<mutex_t> guard(ed.lock);
+        
         loop_mech.prepare_watcher(callback);
         try {
             loop_mech.add_child_watch(callback->watch_handle, child, callback);
@@ -741,6 +761,9 @@ class event_loop
 
     void register_timer(base_timer_watcher *callback, clock_type clock)
     {
+        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        std::lock_guard<mutex_t> guard(ed.lock);
+    
         loop_mech.prepare_watcher(callback);
         try {
             loop_mech.add_timer(callback->timer_handle, callback, clock);
