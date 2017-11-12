@@ -143,7 +143,9 @@ namespace dprivate {
     {
         typename condvar_selector<T_Mutex>::condvar condvar;
         friend class waitqueue<T_Mutex>;
-        waitqueue_node * next = nullptr;
+
+        // ptr to next node in queue, set to null when added to queue tail:
+        waitqueue_node * next;
         
         public:
         void signal()
@@ -160,6 +162,7 @@ namespace dprivate {
     template <> class waitqueue<null_mutex>
     {
         public:
+        // remove current head of queue, return new head:
         waitqueue_node<null_mutex> * unqueue()
         {
             return nullptr;
@@ -191,6 +194,7 @@ namespace dprivate {
         waitqueue_node<T_Mutex> * head = nullptr;
 
         public:
+        // remove current head of queue, return new head:
         waitqueue_node<T_Mutex> * unqueue()
         {
             head = head->next;
@@ -217,6 +221,7 @@ namespace dprivate {
         
         void queue(waitqueue_node<T_Mutex> *node)
         {
+            node->next = nullptr;
             if (tail) {
                 tail->next = node;
             }
