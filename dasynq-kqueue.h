@@ -511,7 +511,7 @@ template <class Base> class kqueue_loop : public Base
     {
         if (pull_signal(signo, userdata)) {
             struct kevent evt;
-            EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ENABLE, 0, 0, 0);
+            EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ENABLE, 0, 0, userdata);
             // TODO use EV_DISPATCH if available (not on OpenBSD)
 
             kevent(kqfd, &evt, 1, nullptr, 0, nullptr);

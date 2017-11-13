@@ -576,7 +576,7 @@ void ftestBidiFdWatch3()
     close(pipe1[1]);
 }
 
-void ftestSigWatch()
+void ftestSigWatch1()
 {
     using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
     Loop_t my_loop;
@@ -626,6 +626,48 @@ void ftestSigWatch()
 
     assert(!seen1);
     assert(seen2);
+}
+
+void ftestSigWatch2()
+{
+    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    Loop_t my_loop;
+
+    bool seen1 = false;
+
+    using siginfo_p = Loop_t::signal_watcher::siginfo_p;
+
+    sigset_t sigmask;
+    sigemptyset(&sigmask);
+    sigaddset(&sigmask, SIGUSR1);
+    sigprocmask(SIG_BLOCK, &sigmask, nullptr);
+
+    auto *swatch = Loop_t::signal_watcher::add_watch(my_loop, SIGUSR1,
+            [&seen1](Loop_t &eloop, int signo, siginfo_p info) -> rearm {
+        seen1 = true;
+        return rearm::REARM;
+    });
+
+    // We avoid using raise(...) since a bug in some versions of MacOS prevents signals generated
+    // using raise from being detected by kqueue (and therefore by Dasynq).
+
+    // raise(SIGUSR1);
+    kill(getpid(), SIGUSR1);
+
+    my_loop.run();
+
+    assert(seen1);
+
+    seen1 = false;
+
+    //raise(SIGUSR1);
+    kill(getpid(), SIGUSR1);
+
+    my_loop.run();
+
+    assert(seen1);
+
+    swatch->deregister(my_loop);
 }
 
 void ftestMultiThread1()
@@ -741,8 +783,12 @@ int main(int argc, char **argv)
     ftestBidiFdWatch3();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestSigWatch... ";
-    ftestSigWatch();
+    std::cout << "ftestSigWatch1... ";
+    ftestSigWatch1();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftestSigWatch2... ";
+    ftestSigWatch2();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftestMultiThread1... ";
