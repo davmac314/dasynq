@@ -1,6 +1,10 @@
-// Dasynq early declarations and base watchers
+// Dasynq: early declarations and base watchers.
 //
-// Here we define watcher functionality that is not dependent on the event loop type.
+// Here we define watcher functionality that is not dependent on the event loop type. In particular,
+// base classes for the various watcher types. These are not part of the public API.
+//
+// In general access to the members of the basewatcher should be protected by a mutex. The
+// event_dispatch lock is used for this purpose.
 
 namespace dasynq {
 
@@ -89,7 +93,12 @@ namespace dprivate {
         base_watcher(const base_watcher &) = delete;
         base_watcher &operator=(const base_watcher &) = delete;
 
+        // The dispatch function is called to process a watcher's callback. It is the "real" callback
+        // function; it usually delegates to a user-provided callback.
         virtual void dispatch(void *loop_ptr) noexcept { };
+
+        // Bi-directional file descriptor watches have a secondary dispatch function for the secondary
+        // watcher (i.e. the output watcher):
         virtual void dispatch_second(void *loop_ptr) noexcept { }
 
         virtual ~base_watcher() noexcept { }
@@ -100,7 +109,7 @@ namespace dprivate {
         // - the dispatch method will not be called.
         virtual void watch_removed() noexcept
         {
-            // TODO this "delete" behaviour could be dependent on a flag, perhaps?
+            // Later: the "delete" behaviour could be dependent on a flag, perhaps?
             // delete this;
         }
     };
@@ -165,8 +174,9 @@ namespace dprivate {
 
         protected:
 
-        // The main instance is the "input" watcher only; we keep a secondary watcher
-        // with a secondary set of flags for the "output" watcher:
+        // The main instance is the "input" watcher only; we keep a secondary watcher with a secondary set
+        // of flags for the "output" watcher. Note that some of the flags in the secondary watcher aren't
+        // used; it exists mainly so that it can be queued independently of the primary watcher.
         base_watcher out_watcher {watch_type_t::SECONDARYFD};
 
         int read_removed : 1; // read watch removed?

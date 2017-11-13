@@ -249,7 +249,12 @@ namespace dprivate {
     // This class serves as the base class (mixin) for the AEN mechanism class.
     //
     // The event_dispatch class maintains the queued event data structures. It inserts watchers
-    // into the queue when events are received (receiveXXX methods).
+    // into the queue when events are received (receiveXXX methods). It also owns a mutex used
+    // to protect those structures.
+    //
+    // In general the methods should be called with lock held. In practice this means that the
+    // event loop backend implementations must obtain the lock; they are also free to use it to
+    // protect their own internal data structures.
     template <typename T_Mutex, typename Traits> class event_dispatch : public Traits
     {
         template <typename, template <typename> class, typename> friend class dasynq::event_loop;
@@ -268,7 +273,7 @@ namespace dprivate {
         using base_child_watcher = dasynq::dprivate::base_child_watcher<T_Mutex>;
         using base_timer_watcher = dasynq::dprivate::base_timer_watcher<T_Mutex>;
         
-        // Add a watcher into the queuing system (but don't queue it)
+        // Add a watcher into the queuing system (but don't queue it). Call with lock held.
         //   may throw: std::bad_alloc
         void prepare_watcher(base_watcher *bwatcher)
         {
@@ -376,6 +381,8 @@ namespace dprivate {
             return r;
         }
         
+        // Queue a watcher for reomval, or issue "removed" callback to it.
+        // Call with lock free.
         void issue_delete(base_watcher *watcher) noexcept
         {
             // This is only called when the attention lock is held, so if the watcher is not
@@ -401,6 +408,8 @@ namespace dprivate {
             }
         }
         
+        // Queue a watcher for reomval, or issue "removed" callback to it.
+        // Call with lock free.
         void issue_delete(base_bidi_fd_watcher *watcher) noexcept
         {
             lock.lock();
@@ -437,7 +446,9 @@ namespace dprivate {
     };
 }
 
-
+// This is the main event_loop implementation. It serves as an interface to the event loop
+// backend (of which it maintains an internal instance). It also serialises waits the backend
+// and provides safe deletion of watchers (see comments inline).
 template <typename T_Mutex, template <typename> class Loop, typename LoopTraits>
 class event_loop
 {
