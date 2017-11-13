@@ -172,7 +172,6 @@ inline bool get_siginfo(int signo, siginfo_t *siginfo)
 template <class Base> class kqueue_loop : public Base
 {
     int kqfd; // kqueue fd
-    sigset_t sigmask; // enabled signal watch mask
 
     // The kqueue signal reporting mechanism *coexists* with the regular signal
     // delivery mechanism without having any connection to it. Whereas regular signals can be
@@ -254,7 +253,6 @@ template <class Base> class kqueue_loop : public Base
         int rsigno = sigtimedwait(&sigw_mask, &siginfo.info, &timeout);
         while (rsigno > 0) {
             if (Base::receive_signal(*this, siginfo, userdata)) {
-                sigdelset(&sigmask, rsigno);
                 enable_filt = false;
                 break;
             }
@@ -267,7 +265,6 @@ template <class Base> class kqueue_loop : public Base
         while (sigismember(&pending_sigs, signo)) {
             get_siginfo(signo, &siginfo.info);
             if (Base::receive_signal(*this, siginfo, userdata)) {
-                sigdelset(&sigmask, signo);
                 enable_filt = false;
                 break;
             }
@@ -290,7 +287,6 @@ template <class Base> class kqueue_loop : public Base
         if (kqfd == -1) {
             throw std::system_error(errno, std::system_category());
         }
-        sigemptyset(&sigmask);
         Base::init(this);
     }
     
@@ -485,7 +481,6 @@ template <class Base> class kqueue_loop : public Base
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
-        sigaddset(&sigmask, signo);
         prepare_signal(signo);
 
         // We need to register the filter with the kqueue early, to avoid a race where we miss
@@ -514,8 +509,6 @@ template <class Base> class kqueue_loop : public Base
     // Note, called with lock held:
     void rearm_signal_watch_nolock(int signo, void *userdata) noexcept
     {
-        sigaddset(&sigmask, signo);
-
         if (pull_signal(signo, userdata)) {
             struct kevent evt;
             EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ENABLE, 0, 0, 0);
@@ -528,7 +521,6 @@ template <class Base> class kqueue_loop : public Base
     void remove_signal_watch_nolock(int signo) noexcept
     {
         unprep_signal(signo);
-        sigdelset(&sigmask, signo);
         
         struct kevent evt;
         EV_SET(&evt, signo, EVFILT_SIGNAL, EV_DELETE, 0, 0, 0);
