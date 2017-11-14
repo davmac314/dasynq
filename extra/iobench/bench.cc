@@ -96,8 +96,8 @@ class PTimer : public event_loop_n::timer_impl<PTimer>
 };
 
 
-static vector<Pipeio> evio;
-static vector<PTimer> evto;
+static Pipeio *evio;
+static PTimer *evto;
 
 rearm Pipeio::fd_event(event_loop_n &eloop, int fd, int flags)
 {
@@ -160,8 +160,8 @@ run_once(void)
         int xcount = 0;
         gettimeofday(&ts, NULL);
         do {
-	    // event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
-	    eloop.run();
+            // event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
+            eloop.run();
             xcount++;
         } while (count != fired);
         gettimeofday(&te, NULL);
@@ -229,8 +229,8 @@ main (int argc, char **argv)
         perror("setrlimit");
     }
 
-    evio.resize(num_pipes);
-    evto.resize(num_pipes);
+    evio = new Pipeio[num_pipes];
+    evto = new PTimer[num_pipes];
     //events = calloc(num_pipes, sizeof(struct event));
     pipes = (int *) calloc(num_pipes * 2, sizeof(int));
     if ( /* events == NULL || */ pipes == NULL) {
