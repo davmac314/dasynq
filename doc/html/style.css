@@ -12,10 +12,30 @@ pre {
 	border-radius: 0.2em;
 }
 
-i.code-name {
-	font: monospace;
+.small-indent {
+	padding-left: 1em;
+}
+
+.note {
+	display: inline-block;
+    background: #e4e8ba;	
+	padding: 0.2em;
+	border: 1px solid #807844;
+	border-radius: 0.2em;
+	margin-top: 0.2em;
+}
+
+.code-name {
+	font-family: monospace;
 	font-style: normal;
 	font-weight: bold;
 	color: #493a18;
-	background: #f2bcd8;
+	background: #eccfd7;
+	border-radius: 0.2em;
+	padding-left: 0.1em;
+	padding-right: 0.1em;
+}
+
+.code-name a {
+	color: #9b7569;	
 }
