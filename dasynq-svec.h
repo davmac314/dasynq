@@ -1,8 +1,7 @@
 #ifndef DASYNQ_SVEC_H_INCLUDED
 #define DASYNQ_SVEC_H_INCLUDED
 
-#include <cstddef>
-#include <cstdlib>
+#include <limits>
 #include <utility>
 #include <new>
 
@@ -23,15 +22,12 @@ class svector
         if (size_v == capacity_v) {
             // double capacity now:
             if (capacity_v == 0) capacity_v = 1;
-            T * new_array = (T *) std::malloc(capacity_v * 2 * sizeof(T));
-            if (new_array == nullptr) {
-                throw std::bad_alloc();  
-            }
+            T * new_array = new T[capacity_v * 2];
             for (size_t i = 0; i < size_v; i++) {
                 new (&new_array[i]) T(std::move(array[i]));
                 array[i].T::~T();
             }
-            std::free(array);
+            delete[] array;
             array = new_array;
             capacity_v *= 2;
         }
@@ -49,10 +45,7 @@ class svector
     {
         capacity_v = other.size_v;
         size_v = other.size_v;
-        array = (T *) std::malloc(capacity_v * sizeof(T));
-        if (array == nullptr) {
-            throw std::bad_alloc();
-        }
+        array = new T[capacity_v];
         for (size_t i = 0; i < size_v; i++) {
             new (&array[i]) T(other[i]);
         }
@@ -63,7 +56,7 @@ class svector
         for (size_t i = 0; i < size_v; i++) {
             array[i].T::~T();
         }
-        std::free(array);
+        delete[] array;
     }
 
     void push_back(const T &t)
@@ -118,18 +111,25 @@ class svector
         return size_v == 0;
     }
     
+    static size_t max_size() noexcept
+    {
+        return std::numeric_limits<size_type>::max() / sizeof(T);
+
+        // if we were to support allocators:
+        //size_t max = std::allocator_traits<std::allocator<char>>::max_size(std::allocator<T>());
+        //return max / sizeof(T);
+        //  (but not / sizeof(T) for C++17 apparently)
+    }
+
     void reserve(size_t amount)
     {
         if (capacity_v < amount) {
-            T * new_array = (T *) std::malloc(amount * sizeof(T));
-            if (new_array == nullptr) {
-                throw std::bad_alloc();
-            }
+            T * new_array = new T[amount];
             for (size_t i = 0; i < size_v; i++) {
                 new (&new_array[i]) T(std::move(array[i]));
                 array[i].T::~T();
             }
-            std::free(array);
+            delete[] array;
             array = new_array;
             capacity_v = amount;
         }
@@ -138,7 +138,7 @@ class svector
     void shrink_to(size_t amount)
     {
         if (capacity_v > amount) {
-            T * new_array = (T *) std::malloc(amount * sizeof(T));
+            T * new_array = new(std::nothrow) T[amount];
             if (new_array == nullptr) {
                 return;
             }
@@ -146,7 +146,7 @@ class svector
                 new (&new_array[i]) T(std::move(array[i]));
                 array[i].T::~T();
             }
-            std::free(array);
+            delete[] array;
             array = new_array;
             capacity_v = amount;            
         }

@@ -259,8 +259,7 @@ class NaryHeap
     {
         new (& hnd.hd) T(u...);
         hnd.heap_index = -1;
-        constexpr hindex_t max_allowed = std::numeric_limits<hindex_t>::is_signed ?
-                std::numeric_limits<hindex_t>::max() : ((hindex_t) - 2);
+        hindex_t max_allowed = hvec.max_size();
 
         if (num_nodes == max_allowed) {
             throw std::bad_alloc();
