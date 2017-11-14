@@ -53,7 +53,7 @@ Additional template parameters are implementation internal.
 
 <h3>Types</h3>
 <ul>
-<li><i class="code-name">loop_traits_t</i> [type] - loop traits.</li>
+<li><i class="code-name"><a href="#loop_traits_t">loop_traits_t</a></i> [type] - loop traits.</li>
 <li><i class="code-name">mutex_t</i> [type] - alias for <i class="code-name">T_Mutex</i></li>
 <li><i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i> [type] - a watcher type for watching file descriptor events</li>
 <li><i class="code-name"><a href="fd_watcher.html#fd_watcher_impl">fd_watcher_impl</a></i> [template] - a template for implementing <i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i> subclasses</li>
@@ -149,5 +149,20 @@ reconstructed in the child before it is used again.</p>
 <i class="code-name">SIGALRM</i>. Blocking or installing handlers for these signals may interfere with the
 function of the event loop. Other signals should be safe for application use, although these can be handled
 easily using the event loop's support via signal watchers.</p>  
+
+<hr>
+<h2 id="loop_traits_t">loop_traits_t (dasynq::event_loop&lt;T&gt;::loop_traits_t)</h2>
+
+<pre>
+    // Member of dasynq::event_loop
+    typedef <i>unspecified</i> loop_traits_t;
+</pre>
+
+<p><b>Brief</b>: this traits class provides details of the supported functionality of the event loop.</p> 
+
+<h2>Data members</h2>
+<ul>
+<li><i class="code-name">bool has_separate_rw_fd_watches</i> [static constexpr] &mdash; indicates whether the
+loop requires read and write watches for the same file descriptor to be added separately.</li>
 
 </body></html>
