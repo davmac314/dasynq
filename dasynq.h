@@ -470,7 +470,6 @@ class event_loop
 
     public:
     using loop_traits_t = LoopTraits;
-    using time_val = dasynq::time_val;
     using mutex_t = T_Mutex;
     
     private:
