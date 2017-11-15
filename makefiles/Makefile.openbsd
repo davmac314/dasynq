@@ -1,0 +1,16 @@
+# For OpenBSD:
+
+# Use eg++ or clang++:
+CXX = clang++
+CXXOPTS = 
+SANITIZE =
+CXXTESTOPTS = -g -std=c++11 -Os -Wall $(SANITIZE)
+CXXLINKOPTS =
+CXXTESTLINKOPTS = -g $(SANITIZE)
+THREADOPT = -pthread
+
+# Sanitizers do not seem to work/be availabe on OpenBSD
+
+# Makefile will work from this dir or if copied one level up:
+-include Makefile.common
+-include ../Makefile.common

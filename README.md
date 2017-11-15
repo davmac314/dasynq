@@ -52,14 +52,22 @@ during program execution.
 
 See doc/USAGE.md for details on how to use the Dasynq API.
 
-To build, edit the Makefile and uncomment the variable settings for the appropriate OS. Run `make check`
-to run the test suite (use `gmake` on BSDs). Run `make install` to install (set `DESTDIR` if you want to
-install to an alternate location for packaging purposes, eg `make DESTDIR=/tmp/dasynq install`).
+GNU make is required to run the test suite / automated install.
+
+Find or create an appropriate makefile in the `makefiles` directory and edit it to your liking.
+Either copy/link it to "Makefile" in the root of the source tree, or supply it via the `-f` argument to
+the `make` (or `gmake`) command. Use the `check` target to run the test suite, or `install` to install
+the library. The `DESTDIR` variable can be used to install to an alternative root (for packaging purposes
+etc).
+
+    make -f makefiles/Makefile.linux  check
+    make -f makefiles/Makefile.linux  install  DESTDIR=/tmp/dasynq
 
 On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too old (4.2 in OpenBSD 6.1;
-4.9+ is required).
+4.9+ is required). The existing makefile sample (Makefile.openbsd) has appropriate settings.
 
-After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq:
+After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq,
+assuming you have pkg-config installed:
 
     pkg-config --cflags dasynq
     pkg-config --libs dasynq
