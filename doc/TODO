@@ -1,0 +1,44 @@
+Version 1.0:
+
+* Finish reference documentation (HTML format)
+
+* Loop traits: add flag to indicate whether system time is handled properly
+
+* Allow specifying how many events to process before re-polling backend.
+  (Currently all pending events are processed before re-polling).
+
+Later:
+
+* Itimer: currently we munge both SYSTEM and MONOTONIC timers into one queue. However, the SYSTEM
+  time in theory can jump. We probably can't handle all (particularly forwards) jumps, but after
+  detecting a jump we should be able to correct later clocks.
+  
+* STOP rearm for timers. Instead of just disabling a timer, actually stop (but don't deallocate) it.
+
+* Use C++ standard library functions to get time (system time and monotonic time). Works on OS X, apparently,
+  even when clock_gettime is not available. Use clock_gettime when available however as it may well have
+  higher precision.
+
+* Support disabling signal watchers?
+
+* More tests
+
+* Maybe use pdfork on FreeBSD? allows safely signalling children without a mutex.
+  However, requires a fd per child.
+
+* User notification mechanism (add a watch to the event loop which can be signalled manually).
+
+* kqueue: use EVDISPATCH where available. On OS X, potentially use EVDISPATCH2.
+
+* poll() (i.e. "pure POSIX") backend?
+
+* Current deregister implementation gets attention lock and issues delete. An alternative would be
+  to test-acquire the attention lock and on failure, instead add the watcher to a queue and signal
+  the current waiter (without waiting to acquire attention lock in *this* thread). On wake from
+  waiting a thread would have to check the deregistration queue.
+
+* Queue up multiple enable/disable commands to backends that support being issued commands in bulk
+  (ie kqueue but not epoll), rather than issuing them individually. Needs care to determine when
+  this can be done.
+
+* Cache current clock times. The API allows for this but it hasn't been implemented.
