@@ -29,10 +29,17 @@ template provides a means for subclassing.</p>
 <li><i class="code-name">EventLoop</i> &mdash; the event loop type which this watcher registers with.</li>
 </ul>
 
-<h2>Public members - bidi_fd_watcher</h2>
+<h2>Members</h2>
 
+<div class="small-indent">
+
+<h2>Constructors</h2>
 <ul>
 <li><i class="code-name">bidi_fd_watcher</i> &mdash; default constructor.</li>
+</ul>
+
+<h2>Functions</h2>
+<ul>
 <li>(#1) <i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)</i> &mdash;<br>
      add a watch for the specified file descriptor. The <i class="code-name">flags</i> argument specifies a
      combination of <i class="code-name">dasynq::IN_EVENTS</i> and <i class="code-name">dasynq::OUT_EVENTS</i>
@@ -62,6 +69,7 @@ template provides a means for subclassing.</p>
 <li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
     removed from the event loop.</li>
 </ul>
+</div>
 
 <h2>Details and Usage</h2>
 
