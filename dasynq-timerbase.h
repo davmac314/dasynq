@@ -38,6 +38,16 @@ class time_val
     second_t & seconds() noexcept { return time.tv_sec; }
     nsecond_t & nseconds() noexcept { return time.tv_nsec; }
 
+    timespec & get_timespec() noexcept
+    {
+        return time;
+    }
+
+    const timespec & get_timespec() const noexcept
+    {
+        return time;
+    }
+
     operator timespec() const noexcept
     {
        return time;
@@ -86,7 +96,7 @@ inline time_val &operator-=(time_val &t1, const time_val &t2) noexcept
 {
     time_val diff;
     t1.seconds() = t1.seconds() - t2.seconds();
-    if (t1.nseconds() > t2.nseconds()) {
+    if (t1.nseconds() >= t2.nseconds()) {
         t1.nseconds() = t1.nseconds() - t2.nseconds();
     }
     else {
@@ -118,6 +128,52 @@ inline bool operator<=(const time_val &t1, const time_val &t2) noexcept
 inline bool operator!=(const time_val &t1, const time_val &t2) noexcept { return !(t1 == t2); }
 inline bool operator>(const time_val &t1, const time_val &t2) noexcept { return t2 < t1; }
 inline bool operator>=(const time_val &t1, const time_val &t2) noexcept { return t2 <= t1; }
+
+static inline int divide_timespec(const struct timespec &num, const struct timespec &den, struct timespec &rem) noexcept;
+
+inline int operator/(const time_val &t1, const time_val &t2) noexcept
+{
+    struct timespec remainder;
+    return divide_timespec(t1.get_timespec(), t2.get_timespec(), remainder);
+}
+
+inline time_val & operator<<=(time_val &t, int n) noexcept
+{
+    for (int i = 0; i < n; i++) {
+        t.seconds() *= 2;
+        t.nseconds() *= 2;
+        if (t.nseconds() >= 1000000000) {
+            t.nseconds() -= 1000000000;
+            t.seconds()++;
+        }
+    }
+    return t;
+}
+
+inline time_val operator<<(time_val &t, int n) noexcept
+{
+    auto r = t;
+    r <<= n;
+    return r;
+}
+
+inline time_val & operator>>=(time_val &t, int n) noexcept
+{
+    for (int i = 0; i < n; i++) {
+        bool low = t.seconds() & 1;
+        t.nseconds() /= 2;
+        t.nseconds() += low ? 500000000ULL : 0;
+        t.seconds() /= 2;
+    }
+    return t;
+}
+
+inline time_val operator>>(time_val &t, int n) noexcept
+{
+    auto r = t;
+    r >>= n;
+    return r;
+}
 
 // Data corresponding to a single timer
 class timer_data
@@ -185,61 +241,39 @@ static inline int divide_timespec(const struct timespec &num, const struct times
 
     // At this point, num.tv_sec >= 1.
 
-    auto &r_sec = rem.tv_sec;
-    auto &r_nsec = rem.tv_nsec;
-    r_sec = num.tv_sec;
-    r_nsec = num.tv_nsec;
-    auto d_sec = den.tv_sec;
-    auto d_nsec = den.tv_nsec;
+    time_val n = { num.tv_sec, num.tv_nsec };
+    time_val d = { den.tv_sec, den.tv_nsec };
+    time_val r = n;
 
-    r_sec -= d_sec;
-    if (r_nsec >= d_nsec) {
-        r_nsec -= d_nsec;
-    }
-    else {
-        r_nsec += (1000000000ULL - d_nsec);
-        r_sec -= 1;
-    }
+    // starting with numerator, subtract 1*denominator
+    r -= d;
 
     // Check now for common case: one timer expiry with no overrun
-    if (r_sec < d_sec || (r_sec == d_sec && r_nsec < d_nsec)) {
+    if (r < d) {
+        rem = r;
         return 1;
     }
 
     int nval = 1;
     int rval = 1; // we have subtracted 1*D already
 
-    // shift denominator until it is greater than/equal to numerator:
-    while (d_sec < r_sec) {
-        d_sec *= 2;
-        d_nsec *= 2;
-        if (d_nsec >= 1000000000) {
-            d_nsec -= 1000000000;
-            d_sec++;
-        }
+    // shift denominator until it is greater than / roughly equal to numerator:
+    while (d.seconds() < r.seconds()) {
+        d <<= 1;
         nval *= 2;
     }
 
     while (nval > 0) {
-        if (d_sec < r_sec || (d_sec == r_sec && d_nsec <= r_nsec)) {
-            // subtract:
-            r_sec -= d_sec;
-            if (d_nsec > r_nsec) {
-                r_nsec += 1000000000;
-                r_sec--;
-            }
-            r_nsec -= d_nsec;
-
+        if (d <= r) {
+            r -= d;
             rval += nval;
         }
 
-        bool low = d_sec & 1;
-        d_nsec /= 2;
-        d_nsec += low ? 500000000ULL : 0;
-        d_sec /= 2;
+        d >>= 1;
         nval /= 2;
     }
 
+    rem = r;
     return rval;
 }
 

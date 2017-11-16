@@ -41,15 +41,24 @@ namespace dasynq {
     // clock time
     class <a href="#time_val">time_val</a>;
     
-    time_val operator-(const time_val &t1, const time_val &t2);
-    time_val operator+(const time_val &t1, const time_val &t2);
-    time_val &operator+=(time_val &t1, const time_val &t2);
-    bool operator<(const time_val &t1, const time_val &t2);
-    bool operator==(const time_val &t1, const time_val &t2);
-    bool operator<=(const time_val &t1, const time_val &t2);
-    bool operator!=(const time_val &t1, const time_val &t2);
-    bool operator>(const time_val &t1, const time_val &t2);
-    bool operator>=(const time_val &t1, const time_val &t2);
+    // time_val operators
+    time_val operator-(const time_val &t1, const time_val &t2) noexcept;
+    time_val operator+(const time_val &t1, const time_val &t2) noexcept;
+    time_val &operator+=(time_val &t1, const time_val &t2) noexcept;
+    time_val &operator-=(time_val &t1, const time_val &t2) noexcept;
+    int operator/(const time_val &t1, const time_val &t2) noexcept;
+    
+    bool operator<(const time_val &t1, const time_val &t2) noexcept;
+    bool operator==(const time_val &t1, const time_val &t2) noexcept;
+    bool operator<=(const time_val &t1, const time_val &t2) noexcept;
+    bool operator!=(const time_val &t1, const time_val &t2) noexcept;
+    bool operator>(const time_val &t1, const time_val &t2) noexcept;
+    bool operator>=(const time_val &t1, const time_val &t2) noexcept;
+    
+    time_val &operator<<=(time_val &t, int n) noexcept;
+    time_val &operator>>=(time_val &t, int n) noexcept;
+    time_val operator<<(time_val &t, int n) noexcept;
+    time_val operator>>(time_val &t, int n) noexcept;
     
     // event watch flags
     constexpr unsigned int IN_EVENTS;
