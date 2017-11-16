@@ -164,5 +164,9 @@ easily using the event loop's support via signal watchers.</p>
 <ul>
 <li><i class="code-name">bool has_separate_rw_fd_watches</i> [static constexpr] &mdash; indicates whether the
 loop requires read and write watches for the same file descriptor to be added separately.</li>
+<li><i class="code-name">bool full_timer_support</i> [static constexpr] &mdash; if false, the event loop
+might not differentiate between the system and monotonic clock, and timers against the system clock might
+not expire at the correct time if the system time is altered after the timer is set.</li>
+</ul>
 
 </body></html>

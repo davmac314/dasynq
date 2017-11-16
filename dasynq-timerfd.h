@@ -103,6 +103,12 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     }
 
     public:
+
+    class traits_t : public Base::traits_t
+    {
+        constexpr static bool full_timer_support = true;
+    };
+
     template <typename T>
     void receive_fd_event(T &loop_mech, typename Base::fd_r fd_r_a, void * userdata, int flags)
     {

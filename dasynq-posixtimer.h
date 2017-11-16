@@ -95,6 +95,11 @@ template <class Base> class posix_timer_events : public timer_base<Base>
 
     public:
 
+    class traits_t : public Base::traits_t
+    {
+        constexpr static bool full_timer_support = true;
+    };
+
     template <typename T> void init(T *loop_mech)
     {
         sigset_t sigmask;

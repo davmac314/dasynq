@@ -101,6 +101,11 @@ template <class Base> class itimer_events : public timer_base<Base>
         
     public:
 
+    class traits_t : public Base::traits_t
+    {
+        constexpr static bool full_timer_support = false;
+    };
+
     template <typename T> void init(T *loop_mech)
     {
         sigset_t sigmask;
