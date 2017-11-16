@@ -63,7 +63,6 @@ class EpollTraits
     
     const static bool has_bidi_fd_watch = true;
     const static bool has_separate_rw_fd_watches = false;
-    const static bool supports_childwatch_reservation = true;
 };
 
 

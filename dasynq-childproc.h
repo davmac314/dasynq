@@ -83,12 +83,18 @@ template <class Base> class child_proc_events : public Base
     public:
     using reaper_mutex_t = typename Base::mutex_t;
 
+    class traits_t : public Base::traits_t
+    {
+        public:
+        constexpr static bool supports_childwatch_reservation = true;
+    };
+
     private:
     pid_map child_waiters;
     reaper_mutex_t reaper_lock; // used to prevent reaping while trying to signal a process
     
     protected:
-    using sigdata_t = typename Base::sigdata_t;
+    using sigdata_t = typename traits_t::sigdata_t;
     
     template <typename T>
     bool receive_signal(T & loop_mech, sigdata_t &siginfo, void *userdata)

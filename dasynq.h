@@ -255,12 +255,13 @@ namespace dprivate {
     // In general the methods should be called with lock held. In practice this means that the
     // event loop backend implementations must obtain the lock; they are also free to use it to
     // protect their own internal data structures.
-    template <typename T_Mutex, typename Traits> class event_dispatch : public Traits
+    template <typename T_Mutex, typename Traits> class event_dispatch
     {
         template <typename, template <typename> class, typename> friend class dasynq::event_loop;
 
         public:
         using mutex_t = T_Mutex;
+        using traits_t = Traits;
 
         private:
 
@@ -468,12 +469,16 @@ class event_loop
     template <typename, typename> friend class dprivate::child_proc_watcher_impl;
     template <typename, typename> friend class dprivate::timer_impl;
 
+    template <typename T, typename U> using event_dispatch = dprivate::event_dispatch<T,U>;
+    using loop_mech_t = Loop<event_dispatch<T_Mutex, LoopTraits>>;
+    using reaper_mutex_t = typename loop_mech_t::reaper_mutex_t;
+
     public:
-    using loop_traits_t = LoopTraits;
+    using basic_traits_t = LoopTraits;
+    using loop_traits_t = typename loop_mech_t::traits_t;
     using mutex_t = T_Mutex;
     
     private:
-    template <typename T, typename U> using event_dispatch = dprivate::event_dispatch<T,U>;
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
     using base_watcher = dprivate::base_watcher;
@@ -484,8 +489,6 @@ class event_loop
     using base_timer_watcher = dprivate::base_timer_watcher<T_Mutex>;
     using watch_type_t = dprivate::watch_type_t;
     
-    using loop_mech_t = Loop<event_dispatch<T_Mutex, LoopTraits>>;
-    using reaper_mutex_t = typename loop_mech_t::reaper_mutex_t;
 
     loop_mech_t loop_mech;
 
@@ -1241,7 +1244,7 @@ namespace dprivate {
 
 // Posix signal event watcher
 template <typename EventLoop>
-class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop::mutex_t, typename EventLoop::loop_traits_t>
+class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop::mutex_t, typename EventLoop::basic_traits_t>
 {
     template <typename, typename> friend class signal_watcher_impl;
 
@@ -1249,7 +1252,7 @@ class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop:
     using T_Mutex = typename EventLoop::mutex_t;
     
     public:
-    using siginfo_p = typename dprivate::base_signal_watcher<T_Mutex, typename EventLoop::loop_traits_t>::siginfo_p;
+    using siginfo_p = typename dprivate::base_signal_watcher<T_Mutex, typename EventLoop::basic_traits_t>::siginfo_p;
 
     // Register this watcher to watch the specified signal.
     // If an attempt is made to register with more than one event loop at

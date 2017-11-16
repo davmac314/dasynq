@@ -61,7 +61,7 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
     }
 
     template <typename T>
-    void receive_fd_event(T &loop_mech, typename Base::fd_r fd_r_a, void * userdata, int flags)
+    void receive_fd_event(T &loop_mech, typename Base::traits_t::fd_r fd_r_a, void * userdata, int flags)
     {
         if (userdata == &pipe_r_fd) {
             // try to clear the pipe
