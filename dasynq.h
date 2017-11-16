@@ -461,7 +461,7 @@ class event_loop
     friend class dprivate::timer<my_event_loop_t>;
     
     friend void dprivate::post_dispatch<my_event_loop_t>(my_event_loop_t &loop,
-            dprivate::base_watcher *watcher, rearm rearmType);
+            dprivate::base_watcher *watcher, rearm rearm_type);
 
     template <typename, typename> friend class dprivate::fd_watcher_impl;
     template <typename, typename> friend class dprivate::bidi_fd_watcher_impl;
@@ -488,7 +488,6 @@ class event_loop
     using base_child_watcher = dprivate::base_child_watcher<T_Mutex>;
     using base_timer_watcher = dprivate::base_timer_watcher<T_Mutex>;
     using watch_type_t = dprivate::watch_type_t;
-    
 
     loop_mech_t loop_mech;
 
@@ -651,7 +650,7 @@ class event_loop
         }
     }
     
-    void setFdEnabled(base_watcher *watcher, int fd, int watch_flags, bool enabled) noexcept
+    void set_fd_enabled(base_watcher *watcher, int fd, int watch_flags, bool enabled) noexcept
     {
         if (enabled) {
             loop_mech.enable_fd_watch(fd, watcher, watch_flags | ONE_SHOT);
@@ -661,7 +660,7 @@ class event_loop
         }
     }
 
-    void setFdEnabled_nolock(base_watcher *watcher, int fd, int watch_flags, bool enabled) noexcept
+    void set_fd_enabled_nolock(base_watcher *watcher, int fd, int watch_flags, bool enabled) noexcept
     {
         if (enabled) {
             loop_mech.enable_fd_watch_nolock(fd, watcher, watch_flags | ONE_SHOT);
@@ -907,20 +906,20 @@ class event_loop
         }                
     }
     
-    void process_signal_rearm(base_signal_watcher * bsw, rearm rearmType) noexcept
+    void process_signal_rearm(base_signal_watcher * bsw, rearm rearm_type) noexcept
     {
         // Called with lock held
-        if (rearmType == rearm::REARM) {
+        if (rearm_type == rearm::REARM) {
             loop_mech.rearm_signal_watch_nolock(bsw->siginfo.get_signo(), bsw);
         }
-        else if (rearmType == rearm::REMOVE) {
+        else if (rearm_type == rearm::REMOVE) {
             loop_mech.remove_signal_watch_nolock(bsw->siginfo.get_signo());
         }
         // Note that signal watchers cannot (currently) be disarmed
     }
 
     // Process rearm return for fd_watcher, including the primary watcher of a bidi_fd_watcher
-    rearm processFdRearm(base_fd_watcher * bfw, rearm rearmType, bool is_multi_watch) noexcept
+    rearm process_fd_rearm(base_fd_watcher * bfw, rearm rearm_type, bool is_multi_watch) noexcept
     {
         bool emulatedfd = static_cast<base_watcher *>(bfw)->emulatefd;
 
@@ -928,7 +927,7 @@ class event_loop
         if (is_multi_watch) {
             base_bidi_fd_watcher * bdfw = static_cast<base_bidi_fd_watcher *>(bfw);
 
-            if (rearmType == rearm::REMOVE) {
+            if (rearm_type == rearm::REMOVE) {
                 bdfw->read_removed = 1;
                 
                 if (LoopTraits::has_separate_rw_fd_watches) {
@@ -957,7 +956,7 @@ class event_loop
                     }
                 }
             }
-            else if (rearmType == rearm::DISARM) {
+            else if (rearm_type == rearm::DISARM) {
                 bdfw->watch_flags &= ~IN_EVENTS;
 
                 if (! emulatedfd) {
@@ -974,7 +973,7 @@ class event_loop
                     }
                 }
             }
-            else if (rearmType == rearm::REARM) {
+            else if (rearm_type == rearm::REARM) {
                 bdfw->watch_flags |= IN_EVENTS;
                 
                 if (! emulatedfd) {
@@ -991,74 +990,74 @@ class event_loop
                     }
                 }
                 else {
-                    rearmType = rearm::REQUEUE;
+                    rearm_type = rearm::REQUEUE;
                 }
             }
-            else if (rearmType == rearm::NOOP) {
+            else if (rearm_type == rearm::NOOP) {
                 if (bdfw->emulatefd) {
                     if (bdfw->watch_flags & IN_EVENTS) {
-                        rearmType = rearm::REQUEUE;
+                        rearm_type = rearm::REQUEUE;
                     }
                 }
             }
-            return rearmType;
+            return rearm_type;
         }
         else { // Not multi-watch:
             if (emulatedfd) {
-                if (rearmType == rearm::REARM) {
+                if (rearm_type == rearm::REARM) {
                     bfw->emulate_enabled = true;
-                    rearmType = rearm::REQUEUE;
+                    rearm_type = rearm::REQUEUE;
                 }
-                else if (rearmType == rearm::DISARM) {
+                else if (rearm_type == rearm::DISARM) {
                     bfw->emulate_enabled = false;
                 }
-                else if (rearmType == rearm::NOOP) {
+                else if (rearm_type == rearm::NOOP) {
                     if (bfw->emulate_enabled) {
-                        rearmType = rearm::REQUEUE;
+                        rearm_type = rearm::REQUEUE;
                     }
                 }
             }
-            else  if (rearmType == rearm::REARM) {
+            else  if (rearm_type == rearm::REARM) {
                 loop_mech.enable_fd_watch_nolock(bfw->watch_fd, bfw,
                         (bfw->watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
             }
-            else if (rearmType == rearm::DISARM) {
+            else if (rearm_type == rearm::DISARM) {
                 loop_mech.disable_fd_watch_nolock(bfw->watch_fd, bfw->watch_flags);
             }
-            else if (rearmType == rearm::REMOVE) {
+            else if (rearm_type == rearm::REMOVE) {
                 loop_mech.remove_fd_watch_nolock(bfw->watch_fd, bfw->watch_flags);
             }
-            return rearmType;
+            return rearm_type;
         }
     }
 
     // Process re-arm for the secondary (output) watcher in a Bi-direction Fd watcher.
-    rearm process_secondary_rearm(base_bidi_fd_watcher * bdfw, base_watcher * outw, rearm rearmType) noexcept
+    rearm process_secondary_rearm(base_bidi_fd_watcher * bdfw, base_watcher * outw, rearm rearm_type) noexcept
     {
         bool emulatedfd = outw->emulatefd;
 
         // Called with lock held
         if (emulatedfd) {
-            if (rearmType == rearm::REMOVE) {
+            if (rearm_type == rearm::REMOVE) {
                 bdfw->write_removed = 1;
                 bdfw->watch_flags &= ~OUT_EVENTS;
-                rearmType = bdfw->read_removed ? rearm::REMOVE : rearm::NOOP;
+                rearm_type = bdfw->read_removed ? rearm::REMOVE : rearm::NOOP;
             }
-            else if (rearmType == rearm::DISARM) {
+            else if (rearm_type == rearm::DISARM) {
                 bdfw->watch_flags &= ~OUT_EVENTS;
             }
-            else if (rearmType == rearm::REARM) {
+            else if (rearm_type == rearm::REARM) {
                 bdfw->watch_flags |= OUT_EVENTS;
-                rearmType = rearm::REQUEUE;
+                rearm_type = rearm::REQUEUE;
             }
-            else if (rearmType == rearm::NOOP) {
+            else if (rearm_type == rearm::NOOP) {
                 if (bdfw->watch_flags & OUT_EVENTS) {
-                    rearmType = rearm::REQUEUE;
+                    rearm_type = rearm::REQUEUE;
                 }
             }
-            return rearmType;
+            return rearm_type;
         }
-        else if (rearmType == rearm::REMOVE) {
+        else if (rearm_type == rearm::REMOVE) {
             bdfw->write_removed = 1;
 
             if (LoopTraits::has_separate_rw_fd_watches) {
@@ -1081,7 +1080,7 @@ class event_loop
                 }
             }
         }
-        else if (rearmType == rearm::DISARM) {
+        else if (rearm_type == rearm::DISARM) {
             bdfw->watch_flags &= ~OUT_EVENTS;
 
             if (! LoopTraits::has_separate_rw_fd_watches) {
@@ -1094,7 +1093,7 @@ class event_loop
                 loop_mech.disable_fd_watch_nolock(bdfw->watch_fd, OUT_EVENTS);
             }
         }
-        else if (rearmType == rearm::REARM) {
+        else if (rearm_type == rearm::REARM) {
             bdfw->watch_flags |= OUT_EVENTS;
             
             if (! LoopTraits::has_separate_rw_fd_watches) {
@@ -1109,7 +1108,7 @@ class event_loop
                         OUT_EVENTS | ONE_SHOT);
             }
         }
-        return rearmType;
+        return rearm_type;
     }
     
     void process_child_watch_rearm(base_child_watcher *bcw, rearm rearm_type) noexcept
@@ -1119,16 +1118,16 @@ class event_loop
         }
     }
 
-    void process_timer_rearm(base_timer_watcher *btw, rearm rearmType) noexcept
+    void process_timer_rearm(base_timer_watcher *btw, rearm rearm_type) noexcept
     {
         // Called with lock held
-        if (rearmType == rearm::REARM) {
+        if (rearm_type == rearm::REARM) {
             loop_mech.enableTimer_nolock(btw->timer_handle, true, btw->clock);
         }
-        else if (rearmType == rearm::REMOVE) {
+        else if (rearm_type == rearm::REMOVE) {
             loop_mech.remove_timer_nolock(btw->timer_handle, btw->clock);
         }
-        else if (rearmType == rearm::DISARM) {
+        else if (rearm_type == rearm::DISARM) {
             loop_mech.enableTimer_nolock(btw->timer_handle, false, btw->clock);
         }
     }
@@ -1272,22 +1271,22 @@ class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop:
     }
     
     template <typename T>
-    static signal_watcher<EventLoop> *add_watch(EventLoop &eloop, int signo, T watchHndlr)
+    static signal_watcher<EventLoop> *add_watch(EventLoop &eloop, int signo, T watch_hndlr)
     {
-        class LambdaSigWatcher : public signal_watcher_impl<EventLoop, LambdaSigWatcher>
+        class lambda_sig_watcher : public signal_watcher_impl<EventLoop, lambda_sig_watcher>
         {
             private:
-            T watchHndlr;
+            T watch_hndlr;
 
             public:
-            LambdaSigWatcher(T watchHandlr_a) : watchHndlr(watchHandlr_a)
+            lambda_sig_watcher(T watch_handlr_a) : watch_hndlr(watch_handlr_a)
             {
                 //
             }
 
             rearm received(EventLoop &eloop, int signo, siginfo_p siginfo)
             {
-                return watchHndlr(eloop, signo, siginfo);
+                return watch_hndlr(eloop, signo, siginfo);
             }
 
             void watch_removed() noexcept override
@@ -1296,7 +1295,7 @@ class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop:
             }
         };
 
-        LambdaSigWatcher * lsw = new LambdaSigWatcher(watchHndlr);
+        lambda_sig_watcher * lsw = new lambda_sig_watcher(watch_hndlr);
         lsw->add_watch(eloop, signo);
         return lsw;
     }
@@ -1312,21 +1311,21 @@ class signal_watcher_impl : public signal_watcher<EventLoop>
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.get_base_lock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->received(loop, this->siginfo.get_signo(), this->siginfo);
+        auto rearm_type = static_cast<Derived *>(this)->received(loop, this->siginfo.get_signo(), this->siginfo);
 
         loop.get_base_lock().lock();
 
-        if (rearmType != rearm::REMOVED) {
+        if (rearm_type != rearm::REMOVED) {
 
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
-                rearmType = rearm::REMOVE;
+                rearm_type = rearm::REMOVE;
             }
 
-            loop.process_signal_rearm(this, rearmType);
+            loop.process_signal_rearm(this, rearm_type);
 
-            post_dispatch(loop, this, rearmType);
+            post_dispatch(loop, this, rearm_type);
         }
     }
 };
@@ -1338,7 +1337,7 @@ class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t
     template <typename, typename> friend class fd_watcher_impl;
 
     using base_watcher = dprivate::base_watcher;
-    using T_Mutex = typename EventLoop::mutex_t;
+    using mutex_t = typename EventLoop::mutex_t;
 
     protected:
     
@@ -1404,12 +1403,12 @@ class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t
     
     void set_enabled(EventLoop &eloop, bool enable) noexcept
     {
-        std::lock_guard<T_Mutex> guard(eloop.get_base_lock());
+        std::lock_guard<mutex_t> guard(eloop.get_base_lock());
         if (this->emulatefd) {
             this->emulate_enabled = enable;
         }
         else {
-            eloop.setFdEnabled_nolock(this, this->watch_fd, this->watch_flags, enable);
+            eloop.set_fd_enabled_nolock(this, this->watch_fd, this->watch_flags, enable);
         }
         if (! enable) {
             eloop.dequeue_watcher(this);
@@ -1463,21 +1462,21 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
 
         loop.get_base_lock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->fd_event(loop, this->watch_fd, this->event_flags);
+        auto rearm_type = static_cast<Derived *>(this)->fd_event(loop, this->watch_fd, this->event_flags);
 
         loop.get_base_lock().lock();
 
-        if (rearmType != rearm::REMOVED) {
+        if (rearm_type != rearm::REMOVED) {
             this->event_flags = 0;
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
-                rearmType = rearm::REMOVE;
+                rearm_type = rearm::REMOVE;
             }
 
-            rearmType = loop.processFdRearm(this, rearmType, false);
+            rearm_type = loop.process_fd_rearm(this, rearm_type, false);
 
-            post_dispatch(loop, this, rearmType);
+            post_dispatch(loop, this, rearm_type);
         }
     }
 };
@@ -1509,10 +1508,10 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
 
         if (! basewatcher_get_emulatefd(*watcher)) {
             if (EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
-                eloop.setFdEnabled_nolock(this, this->watch_fd, events | ONE_SHOT, b);
+                eloop.set_fd_enabled_nolock(this, this->watch_fd, events | ONE_SHOT, b);
             }
             else {
-                eloop.setFdEnabled_nolock(this, this->watch_fd,
+                eloop.set_fd_enabled_nolock(this, this->watch_fd,
                         (this->watch_flags & IO_EVENTS) | ONE_SHOT,
                         (this->watch_flags & IO_EVENTS) != 0);
             }
@@ -1547,17 +1546,17 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
     // (i.e. it is ok to call setWatchFlags from within the readReady/writeReady handlers if no other
     //  thread will poll the event loop; it is always ok to *dis*able a watcher that might be active,
     //  though the re-arm action returned by the callback may undo the effect).
-    void set_watches(EventLoop &eloop, int newFlags) noexcept
+    void set_watches(EventLoop &eloop, int new_flags) noexcept
     {
         std::lock_guard<T_Mutex> guard(eloop.get_base_lock());
         bool use_emulation = this->emulatefd || basewatcher_get_emulatefd(this->out_watcher);
         if (use_emulation || EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
-            set_watch_enabled(eloop, true, (newFlags & IN_EVENTS) != 0);
-            set_watch_enabled(eloop, false, (newFlags & OUT_EVENTS) != 0);
+            set_watch_enabled(eloop, true, (new_flags & IN_EVENTS) != 0);
+            set_watch_enabled(eloop, false, (new_flags & OUT_EVENTS) != 0);
         }
         else {
-            this->watch_flags = (this->watch_flags & ~IO_EVENTS) | newFlags;
-            eloop.setFdEnabled((dprivate::base_watcher *) this, this->watch_fd, this->watch_flags & IO_EVENTS, true);
+            this->watch_flags = (this->watch_flags & ~IO_EVENTS) | new_flags;
+            eloop.set_fd_enabled((dprivate::base_watcher *) this, this->watch_fd, this->watch_flags & IO_EVENTS, true);
         }
     }
     
@@ -1610,27 +1609,27 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
     }
     
     template <typename T>
-    static bidi_fd_watcher<EventLoop> *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)
+    static bidi_fd_watcher<EventLoop> *add_watch(EventLoop &eloop, int fd, int flags, T watch_hndlr)
     {
         class lambda_bidi_watcher : public bidi_fd_watcher_impl<EventLoop, lambda_bidi_watcher>
         {
             private:
-            T watchHndlr;
+            T watch_hndlr;
 
             public:
-            lambda_bidi_watcher(T watchHandlr_a) : watchHndlr(watchHandlr_a)
+            lambda_bidi_watcher(T watch_handlr_a) : watch_hndlr(watch_handlr_a)
             {
                 //
             }
 
             rearm read_ready(EventLoop &eloop, int fd)
             {
-                return watchHndlr(eloop, fd, IN_EVENTS);
+                return watch_hndlr(eloop, fd, IN_EVENTS);
             }
 
             rearm write_ready(EventLoop &eloop, int fd)
             {
-                return watchHndlr(eloop, fd, OUT_EVENTS);
+                return watch_hndlr(eloop, fd, OUT_EVENTS);
             }
 
             void watch_removed() noexcept override
@@ -1639,7 +1638,7 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
             }
         };
 
-        lambda_bidi_watcher * lfd = new lambda_bidi_watcher(watchHndlr);
+        lambda_bidi_watcher * lfd = new lambda_bidi_watcher(watch_hndlr);
         lfd->add_watch(eloop, fd, flags);
         return lfd;
     }
@@ -1657,21 +1656,21 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
         this->emulate_enabled = false;
         loop.get_base_lock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->read_ready(loop, this->watch_fd);
+        auto rearm_type = static_cast<Derived *>(this)->read_ready(loop, this->watch_fd);
 
         loop.get_base_lock().lock();
 
-        if (rearmType != rearm::REMOVED) {
+        if (rearm_type != rearm::REMOVED) {
             this->event_flags &= ~IN_EVENTS;
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
-                rearmType = rearm::REMOVE;
+                rearm_type = rearm::REMOVE;
             }
 
-            rearmType = loop.processFdRearm(this, rearmType, true);
+            rearm_type = loop.process_fd_rearm(this, rearm_type, true);
 
-            post_dispatch(loop, this, rearmType);
+            post_dispatch(loop, this, rearm_type);
         }
     }
 
@@ -1682,25 +1681,25 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.get_base_lock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->write_ready(loop, this->watch_fd);
+        auto rearm_type = static_cast<Derived *>(this)->write_ready(loop, this->watch_fd);
 
         loop.get_base_lock().lock();
 
-        if (rearmType != rearm::REMOVED) {
+        if (rearm_type != rearm::REMOVED) {
             this->event_flags &= ~OUT_EVENTS;
             basewatcher_set_active(outwatcher, false);
             if (basewatcher_get_deleteme(outwatcher)) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
-                rearmType = rearm::REMOVE;
+                rearm_type = rearm::REMOVE;
             }
 
-            rearmType = loop.process_secondary_rearm(this, &outwatcher, rearmType);
+            rearm_type = loop.process_secondary_rearm(this, &outwatcher, rearm_type);
 
-            if (rearmType == rearm::REQUEUE) {
-                post_dispatch(loop, &outwatcher, rearmType);
+            if (rearm_type == rearm::REQUEUE) {
+                post_dispatch(loop, &outwatcher, rearm_type);
             }
             else {
-                post_dispatch(loop, this, rearmType);
+                post_dispatch(loop, this, rearm_type);
             }
         }
     }
@@ -1893,22 +1892,22 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.get_base_lock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->status_change(loop, this->watch_pid, this->child_status);
+        auto rearm_type = static_cast<Derived *>(this)->status_change(loop, this->watch_pid, this->child_status);
 
         loop.get_base_lock().lock();
 
-        if (rearmType != rearm::REMOVED) {
+        if (rearm_type != rearm::REMOVED) {
 
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
-                rearmType = rearm::REMOVE;
+                rearm_type = rearm::REMOVE;
             }
 
-            loop.process_child_watch_rearm(this, rearmType);
+            loop.process_child_watch_rearm(this, rearm_type);
 
-            // rearmType = loop.process??;
-            post_dispatch(loop, this, rearmType);
+            // rearm_type = loop.process??;
+            post_dispatch(loop, this, rearm_type);
         }
     }
 };
@@ -2012,21 +2011,21 @@ class timer_impl : public timer<EventLoop>
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.get_base_lock().unlock();
 
-        auto rearmType = static_cast<Derived *>(this)->timer_expiry(loop, this->intervals);
+        auto rearm_type = static_cast<Derived *>(this)->timer_expiry(loop, this->intervals);
 
         loop.get_base_lock().lock();
 
-        if (rearmType != rearm::REMOVED) {
+        if (rearm_type != rearm::REMOVED) {
 
             this->active = false;
             if (this->deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
-                rearmType = rearm::REMOVE;
+                rearm_type = rearm::REMOVE;
             }
 
-            loop.process_timer_rearm(this, rearmType);
+            loop.process_timer_rearm(this, rearm_type);
 
-            post_dispatch(loop, this, rearmType);
+            post_dispatch(loop, this, rearm_type);
         }
     }
 };
