@@ -13,6 +13,7 @@ This is the manual for the <b>Dasynq</b> event loop library.
   <ul>
   <li><a href="event_loop.html">event_loop, event_loop_n, event_loop_th</a></li>
   <li><a href="fd_watcher.html">fd_watcher, fd_watcher_impl</a></li>
+  <li><a href="dasynq-namespace.html">dasynq namespace synopsis</a></li>
   </ul>
 </ul>
 
@@ -37,11 +38,10 @@ for detecting:
 
 It also supports one-shot and periodic timers.</p>
 
-<p>Dasynq is fully thread safe, allowing events to be polled and processed on any thread, unlike
-nearly every other event loop library (some of which are thread-safe, but which require that events be
-polled from a single thread). There are <i>some</i> limitations on the use the Dasynq API in a
-multi-threaded application. However, when used in a single-thread application, the API is just about as
-straight-forward as the API of most other event loop libraries.</p>
+<p>Dasynq is fully thread safe, allowing events to be polled and processed on any thread. There are
+<i>some</i> limitations on the use the Dasynq API in a multi-threaded application. However, when used in a
+single-thread application, the API is just about as straight-forward as the API of most other event loop
+libraries.</p>
 
 <p>Dasynq is also intended to allow development of extremely robust client applications. Where possible,
 it allows pre-allocation of resources to prevent allocation failures from occurring at inopportune moments

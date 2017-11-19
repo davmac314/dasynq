@@ -9,6 +9,10 @@
 #include "dasynq.h"
 
 namespace dasynq {
+
+    // "null mutex", i.e. a no-op mutex "implementation" suitable for use in a single-threaded application
+    class null_mutex; 
+
     // generic event loop
     template &lt;typename T_Mutex&gt; class <a href="event_loop.html">event_loop</a>;
     typedef event_loop&lt;null_mutex&gt; event_loop_n;

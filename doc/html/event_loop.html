@@ -76,7 +76,7 @@ Additional template parameters are implementation internal.
 <li><i class="code-name">void run() noexcept</i> - wait while there are no events pending; queue and process pending events</li>
 <li><i class="code-name">void poll() noexcept</i> - queue and process any currently pending events</li>
 <li><i class="code-name">void get_time(timespec &ts, clock_type clock, bool force_update = false) noexcept</i><br>
-    <i class="code-name">void get_time(time_val &tv, clock_type clock, bool force_update = false) noexcept</i><br>
+    <i class="code-name">void get_time(<a href="dasynq-namespace.html#time_val">time_val</a> &tv, clock_type clock, bool force_update = false) noexcept</i><br>
     &mdash; get the current
     time for the specified clock. The clock times may be cached for performance reasons; specify
     <i class="code-name">force_update</i> as true to avoid using a cached value (in general this should not be necessary).</li>
