@@ -207,7 +207,7 @@ class compare_timespec
     }
 };
 
-using timer_queue_t = NaryHeap<timer_data, struct timespec, compare_timespec>;
+using timer_queue_t = NaryHeap<timer_data, time_val, compare_timespec>;
 using timer_handle_t = timer_queue_t::handle_t;
 
 static inline void init_timer_handle(timer_handle_t &hnd) noexcept
@@ -284,9 +284,9 @@ template <typename Base> class timer_base : public Base
     void process_timer_queue(timer_queue_t &queue, const struct timespec &curtime) noexcept
     {
         // Peek timer queue; calculate difference between current time and timeout
-        const struct timespec * timeout = &queue.get_root_priority();
-        while (timeout->tv_sec < curtime.tv_sec || (timeout->tv_sec == curtime.tv_sec &&
-                timeout->tv_nsec <= curtime.tv_nsec)) {
+        const time_val * timeout = &queue.get_root_priority();
+        time_val curtime_tv = curtime;
+        while (*timeout <= curtime_tv) {
             auto & thandle = queue.get_root();
             timer_data &data = queue.node_data(thandle);
             time_val &interval = data.interval_time;
