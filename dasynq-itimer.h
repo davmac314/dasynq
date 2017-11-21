@@ -33,8 +33,8 @@ template <class Base> class itimer_events : public timer_base<Base>
     }
 #endif
     
-    // Set the aalrm timeout to match the first timer in the queue (disable the timerfd
-    // if there are no active timers).
+    // Set the alarm timeout to match the first timer in the queue (disable the alarm if there are no
+    // active timers).
     void set_timer_from_queue()
     {
         time_val newtime;

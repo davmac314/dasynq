@@ -281,6 +281,8 @@ template <typename Base> class timer_base : public Base
 {
     protected:
 
+    // For the specified timer queue, issue expirations for all timers set to expire on or before the given
+    // time (curtime).
     void process_timer_queue(timer_queue_t &queue, const struct timespec &curtime) noexcept
     {
         // Peek timer queue; calculate difference between current time and timeout
@@ -335,9 +337,7 @@ template <typename Base> class timer_base : public Base
 
     void get_time(time_val &tv, clock_type clock, bool force_update) noexcept
     {
-        timespec ts;
-        get_time(ts, clock, force_update);
-        tv = ts;
+        get_time(tv.get_timespec(), clock, force_update);
     }
 
 #ifdef CLOCK_MONOTONIC
