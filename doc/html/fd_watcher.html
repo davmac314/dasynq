@@ -52,16 +52,22 @@ ready for reading or writing (or both, if supported by the event loop back-end).
     than emulating readiness events (see details section).</li>
 <li><i class="code-name">void deregister(event_loop_t &eloop) noexcept</i>
     <br>&mdash; request removal from the event loop.</li>
-<li><i class="code-name">int get_watched_fd()</i> &mdash; returns the file descriptor associated with this watcher</li>
-<li><i class="code-name">void set_enabled(event_loop_t &eloop, bool enable) noexcept</i> &mdash; enable or disable the watcher</li>
+<li><i class="code-name">int get_watched_fd()</i> &mdash; returns the file descriptor associated with this watcher.</li>
+<li><i class="code-name">void set_enabled(event_loop_t &eloop, bool enable) noexcept</i> &mdash; enable or disable the watcher.</li>
 <li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
     removed from the event loop.</li>
 </ul>
 
-<h3>Protected members - fd_watcher</h2>
+<h3>Protected functions</h2>
 
 <ul>
-<li><i class="code-name">void set_watch_flags(int newFlags)</i> - set watched event types</li>
+<li><i class="code-name">void set_watch_flags(int newFlags)</i> &mdash; set watched event types (a combination
+of <i class="code-name">IN_EVENTS</i> and <i class="code-name">OUT_EVENTS</i>). Must only be called if
+the event loop supports multi-direction file descriptor watches (i.e. if the <i class="code-name">
+has_separate_rw_fd_watches</i> loop trait is false). For multi-threaded event loops, must only be called
+from within the callback function. Takes effect when the watcher is next enabled (either by using the
+<i class="code-name">set_enabled</i> function or returning the <i class="code-name">REARM</i> code from
+the callback).</li>
 </ul>
 </div>
 
