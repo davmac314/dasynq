@@ -22,41 +22,48 @@ ready for reading or writing (or both, if supported by the event loop back-end).
 <i class="code-name">fd_watcher</i> class should not be subclassed directly; the
 <a href="#fd_watcher_impl"><i class="code-name">fd_watcher_impl</i></a> template provides a means for subclassing.</p>
 
-<h2>Internal types</h2>
+<h2>Members</h2>
 
+<div class="small-indent">
+
+<h3>Types</h3>
 <ul>
-<li><i class="code-name">EventLoop</i> &mdash; the event loop type which this watcher registers with.</li>
+<li><i class="code-name">event_loop_t</i> &mdash; the event loop type that this watcher registers with.</li>
 </ul>
 
-<h2>Public members - fd_watcher</h2>
-
+<h3>Constructors</h3>
 <ul>
 <li><i class="code-name">fd_watcher()</i> &mdash; default constructor.</li>
-<li>(#1) <i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
+</ul>
+
+<h3>Functions</h3>
+<ul>
+<li>(#1) <i class="code-name">void add_watch(event_loop_t &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
     <br>&mdash; register a watcher with an event loop. <i class="code-name">flags</i> is a combination of <i class="code-name">dasynq::IN_EVENTS</i> and
     <i class="code-name">dasynq::OUT_EVENTS</i> (see details section for limitations). May throw
     <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
 <li>(#2) <i class="code-name">template &lt;typename T&gt;
-    <br>static fd_watcher *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)</i>
+    <br>static fd_watcher *add_watch(event_loop_t &eloop, int fd, int flags, T watchHndlr)</i>
     <br>&mdash; add a dynamically-allocated watch with the specified callback. The watch is automatically
     deleted when removed. See <a href="#add_watch_2">details</a> below.</li>
-<li><i class="code-name">void add_watch_noemu(EventLoop &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
+<li><i class="code-name">void add_watch_noemu(event_loop_t &eloop, int fd, int flags, bool enabled = true, int prio = DEFAULT_PRIORITY)</i>
     <br>&mdash; add a watcher with no emulation. See <i class="code-name">add_watch</i>(#1). If the backend
     does not support the specified file descriptor, throws <i class="code-name">std::system_error</i> rather
     than emulating readiness events (see details section).</li>
-<li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i>
+<li><i class="code-name">void deregister(event_loop_t &eloop) noexcept</i>
     <br>&mdash; request removal from the event loop.</li>
 <li><i class="code-name">int get_watched_fd()</i> &mdash; returns the file descriptor associated with this watcher</li>
-<li><i class="code-name">void set_enabled(EventLoop &eloop, bool enable) noexcept</i> &mdash; enable or disable the watcher</li>
+<li><i class="code-name">void set_enabled(event_loop_t &eloop, bool enable) noexcept</i> &mdash; enable or disable the watcher</li>
 <li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
     removed from the event loop.</li>
 </ul>
 
-<h2>Protected members - fd_watcher</h2>
+<h3>Protected members - fd_watcher</h2>
 
 <ul>
 <li><i class="code-name">void set_watch_flags(int newFlags)</i> - set watched event types</li>
 </ul>
+</div>
 
 <h2>Details and Usage</h2>
 
@@ -134,7 +141,7 @@ watchers. However, it is recommended to avoid this if possible.</p>
 <pre>
 // member of dasynq::event_loop&lt;T&gt;::fd_watcher
 template &lt;typename T&gt;
-static fd_watcher&lt;EventLoop&gt; *add_watch(EventLoop &eloop, int fd, int flags, T watch_hndlr)</i>
+static fd_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &eloop, int fd, int flags, T watch_hndlr)
 </pre>
 
 <p>This variant of the <i class="code-name">add_watch</i> function can be used to create and register a
@@ -143,7 +150,7 @@ dynamically-allocated <i class="code-name">fd_watcher</i>. The first three param
 or lambda of the form:</p>
 
 <pre>
-[](loop_t &eloop, int fd, int flags) -> rearm { ... }
+[](event_loop_t &eloop, int fd, int flags) -> rearm { ... }
 </pre>
 
 <p>It acts as the callback function for the generated watcher. The watcher will delete itself when it is
@@ -171,11 +178,10 @@ class my_watcher : public fd_watcher_impl<my_watcher>
 <h2>Details and Usage</h2>
 
 <p>The callback function must be provided in the subclass and named <i class="code-name">fd_event</i>, with
-a signature compatible with the following (where <i class="code-name">loop_t</i> is an alias to the
-appropriate event loop type):</p>
+a signature compatible with the following:</p>
 
 <pre>
-rearm fd_event(loop_t & loop, int fd, int flags);
+rearm fd_event(event_loop_t & loop, int fd, int flags);
 </pre>
 
 <p>The <i class="code-name">fd_event</i> function must be public (or otherwise the

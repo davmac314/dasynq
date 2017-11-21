@@ -23,15 +23,14 @@ both  input and output readiness using a single watcher. The <i class="code-name
 should not be subclassed directly; the <a href="#bidi_fd_watcher_impl"><i class="code-name">bidi_fd_watcher_impl</i></a>
 template provides a means for subclassing.</p>
 
-<h2>Internal types</h2>
-
-<ul>
-<li><i class="code-name">EventLoop</i> &mdash; the event loop type which this watcher registers with.</li>
-</ul>
-
 <h2>Members</h2>
 
 <div class="small-indent">
+
+<h2>Types</h2>
+<ul>
+<li><i class="code-name">event_loop_t</i> &mdash; the event loop type that this watcher registers with.</li>
+</ul>
 
 <h2>Constructors</h2>
 <ul>
@@ -40,30 +39,30 @@ template provides a means for subclassing.</p>
 
 <h2>Functions</h2>
 <ul>
-<li>(#1) <i class="code-name">void add_watch(EventLoop &eloop, int fd, int flags, int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)</i> &mdash;<br>
+<li>(#1) <i class="code-name">void add_watch(event_loop_t &eloop, int fd, int flags, int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)</i> &mdash;<br>
      add a watch for the specified file descriptor. The <i class="code-name">flags</i> argument specifies a
      combination of <i class="code-name">dasynq::IN_EVENTS</i> and <i class="code-name">dasynq::OUT_EVENTS</i>
      specifying which readiness events to initially enable.</li>
 <li>(#2) <i class="code-name">template &lt;typename T&gt;<br>
-    static bidi_fd_watcher *add_watch(EventLoop &eloop, int fd, int flags, T watchHndlr)</i> &mdash;<br>
+    static bidi_fd_watcher *add_watch(event_loop_t &eloop, int fd, int flags, T watchHndlr)</i> &mdash;<br>
     add a dynamically-allocated watch with the specified callback. See <i class="code-name">add_watch(#1)</i>.
     The watch is automatically deleted when removed. The <i class="code-name">watchHandlr</i> should be
-    a lambda of the form <i class="code-name">[](EventLoop &eloop, int fd, int flags) -> dasynq::rearm</i> or a
+    a lambda of the form <i class="code-name">[](event_loop_t &eloop, int fd, int flags) -> dasynq::rearm</i> or a
     compatible function object. See <a href="#add_watch_2">details</a> below.</li>
-<li><i class="code-name">void add_watch_noemu(EventLoop &eloop, int fd, int flags,<br>
+<li><i class="code-name">void add_watch_noemu(event_loop_t &eloop, int fd, int flags,<br>
      &nbsp;&nbsp;&nbsp;&nbsp;int inprio = DEFAULT_PRIORITY, int outprio = DEFAULT_PRIORITY)</i> &mdash;<br>
      add a watch as per <i class="code-name">add_watcher</i>, but without watch emulation for regular files.
      If the backend does not support the specified file descriptor, throws <i class="code-name">std::system_error</i> rather
      than emulating readiness events.</li>
-<li><i class="code-name">void set_in_watch_enabled(EventLoop &eloop, bool b) noexcept</i> &mdash; enable or disable
+<li><i class="code-name">void set_in_watch_enabled(event_loop_t &eloop, bool b) noexcept</i> &mdash; enable or disable
      watching input readiness events.</li>
-<li><i class="code-name">void set_out_watch_enabled(EventLoop &eloop, bool b) noexcept</i> &mdash; enable or disable
+<li><i class="code-name">void set_out_watch_enabled(event_loop_t &eloop, bool b) noexcept</i> &mdash; enable or disable
      watching output readiness events.</li>
-<li><i class="code-name">void set_watches(EventLoop &eloop, int newFlags) noexcept</i> &mdash; enable/disable both
+<li><i class="code-name">void set_watches(event_loop_t &eloop, int newFlags) noexcept</i> &mdash; enable/disable both
      input and output readiness watches at the same time. <i class="code-name">newFlags</i> is a combination
      of <i class="code-name">dasynq::IN_EVENTS</i> and <i class="code-name">dasynq::OUT_EVENTS</i> which
      specifies which watches will be enabled (if not set, the corresponding watch is disabled).</li>
-<li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i>
+<li><i class="code-name">void deregister(event_loop_t &eloop) noexcept</i>
     <br>&mdash; request removal from the event loop.</li>
 <li><i class="code-name">int get_watched_fd()</i> &mdash; returns the file descriptor associated with this watcher</li>
 <li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
@@ -96,7 +95,7 @@ implementation wrapper template.</p>
 <pre>
 // member of dasynq::event_loop&lt;T&gt;::bidi_fd_watcher
 template &lt;typename T&gt;
-static fd_watcher&lt;EventLoop&gt; *add_watch(EventLoop &eloop, int fd, int flags, T watch_hndlr)</i>
+static fd_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &eloop, int fd, int flags, T watch_hndlr)</i>
 </pre>
 
 <p>This variant of the <i class="code-name">add_watch</i> function can be used to create and register a
@@ -105,7 +104,7 @@ dynamically-allocated <i class="code-name">fd_watcher</i>. The first three param
 or lambda of the form:</p>
 
 <pre>
-[](loop_t &eloop, int fd, int flags) -> rearm { ... }
+[](event_loop_t &eloop, int fd, int flags) -> rearm { ... }
 </pre>
 
 <p>It acts as the callback function for the generated watcher (for both input and output readiness
@@ -136,12 +135,11 @@ class my_watcher : public bidi_fd_watcher_impl<my_watcher>
 <h2>Details and Usage</h2>
 
 <p>The callback functions must be provided in the subclass and named <i class="code-name">read_ready</i>
-and <i class="code-name">write_ready</i>, with signatures compatible with the following (where
-<i class="code-name">loop_t</i> is an alias to the appropriate event loop type):</p>
+and <i class="code-name">write_ready</i>, with signatures compatible with the following:</p>
 
 <pre>
-rearm read_ready(loop_t & loop, int fd);
-rearm write_ready(loop_t & loop, int fd);
+rearm read_ready(event_loop_t & loop, int fd);
+rearm write_ready(event_loop_t & loop, int fd);
 </pre>
 
 <p>The callback functions must be public (or otherwise the <i class="code-name">bidi_fd_watcher_impl</i>
