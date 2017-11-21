@@ -19,7 +19,7 @@ namespace dasynq {
     typedef event_loop&lt;std::mutex&gt; event_loop_th;
     
     // rearm codes
-    enum class rearm
+    enum class <a href="#rearm">rearm</a>
     {
         /** Re-arm the event watcher so that it receives further events */
         REARM,
@@ -29,7 +29,7 @@ namespace dasynq {
         NOOP,
         /** Remove the event watcher (and call "removed" callback) */
         REMOVE,
-        /** The watcher has been removed - don't touch it! */
+        /** The watcher has been removed explicitly */
         REMOVED,
         /** RE-queue the watcher to have its notification called again */
         REQUEUE
@@ -98,5 +98,54 @@ the public members listed below, a number of arithmetic and comparison operators
     <i class="code-name">nsecond_t & nseconds()</i> - access the nanoseconds value</li>
 <li><i class="code-name">operator timespec() const</i> - conversion to <i class="code-name">struct timespec</i></li>
 </ul>
+
+<hr><h1 id="rearm">rearm &mdash; dasynq::rearm</h1>
+
+<pre>
+#include "dasynq.h"
+
+namespace dasynq {
+    enum class rearm
+    {
+        /** Re-arm the event watcher so that it receives further events */
+        REARM,
+        /** Disarm the event watcher so that it receives no further events, until it is re-armed explicitly */
+        DISARM,
+        /** Leave in current armed/disarmed state */
+        NOOP,
+        /** Remove the event watcher (and call "removed" callback) */
+        REMOVE,
+        /** The watcher has been removed explicitly */
+        REMOVED,
+        /** Re-queue the watcher to have its callback called again */
+        REQUEUE
+    };
+}
+</pre>
+
+<p><b>Brief</b>: The <i class="code-name">rearm</i> enumeration specifies various watcher actions that can
+be applied automatically on return from the callback function.</p>
+
+<h2>Details</h2>
+
+<p>A watcher that has been added to an event loop can be enabled or disabled. If enabled, the watcher may be
+queued for processing by the event loop; at the processing stage, the callback function of a queued
+watcher will be called. See the <i class="code-name"><a href="event_loop.html">event_loop</a></i>
+documentation for a detailed discussion. A watcher is disabled when it is queued and must be re-enabled
+after processing in order to receive further events; an easy way to accomplish this is to return the
+<i class="code-name">rearm::REARM</i> value from the callback.<br>
+<span class="note"><i>Note:</i> a multi-threaded event loop has the limitation that the watcher should
+normally not be re-enabled while the callback is being executed. Returning
+<i class="code-name">rearm::REARM</i> from the callback is a convenient way to get around this
+limitation.</span></p>
+
+<p>In the case of a single-threaded event loop where a watcher has been re-enabled explicitly while the
+callback function is executing, the <i class="code-name">rearm::DISARM</i> code can be returned in order
+to disable it again (this has no effect if the watcher is already disabled).<p>
+
+<p>Other return codes are largely self-explanatory. Note that <i class="code-name">rearm::REMOVED</i> code
+must be returned if the watcher has been scheduled for removal from the loop (de-registered) via the
+watcher's <i class="code-name">deregister</i> function.
+
 
 </body></html>

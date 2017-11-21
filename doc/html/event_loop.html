@@ -95,7 +95,7 @@ be setup on some systems, and child process status requires watching for a signa
 <p>Watchers for events of interest should be registered with the event loop, and their callbacks will be
 notified when the events are processed. Event processing occurs only during execution of the
 <i class="code-name">run()</i> and <i class="code-name">poll()</i> functions. Watcher callbacks can return a
-<i class="code-name">rearm</i> value to perform various actions, including to re-enable the watcher in order
+<i class="code-name"><a href="dasynq-namespace.html#rearm">rearm</a></i> value to perform various actions, including to re-enable the watcher in order
 to detect future events.</p>
 
 <p>Most operations involving event watchers, such as registration, removing, enabling, and disabling, are performed via
@@ -112,8 +112,9 @@ is run; during execution of the callback, the watcher is in the <i>processing</i
 
 <p>If the event loop may be polled (via <i class="code-name">run</i> or <i class="code-name">poll</i> from another
 thread while a watcher is in the <i>queued</i> or <i>processing</i> states, then the watcher must not be re-enabled
-while in those states (except by returning a suitable <i class="code-name">rearm</i> code from the callback).
-<br><span class="note"><i>Note:</i> Technically, the requirement is that polling must not be performed if an event may be detected
+while in those states (except by returning a suitable <i class="code-name"><a href="dasynq-namespace.html#rearm">rearm</a></i>
+code from the callback).<br>
+<span class="note"><i>Note:</i> Technically, the requirement is that polling must not be performed if an event may be detected
 via an enabled watcher that is not in the <i>waiting</i> state.</span></p>
 
 <p>Watchers may not be registered with more than one event loop at any time.</p>
