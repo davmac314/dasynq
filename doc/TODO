@@ -5,14 +5,8 @@ Version 1.0:
 * Allow specifying how many events to process before re-polling backend.
   (Currently all pending events are processed before re-polling).
 
-* Clean up time handling, add division to time_val.
-
 Later:
 
-* Itimer: currently we munge both SYSTEM and MONOTONIC timers into one queue. However, the SYSTEM
-  time in theory can jump. We probably can't handle all (particularly forwards) jumps, but after
-  detecting a jump we should be able to correct later clocks.
-  
 * STOP rearm for timers. Instead of just disabling a timer, actually stop (but don't deallocate) it.
 
 * Use C++ standard library functions to get time (system time and monotonic time). Works on OS X, apparently,
