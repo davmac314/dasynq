@@ -1,9 +1,14 @@
 Version 1.0:
 
 * Finish reference documentation (HTML format)
+  - Document siginfo_p
+  - Document timers
+  - Document child process watchers
 
 * Allow specifying how many events to process before re-polling backend.
   (Currently all pending events are processed before re-polling).
+
+* check for uses of sigprocmask, use pthread_sigmask when required.
 
 Later:
 

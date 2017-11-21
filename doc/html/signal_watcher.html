@@ -1,0 +1,141 @@
+<html>
+<head><title>Dasynq manual - signal_watcher</title>
+  <link rel="stylesheet" href="style.css">  
+</head>
+<body>
+<h1>signal_watcher, signal_watcher_impl</h1>
+
+<pre>
+    // Members of dasynq::event_loop&lt;T&gt; instantiation:
+
+    class signal_watcher;
+
+    template &lt;class Derived&gt; class <a href="#signal_watcher_impl">signal_watcher_impl</a>; // : public signal_watcher;
+</pre>
+
+<h2>signal_watcher</h2>
+
+<p><b>Brief</b>: <i class="code-name">signal_watcher</i> is a member type of the <a href="event_loop.html"><i class="code-name">event_loop</i></a>
+template class. It represents an event watcher for POSIX signal reception events; a registered
+<i class="code-name">signal_watcher</i> will receive callbacks when its associated signal is received. The
+<i class="code-name">signal_watcher</i> class should not be subclassed directly; the
+<a href="#signal_watcher_impl"><i class="code-name">signal_watcher_impl</i></a> template provides a means for subclassing.</p>
+
+<h2>Members</h2>
+
+<div class="small-indent">
+
+<h3>Types</h3>
+<ul>
+<li><i class="code-name">event_loop_t</i> &mdash; the event loop type that this watcher registers with.</li>
+<li><i class="code-name">siginfo_p</i> &mdash; a receiver type for signal parameters / information. May be
+    a reference type.</li>
+</ul>
+
+<h3>Constructors</h3>
+<ul>
+<li><i class="code-name">signal_watcher()</i> &mdash; default constructor.</li>
+</ul>
+
+<h3>Functions</h3>
+<ul>
+<li>(#1) <i class="code-name">void add_watch(event_loop_t &eloop, int signo, int prio = DEFAULT_PRIORITY)</i>
+    <br>&mdash; register a watcher with an event loop. <i class="code-name">signo</i> specifies the signal
+    to watch. May throw <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
+<li>(#2) <i class="code-name">template &lt;typename T&gt;
+    <br>static signal_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &eloop, int signo, T watch_hndlr)</i>
+    <br>&mdash; add a dynamically-allocated watch with the specified callback. The watch is automatically
+    deleted when removed. See <a href="#add_watch_2">details</a> below.</li>
+<li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i>
+    <br>&mdash; request removal from the event loop.</li>
+<li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
+    removed from the event loop.</li>
+</ul>
+
+<h2>Details and Usage</h2>
+
+<p>A <i class="code-name">signal_watcher</i> implementation receives notification of delivery of the chosen
+POSIX signal. An application should establish a separate <i class="code-name">signal_watcher</i> for each
+signal it wishes to monitor.</p>
+  
+<p>A signal should be (and should remain) blocked in all threads prior to registration of a watcher for the
+signal (this can be achieved using <i class="code-name">sigprocmask</i> or
+<i class="code-name">pthread_sigmask</i>). Threads inherit their signal mask from their creator; threads
+created by libraries should always have all signals blocked, but there may be badly-behaved libraries which
+fail to adhere to this rule. Therefore, it is recommended to block required signals early in the application
+lifetime (before initialising other libraries) if possible.</p>
+
+<p>Note that signals are consumed before the watcher callback is called.</p>
+
+<h3>Subclassing signal_watcher</h3>
+
+<p>To specify callback behaviour, <i class="code-name">signal_watcher</i> can be subclassed &mdash; however, it should
+not be directly subclassed; instead, use the <i class="code-name">signal_watcher_impl</i> implementation wrapper
+template.</p>
+
+
+
+<h2 id="add_watch_2">add_watch (#2)</h2>
+
+<pre>
+// member of dasynq::event_loop&lt;T&gt;::signal_watcher
+template &lt;typename T&gt;
+static signal_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &eloop, int signo, T watch_hndlr);
+</pre>
+
+<p>This variant of the <i class="code-name">add_watch</i> function can be used to create and register a
+dynamically-allocated <i class="code-name">signal_watcher</i>. The first two parameters are the same as for
+<i class="code-name">add_watch</i>(#1). The <i class="code-name">watch_hndlr</i> parameter is a function
+or lambda of the form:</p>
+
+<pre>
+[](event_loop_t &eloop, int signo, siginfo_p siginfo) -> rearm { ... }
+</pre>
+
+<p>It acts as the callback function for the generated watcher. The watcher will delete itself when it is
+removed from the event loop.</p>
+
+<p>This function can throw <i class="code-name">std::system_error</i> or
+<i class="code-name">std::bad_alloc</i> on failure.</p>
+
+<hr>
+<h2 id="signal_watcher_impl">signal_watcher_impl</h2>
+
+<p><b>Brief</b>: The <i class="code-name">signal_watcher_impl</i> provides a basis for implementing
+<i class="code-name">signal_watcher</i>, using the "curiously recurring template pattern". Instead of
+subclassing <i class="code-name">signal_watcher</i> directly, subclass an instantiation of
+<i class="code-name">signal_watcher_impl</i> with the template parameter specified as the subclass itself.
+For example:</p>
+
+<pre>
+class my_watcher : public signal_watcher_impl<my_watcher>
+{
+    // ...
+}
+</pre>
+
+<h2>Details and Usage</h2>
+
+<p>The callback function must be provided in the subclass and named <i class="code-name">received</i>, with
+a signature compatible with the following:</p>
+
+<pre>
+rearm received(event_loop_t & loop, int signo, siginfo_p siginfo) noexcept;
+</pre>
+
+<p>The <i class="code-name">received</i> function must be public (or otherwise the
+<i class="code-name">signal_watcher_impl</i> instantiation which is subclassed must be declared as a
+<i class="code-name">friend</i>), but need not be virtual. It will be called with the following parameters:
+
+<ul>
+<li><i class="code-name">loop</i> &mdash; a reference to the event loop.</li>
+<li><i class="code-name">signo</i> &mdash; the signal number.</li>
+<li><i class="code-name">siginfo</i> &mdash; the signal data associated with the delivered signal instance.</li>
+</ul>
+
+<p>The return value specifies the <a href="dasynq-namespace.html"><i class="code-name">rearm</i></a> action.</p>
+
+<p>A <i class="code-name">signal_watcher_impl</i> instantiation has no public or protected members, other than
+those inherited from <i class="code-name">signal_watcher</i>, which it publicly derives from.</p>
+
+</body></html>
