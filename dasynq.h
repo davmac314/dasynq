@@ -549,7 +549,7 @@ class event_loop
         return loop_mech.get_reaper_lock();
     }
 
-    void registerSignal(base_signal_watcher *callBack, int signo)
+    void register_signal(base_signal_watcher *callBack, int signo)
     {
         auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
@@ -1263,7 +1263,7 @@ class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop:
         base_watcher::init();
         this->priority = prio;
         this->siginfo.set_signo(signo);
-        eloop.registerSignal(this, signo);
+        eloop.register_signal(this, signo);
     }
     
     inline void deregister(event_loop_t &eloop) noexcept
@@ -1717,7 +1717,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
     template <typename, typename> friend class child_proc_watcher_impl;
 
     using base_watcher = dprivate::base_watcher;
-    using T_Mutex = typename EventLoop::mutex_t;
+    using mutex_t = typename EventLoop::mutex_t;
 
     public:
 
@@ -1843,7 +1843,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
                 throw std::system_error(errno, std::system_category());
             }
             
-            std::lock_guard<T_Mutex> guard(eloop.get_base_lock());
+            std::lock_guard<mutex_t> guard(eloop.get_base_lock());
             
             pid_t child = ::fork();
             if (child == -1) {

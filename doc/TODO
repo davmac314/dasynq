@@ -18,7 +18,9 @@ Later:
   even when clock_gettime is not available. Use clock_gettime when available however as it may well have
   higher precision.
 
-* Support disabling signal watchers?
+* Support disabling signal watchers? Issue currently is that signals are consumed by the event loop before
+  watcher is enqueued, therefore a naive disable would actually lose signals. Probably should allow
+  re-enable with and without flushing currently queued signals.
 
 * More tests
 
