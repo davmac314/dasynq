@@ -1132,8 +1132,10 @@ class event_loop
         }
     }
 
-    // Process all queued events; returns true if any events were processed.
-    bool process_events() noexcept
+    // Process queued events; returns true if any events were processed.
+    //   limit - maximum number of events to process before returning; -1 for
+    //           no limit.
+    bool process_events(int limit) noexcept
     {
         auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
         ed.lock.lock();
@@ -1144,7 +1146,7 @@ class event_loop
         base_watcher * pqueue = ed.pull_event();
         bool active = false;
         
-        while (pqueue != nullptr) {
+        while (pqueue != nullptr && limit != 0) {
         
             pqueue->active = true;
             active = true;
@@ -1170,6 +1172,7 @@ class event_loop
 
             pqueue->dispatch(this);
             pqueue = ed.pull_event();
+            if (limit > 0) limit--;
         }
         
         ed.lock.unlock();
@@ -1190,9 +1193,9 @@ class event_loop
     template <typename D> using child_proc_watcher_impl = dprivate::child_proc_watcher_impl<my_event_loop_t, D>;
     template <typename D> using timer_impl = dprivate::timer_impl<my_event_loop_t, D>;
 
-    // Poll the event loop and process any pending events. If no events are pending, wait
+    // Poll the event loop and process any pending events (up to a limit). If no events are pending, wait
     // for and process at least one event.
-    void run() noexcept
+    void run(int limit = -1) noexcept
     {
         // Poll the mechanism first, in case high-priority events are pending:
         waitqueue_node<T_Mutex> qnode;
@@ -1200,7 +1203,7 @@ class event_loop
         loop_mech.pull_events(false);
         release_lock(qnode);
 
-        while (! process_events()) {
+        while (! process_events(limit)) {
             // Pull events from the AEN mechanism and insert them in our internal queue:
             get_pollwait_lock(qnode);
             loop_mech.pull_events(true);
@@ -1208,15 +1211,15 @@ class event_loop
         }
     }
 
-    // Poll the event loop and process any pending events
-    void poll() noexcept
+    // Poll the event loop and process any pending events (up to a limit).
+    void poll(int limit = -1) noexcept
     {
         waitqueue_node<T_Mutex> qnode;
         get_pollwait_lock(qnode);
         loop_mech.pull_events(false);
         release_lock(qnode);
 
-        process_events();
+        process_events(limit);
     }
 
     // Get the current time corresponding to a specific clock.

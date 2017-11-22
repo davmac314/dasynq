@@ -35,7 +35,7 @@ interface should conform to that of <i class="code-name">std::mutex</i>, with <i
 <i class="code-name">unlock</i> and <i class="code-name">try_lock</i> functions.
 <br><span class="note"><i>Note:</i> it is required
 that the functions of <i class="code-name">T_Mutex</i> do not throw exceptions if used properly. Technically
-<i>std::mutex</i> may throw an exception if a system-level error occurs, but realistically this should only
+<i class="code-name">std::mutex</i> may throw an exception if a system-level error occurs, but realistically this should only
 occur in the case of application error (memory corruption, double lock etc). If it does, it will cause the
 client application to terminate.</span></li>
 </ul>
@@ -73,8 +73,12 @@ Additional template parameters are implementation internal.
 
 <h3>Functions</h3>
 <ul>
-<li><i class="code-name">void run() noexcept</i> - wait while there are no events pending; queue and process pending events</li>
-<li><i class="code-name">void poll() noexcept</i> - queue and process any currently pending events</li>
+<li><i class="code-name">void run(int limit = -1) noexcept</i> - wait while there are no events pending;
+    queue and process pending events, up to the number specified by <i class="code-name">limit</i> (no
+    limit if the default value of -1 is specified).</li>
+<li><i class="code-name">void poll(int limit = -1) noexcept</i> - queue and process any currently pending
+    events, up to the number specified by <i class="code-name">limit</i> (no limit if the default value of
+    -1 is specified).</li>
 <li><i class="code-name">void get_time(timespec &ts, clock_type clock, bool force_update = false) noexcept</i><br>
     <i class="code-name">void get_time(<a href="dasynq-namespace.html#time_val">time_val</a> &tv, clock_type clock, bool force_update = false) noexcept</i><br>
     &mdash; get the current
@@ -121,9 +125,17 @@ via an enabled watcher that is not in the <i>waiting</i> state.</span></p>
 
 <h3>Event batching</h3>
 
-<p>Events are queued in batches before processing. Watchers can be assigned a priority value and processing of
-queued events occurs in priority order. Note however that incoming events currently do not cause additional
-watchers to be queued while in the processing phase.</p>
+<p>Events are queued and processed in batches. Watchers can be assigned a priority value and processing of
+queued events occurs in priority order; however, incoming events currently do not cause additional
+watchers to be queued while in the processing phase, meaning that events may be processed slightly out
+of priority order. To mitigate this a processing batch size limit can be specified as an argument to the
+<i class="code-name">run</i> or <i class="code-name">poll</i> function. A smaller batch limit gives more
+accurate priority ordering, at a cost to throughput.</p>
+
+<p>Note that watchers which re-queue immediately after processing (by returning <i class="code-name">rearm::REQUEUE</i>
+from the callback function, or due to emulation mode of an <i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i>
+watching readiness state of a regular file) can potentially cause an unlimited processing cycle if no
+specific batch limit is specified.</p>
 
 <h3>Removal of watchers</h3>
 

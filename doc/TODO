@@ -5,9 +5,6 @@ Version 1.0:
   - Document timers
   - Document child process watchers
 
-* Allow specifying how many events to process before re-polling backend.
-  (Currently all pending events are processed before re-polling).
-
 * check for uses of sigprocmask, use pthread_sigmask when required.
 
 Later:
@@ -25,7 +22,7 @@ Later:
 * More tests
 
 * Maybe use pdfork on FreeBSD? allows safely signalling children without a mutex.
-  However, requires a fd per child.
+  However, requires an fd per child.
 
 * User notification mechanism (add a watch to the event loop which can be signalled manually).
 
