@@ -24,9 +24,6 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     private:
     int timerfd_fd = -1;
     int systemtime_fd = -1;
-
-    timer_queue_t timer_queue;
-    timer_queue_t wallclock_queue;
     
     // Set the timerfd timeout to match the first timer in the queue (disable the timerfd
     // if there are no active timers).
@@ -44,8 +41,9 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         timerfd_settime(fd, TFD_TIMER_ABSTIME, &newtime, nullptr);
     }
     
-    void process_timer(clock_type clock, int fd, timer_queue_t &queue) noexcept
+    void process_timer(clock_type clock, int fd) noexcept
     {
+        timer_queue &queue = queue_for_clock(clock);
         struct timespec curtime;
         switch (clock) {
         case clock_type::SYSTEM:
@@ -90,18 +88,6 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         }
     }
 
-    timer_queue_t & get_queue(clock_type clock)
-    {
-        switch(clock) {
-        case clock_type::SYSTEM:
-            return wallclock_queue;
-        case clock_type::MONOTONIC:
-            return timer_queue;
-        default:
-            DASYNQ_UNREACHABLE;
-        }
-    }
-
     public:
 
     class traits_t : public Base::traits_t
@@ -113,10 +99,10 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     void receive_fd_event(T &loop_mech, typename Base::fd_r fd_r_a, void * userdata, int flags)
     {
         if (userdata == &timerfd_fd) {
-            process_timer(clock_type::MONOTONIC, timerfd_fd, timer_queue);
+            process_timer(clock_type::MONOTONIC, timerfd_fd);
         }
         else if (userdata == &systemtime_fd) {
-            process_timer(clock_type::SYSTEM, systemtime_fd, wallclock_queue);
+            process_timer(clock_type::SYSTEM, systemtime_fd);
         }
         else {
             Base::receive_fd_event(loop_mech, fd_r_a, userdata, flags);
@@ -147,27 +133,6 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         }
     }
 
-    // Add timer, store into given handle
-    void add_timer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        timer_queue_t & queue = get_queue(clock);
-        queue.allocate(h, userdata);
-    }
-    
-    void remove_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        remove_timer_nolock(timer_id, clock);
-    }
-    
-    void remove_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        stop_timer_nolock(timer_id, clock);
-        timer_queue_t & queue = get_queue(clock);
-        queue.deallocate(timer_id);
-    }
-
     void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
@@ -176,7 +141,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
 
     void stop_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        timer_queue_t & queue = get_queue(clock);
+        timer_queue_t & queue = this->queue_for_clock(clock);
         int fd = (clock == clock_type::MONOTONIC) ? timerfd_fd : systemtime_fd;
         if (queue.is_queued(timer_id)) {
             bool was_first = (&timer_queue.get_root()) == &timer_id;
@@ -194,13 +159,14 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     {
         timespec timeout = timeouttv;
         timespec interval = intervaltv;
+        timer_queue_t queue = queue_for_clock(clock);
 
         switch (clock) {
         case clock_type::SYSTEM:
-            set_timer(timer_id, timeout, interval, wallclock_queue, systemtime_fd, enable);
+            set_timer(timer_id, timeout, interval, queue, systemtime_fd, enable);
             break;
         case clock_type::MONOTONIC:
-            set_timer(timer_id, timeout, interval, timer_queue, timerfd_fd, enable);
+            set_timer(timer_id, timeout, interval, queue, timerfd_fd, enable);
             break;
         default:
             DASYNQ_UNREACHABLE;
@@ -208,59 +174,16 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     }
 
     // Set timer relative to current time:    
-    void set_timer_rel(timer_handle_t & timer_id, const time_val &timeouttv, const time_val &intervaltv,
+    void set_timer_rel(timer_handle_t & timer_id, const time_val &timeout, const time_val &interval,
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        timespec timeout = timeouttv;
-        timespec interval = intervaltv;
+        time_val alarmtime;
+        get_time(alarmtime, clock, false);
+        alarmtime += timeout;
 
-        clockid_t sclock;
-        switch (clock) {
-        case clock_type::SYSTEM:
-            sclock = CLOCK_REALTIME;
-            break;
-        case clock_type::MONOTONIC:
-            sclock = CLOCK_MONOTONIC;
-            break;
-        default:
-            DASYNQ_UNREACHABLE;
-        }
-
-        // TODO consider caching current time somehow; need to decide then when to update cached value.
-        struct timespec curtime;
-        clock_gettime(sclock, &curtime);
-        curtime.tv_sec += timeout.tv_sec;
-        curtime.tv_nsec += timeout.tv_nsec;
-        if (curtime.tv_nsec > 1000000000) {
-            curtime.tv_nsec -= 1000000000;
-            curtime.tv_sec++;
-        }
-
-        set_timer(timer_id, curtime, interval, enable, clock);
+        set_timer(timer_id, alarmtime, interval, enable, clock);
     }
     
-    // Enables or disabling report of timeouts (does not stop timer)
-    void enableTimer(timer_handle_t & timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        enableTimer_nolock(timer_id, enable, clock);
-    }
-    
-    void enableTimer_nolock(timer_handle_t & timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        timer_queue_t & queue = get_queue(clock);
-
-        auto &node_data = queue.node_data(timer_id);
-        auto expiry_count = node_data.expiry_count;
-        if (expiry_count != 0) {
-            node_data.expiry_count = 0;
-            Base::receive_timer_expiry(timer_id, node_data.userdata, expiry_count);
-        }
-        else {
-            queue.node_data(timer_id).enabled = enable;
-        }
-    }
-
     ~timer_fd_events()
     {
         close(timerfd_fd);

@@ -279,7 +279,39 @@ static inline int divide_timespec(const struct timespec &num, const struct times
 
 template <typename Base> class timer_base : public Base
 {
+    private:
+    timer_queue_t timer_queue;
+
+#if defined(CLOCK_MONOTONIC)
+    timer_queue_t mono_timer_queue;
+
     protected:
+    inline timer_queue_t &queue_for_clock(clock_type clock)
+    {
+        if (clock == clock_type::MONOTONIC) {
+            return mono_timer_queue;
+        }
+        else {
+            return timer_queue;
+        }
+    }
+
+    inline bool timer_queues_empty()
+    {
+        return timer_queue.empty() && mono_timer_queue.empty();
+    }
+#else
+    protected:
+    inline timer_queue_t &queue_for_clock(clock_type clock)
+    {
+        return timer_queue;
+    }
+
+    inline bool timer_queues_empty()
+    {
+        return timer_queue.empty();
+    }
+#endif
 
     // For the specified timer queue, issue expirations for all timers set to expire on or before the given
     // time (curtime).
@@ -357,6 +389,47 @@ template <typename Base> class timer_base : public Base
     }
 #endif
 
+    void add_timer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
+    {
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        this->queue_for_clock(clock).allocate(h, userdata);
+    }
+
+    void remove_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    {
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        remove_timer_nolock(timer_id, clock);
+    }
+
+    void remove_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
+    {
+        auto &timer_queue = this->queue_for_clock(clock);
+        if (timer_queue.is_queued(timer_id)) {
+            timer_queue.remove(timer_id);
+        }
+        timer_queue.deallocate(timer_id);
+    }
+
+    // Enables or disabling report of timeouts (does not stop timer)
+    void enableTimer(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
+    {
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        enableTimer_nolock(timer_id, enable, clock);
+    }
+
+    void enableTimer_nolock(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
+    {
+        auto &timer_queue = this->queue_for_clock(clock);
+        auto &node_data = timer_queue.node_data(timer_id);
+        auto expiry_count = node_data.expiry_count;
+        if (expiry_count != 0) {
+            node_data.expiry_count = 0;
+            Base::receive_timer_expiry(timer_id, node_data.userdata, expiry_count);
+        }
+        else {
+            timer_queue.node_data(timer_id).enabled = enable;
+        }
+    }
 };
 
 }

@@ -16,37 +16,6 @@ namespace dasynq {
 template <class Base> class itimer_events : public timer_base<Base>
 {
     private:
-    timer_queue_t timer_queue;
-
-
-#if defined(CLOCK_MONOTONIC)
-    timer_queue_t mono_timer_queue;
-
-    inline timer_queue_t &queue_for_clock(clock_type clock)
-    {
-        if (clock == clock_type::MONOTONIC) {
-            return mono_timer_queue;
-        }
-        else {
-            return timer_queue;
-        }
-    }
-
-    inline bool timer_queues_empty()
-    {
-        return timer_queue.empty() && mono_timer_queue.empty();
-    }
-#else
-    inline timer_queue_t &queue_for_clock(clock_type clock)
-    {
-        return timer_queue;
-    }
-
-    inline bool timer_queues_empty()
-    {
-        return timer_queue.empty();
-    }
-#endif
     
     // Set the alarm timeout to match the first timer in the queue (disable the alarm if there are no
     // active timers).
@@ -54,13 +23,14 @@ template <class Base> class itimer_events : public timer_base<Base>
     {
         time_val newtime;
         struct itimerval newalarm;
-        if (timer_queues_empty()) {
+        if (this->timer_queues_empty()) {
             newalarm.it_value = {0, 0};
             newalarm.it_interval = {0, 0};
             setitimer(ITIMER_REAL, &newalarm, nullptr);
             return;
         }
 
+        auto &timer_queue = this->queue_for_clock(clock_type::SYSTEM);
         newtime = timer_queue.get_root_priority();
 
         time_val curtimev;
@@ -73,6 +43,8 @@ template <class Base> class itimer_events : public timer_base<Base>
         }
 
 #ifdef CLOCK_MONOTONIC
+        auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
+
         // If we have a separate monotonic clock, we get the interval for the expiry of the next monotonic
         // timer and use the lesser of the system interval and monotonic interval:
         time_val mono_newtime = mono_timer_queue.get_root_priority();
@@ -114,11 +86,13 @@ template <class Base> class itimer_events : public timer_base<Base>
     bool receive_signal(T & loop_mech, sigdata_t &siginfo, void *userdata)
     {
         if (siginfo.get_signo() == SIGALRM) {
+            auto &timer_queue = this->queue_for_clock(clock_type::SYSTEM);
             struct timespec curtime;
             timer_base<Base>::get_time(curtime, clock_type::SYSTEM, true);
             timer_base<Base>::process_timer_queue(timer_queue, curtime);
             
 #ifdef CLOCK_MONOTONIC
+            auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
             struct timespec curtime_mono;
             timer_base<Base>::get_time(curtime_mono, clock_type::MONOTONIC, true);
             timer_base<Base>::process_timer_queue(mono_timer_queue, curtime_mono);
@@ -149,34 +123,13 @@ template <class Base> class itimer_events : public timer_base<Base>
         loop_mech->add_signal_watch(SIGALRM, nullptr);
         Base::init(loop_mech);
     }
-
-    void add_timer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        queue_for_clock(clock).allocate(h, userdata);
-    }
-    
-    void remove_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        remove_timer_nolock(timer_id, clock);
-    }
-    
-    void remove_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        auto &timer_queue = queue_for_clock(clock);
-        if (timer_queue.is_queued(timer_id)) {
-            timer_queue.remove(timer_id);
-        }
-        timer_queue.deallocate(timer_id);
-    }
     
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
     //   enable: specifies whether to enable reporting of timeouts/intervals
     void set_timer(timer_handle_t &timer_id, const time_val &timeouttv, const time_val &intervaltv,
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        auto &timer_queue = queue_for_clock(clock);
+        auto &timer_queue = this->queue_for_clock(clock);
         timespec timeout = timeouttv;
         timespec interval = intervaltv;
 
@@ -218,27 +171,6 @@ template <class Base> class itimer_events : public timer_base<Base>
         set_timer(timer_id, curtime, interval, enable, clock);
     }
     
-    // Enables or disabling report of timeouts (does not stop timer)
-    void enableTimer(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        enableTimer_nolock(timer_id, enable, clock);
-    }
-    
-    void enableTimer_nolock(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        auto &timer_queue = queue_for_clock(clock);
-        auto &node_data = timer_queue.node_data(timer_id);
-        auto expiry_count = node_data.expiry_count;
-        if (expiry_count != 0) {
-            node_data.expiry_count = 0;
-            Base::receive_timer_expiry(timer_id, node_data.userdata, expiry_count);
-        }
-        else {
-            timer_queue.node_data(timer_id).enabled = enable;
-        }
-    }
-
     void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
@@ -247,7 +179,7 @@ template <class Base> class itimer_events : public timer_base<Base>
 
     void stop_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        auto &timer_queue = queue_for_clock(clock);
+        auto &timer_queue = this->queue_for_clock(clock);
         if (timer_queue.is_queued(timer_id)) {
             bool was_first = (&timer_queue.get_root()) == &timer_id;
             timer_queue.remove(timer_id);

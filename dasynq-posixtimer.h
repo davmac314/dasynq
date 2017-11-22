@@ -16,9 +16,6 @@ namespace dasynq {
 template <class Base> class posix_timer_events : public timer_base<Base>
 {
     private:
-    timer_queue_t real_timer_queue;
-    timer_queue_t mono_timer_queue;
-
     timer_t real_timer;
     timer_t mono_timer;
 
@@ -69,18 +66,6 @@ template <class Base> class posix_timer_events : public timer_base<Base>
         }
     }
 
-    timer_queue_t &queue_for_clock(clock_type clock)
-    {
-        switch (clock) {
-        case clock_type::MONOTONIC:
-            return mono_timer_queue;
-        case clock_type::SYSTEM:
-            return real_timer_queue;
-        default:
-            DASYNQ_UNREACHABLE;
-        }
-    }
-
     timer_t &timer_for_clock(clock_type clock)
     {
         switch (clock) {
@@ -127,28 +112,6 @@ template <class Base> class posix_timer_events : public timer_base<Base>
         Base::init(loop_mech);
     }
 
-    void add_timer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        queue_for_clock(clock).allocate(h, userdata);
-    }
-
-    void remove_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        remove_timer_nolock(timer_id, clock);
-    }
-
-    void remove_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        timer_queue_t &timer_queue = queue_for_clock(clock);
-
-        if (timer_queue.is_queued(timer_id)) {
-            timer_queue.remove(timer_id);
-        }
-        timer_queue.deallocate(timer_id);
-    }
-
     // starts (if not started) a timer to timeout at the given time. Resets the expiry count to 0.
     //   enable: specifies whether to enable reporting of timeouts/intervals
     void set_timer(timer_handle_t &timer_id, time_val &timeouttv, struct timespec &interval,
@@ -158,7 +121,7 @@ template <class Base> class posix_timer_events : public timer_base<Base>
 
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
 
-        timer_queue_t &timer_queue = queue_for_clock(clock);
+        timer_queue_t &timer_queue = this->queue_for_clock(clock);
         timer_t &timer = timer_for_clock(clock);
 
         auto &ts = timer_queue.node_data(timer_id);
@@ -199,27 +162,6 @@ template <class Base> class posix_timer_events : public timer_base<Base>
         set_timer(timer_id, curtime, interval, enable, clock);
     }
 
-    // Enables or disabling report of timeouts (does not stop timer)
-    void enableTimer(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        enableTimer_nolock(timer_id, enable, clock);
-    }
-
-    void enableTimer_nolock(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
-    {
-        timer_queue_t &timer_queue = queue_for_clock(clock);
-
-        auto &node_data = timer_queue.node_data(timer_id);
-        auto expiry_count = node_data.expiry_count;
-        if (expiry_count != 0) {
-            node_data.expiry_count = 0;
-            Base::receive_timer_expiry(timer_id, node_data.userdata, expiry_count);
-        }
-        else {
-            timer_queue.node_data(timer_id).enabled = enable;
-        }
-    }
 
     void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
@@ -229,7 +171,7 @@ template <class Base> class posix_timer_events : public timer_base<Base>
 
     void stop_timer_nolock(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        timer_queue_t &timer_queue = queue_for_clock(clock);
+        timer_queue_t &timer_queue = this->queue_for_clock(clock);
         timer_t &timer = timer_for_clock(clock);
 
         if (timer_queue.is_queued(timer_id)) {
