@@ -172,12 +172,12 @@ template <class Base> class test_loop : public Base, io_receiver
         return true;
     }
     
-    void enableTimer_nolock(timer_handle_t &hnd, bool enable, clock_type clock = clock_type::MONOTONIC)
+    void enable_timer_nolock(timer_handle_t &hnd, bool enable, clock_type clock = clock_type::MONOTONIC)
     {
         // TODO
     }
     
-    void removeTimer_nolock(timer_handle_t &hnd, clock_type clock = clock_type::MONOTONIC)
+    void remove_timer_nolock(timer_handle_t &hnd, clock_type clock = clock_type::MONOTONIC)
     {
         // TODO
     }

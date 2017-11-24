@@ -411,13 +411,13 @@ template <typename Base> class timer_base : public Base
     }
 
     // Enables or disabling report of timeouts (does not stop timer)
-    void enableTimer(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
+    void enable_timer(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        enableTimer_nolock(timer_id, enable, clock);
+        enable_timer_nolock(timer_id, enable, clock);
     }
 
-    void enableTimer_nolock(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
+    void enable_timer_nolock(timer_handle_t &timer_id, bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         auto &timer_queue = this->queue_for_clock(clock);
         auto &node_data = timer_queue.node_data(timer_id);

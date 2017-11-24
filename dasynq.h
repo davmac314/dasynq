@@ -1122,13 +1122,13 @@ class event_loop
     {
         // Called with lock held
         if (rearm_type == rearm::REARM) {
-            loop_mech.enableTimer_nolock(btw->timer_handle, true, btw->clock);
+            loop_mech.enable_timer_nolock(btw->timer_handle, true, btw->clock);
         }
         else if (rearm_type == rearm::REMOVE) {
             loop_mech.remove_timer_nolock(btw->timer_handle, btw->clock);
         }
         else if (rearm_type == rearm::DISARM) {
-            loop_mech.enableTimer_nolock(btw->timer_handle, false, btw->clock);
+            loop_mech.enable_timer_nolock(btw->timer_handle, false, btw->clock);
         }
     }
 
