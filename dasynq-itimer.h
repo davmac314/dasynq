@@ -23,49 +23,54 @@ template <class Base> class itimer_events : public timer_base<Base>
     {
         time_val newtime;
         struct itimerval newalarm;
-        if (this->timer_queues_empty()) {
-            newalarm.it_value = {0, 0};
-            newalarm.it_interval = {0, 0};
-            setitimer(ITIMER_REAL, &newalarm, nullptr);
-            return;
-        }
+
+        bool interval_set = false;
+        time_val interval_tv = {0, 0};
 
         auto &timer_queue = this->queue_for_clock(clock_type::SYSTEM);
-        newtime = timer_queue.get_root_priority();
+        if (! timer_queue.empty()) {
+            newtime = timer_queue.get_root_priority();
 
-        time_val curtimev;
-        timer_base<Base>::get_time(curtimev, clock_type::SYSTEM, true);
+            time_val curtimev;
+            timer_base<Base>::get_time(curtimev, clock_type::SYSTEM, true);
 
-        // interval before next timeout:
-        time_val interval_tv = {0, 0};
-        if (curtimev < newtime) {
-            interval_tv = newtime - curtimev;
+            // interval before next timeout:
+            if (curtimev < newtime) {
+                interval_tv = newtime - curtimev;
+            }
+
+            interval_set = true;
         }
 
 #ifdef CLOCK_MONOTONIC
         auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
 
-        // If we have a separate monotonic clock, we get the interval for the expiry of the next monotonic
-        // timer and use the lesser of the system interval and monotonic interval:
-        time_val mono_newtime = mono_timer_queue.get_root_priority();
+        if (! mono_timer_queue.empty()) {
 
-        time_val curtimev_mono;
-        timer_base<Base>::get_time(curtimev_mono, clock_type::MONOTONIC, true);
+            // If we have a separate monotonic clock, we get the interval for the expiry of the next monotonic
+            // timer and use the lesser of the system interval and monotonic interval:
+            time_val mono_newtime = mono_timer_queue.get_root_priority();
 
-        time_val interval_mono = {0, 0};
-        if (curtimev_mono < mono_newtime) {
-            interval_mono = mono_newtime - curtimev_mono;
-        }
+            time_val curtimev_mono;
+            timer_base<Base>::get_time(curtimev_mono, clock_type::MONOTONIC, true);
 
-        if (interval_mono < interval_tv) {
-            interval_tv = interval_mono;
+            time_val interval_mono = {0, 0};
+            if (curtimev_mono < mono_newtime) {
+                interval_mono = mono_newtime - curtimev_mono;
+            }
+
+            if (! interval_set || interval_mono < interval_tv) {
+                interval_tv = interval_mono;
+            }
+
+            interval_set = true;
         }
 #endif
 
         newalarm.it_interval.tv_sec = interval_tv.seconds();
         newalarm.it_interval.tv_usec = interval_tv.nseconds() / 1000;
 
-        if (newalarm.it_interval.tv_sec == 0 && newalarm.it_interval.tv_usec == 0) {
+        if (interval_set && newalarm.it_interval.tv_sec == 0 && newalarm.it_interval.tv_usec == 0) {
             // We passed the timeout: set alarm to expire immediately (we must use {0,1} as
             // {0,0} disables the timer).
             // TODO: it would be better if we just processed the appropriate timers here,
@@ -87,15 +92,19 @@ template <class Base> class itimer_events : public timer_base<Base>
     {
         if (siginfo.get_signo() == SIGALRM) {
             auto &timer_queue = this->queue_for_clock(clock_type::SYSTEM);
-            struct timespec curtime;
-            timer_base<Base>::get_time(curtime, clock_type::SYSTEM, true);
-            timer_base<Base>::process_timer_queue(timer_queue, curtime);
+            if (! timer_queue.empty()) {
+                struct timespec curtime;
+                timer_base<Base>::get_time(curtime, clock_type::SYSTEM, true);
+                timer_base<Base>::process_timer_queue(timer_queue, curtime);
+            }
             
 #ifdef CLOCK_MONOTONIC
             auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
-            struct timespec curtime_mono;
-            timer_base<Base>::get_time(curtime_mono, clock_type::MONOTONIC, true);
-            timer_base<Base>::process_timer_queue(mono_timer_queue, curtime_mono);
+            if (! mono_timer_queue.empty()) {
+                struct timespec curtime_mono;
+                timer_base<Base>::get_time(curtime_mono, clock_type::MONOTONIC, true);
+                timer_base<Base>::process_timer_queue(mono_timer_queue, curtime_mono);
+            }
 #endif
 
             // arm alarm with timeout from head of queue
