@@ -29,6 +29,7 @@ connection file descriptor is stored in a variable `fd`:
         // this is the callback method; for file descriptor watchers, it must be declared
         // as it is here:
         
+        public:
         rearm fd_event(loop_t &, int fd, int flags)
         {
             // Process I/O here
@@ -108,6 +109,7 @@ saw an example earlier:
 
     class my_fd_watcher : public loop_t::fd_watcher_impl<my_fd_watcher>
     {
+        public:
         rearm fd_event(loop_t &, int fd, int flags)
         {
             // Process I/O here
@@ -187,14 +189,15 @@ Some backends support watching `IN_EVENTS | OUT_EVENTS` at the same time, but so
 
     class my_bidi_fd_watcher : public loop_t::bidi_fd_watcher_impl<my_bidi_fd_watcher>
     {
-        rearm read_ready(loop_t &, int fd) override
+        public:
+        rearm read_ready(loop_t &, int fd)
         {
             // Process input
             //   int r = read(fd, ...) etc
             return rearm::REARM;
         }
         
-        rearm write_ready(loop_t &, int fd) override
+        rearm write_ready(loop_t &, int fd)
         {
             // Perform output
             //   int r = write(fd, ...) etc
@@ -247,6 +250,7 @@ You can watch for POSIX signals (SIGTERM etc) using a signal watcher:
     class my_signal_watcher : public loop_t::signal_watcher_impl<my_signal_watcher>
     {
         // SignalWatcher defines type "siginfo_p"
+        public:
         rearm received(loop_t &, int signo, siginfo_p siginfo)
         {
             return rearm::REARM;
@@ -279,6 +283,7 @@ MacOS, at least on version 10.12.6, appears to have a bug where signals generate
 
     class my_child_proc_watcher : public loop_t::child_proc_watcher<my_child_proc_watcher>
     {
+        public:
         rearm status_change(loop_t &, pid_t child, int status)
         {
             reap(); // make certain child process has been reaped
@@ -353,9 +358,10 @@ which only increases and should never jump.
 
     class my_timer : public loop_t::timer_impl<my_timer>
     {
+        public:
         rearm timer_expiry(loop_t &, int expiry_count)
         {
-        	return rearm::REARM;
+            return rearm::REARM;
         }
     }
 
