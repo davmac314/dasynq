@@ -314,7 +314,7 @@ template <typename Base> class timer_base : public Base
 #endif
 
     // For the specified timer queue, issue expirations for all timers set to expire on or before the given
-    // time (curtime).
+    // time (curtime). The timer queue must not be empty.
     void process_timer_queue(timer_queue_t &queue, const struct timespec &curtime) noexcept
     {
         // Peek timer queue; calculate difference between current time and timeout
@@ -422,7 +422,7 @@ template <typename Base> class timer_base : public Base
         auto &timer_queue = this->queue_for_clock(clock);
         auto &node_data = timer_queue.node_data(timer_id);
         auto expiry_count = node_data.expiry_count;
-        if (expiry_count != 0) {
+        if (expiry_count != 0 && enable) {
             node_data.expiry_count = 0;
             Base::receive_timer_expiry(timer_id, node_data.userdata, expiry_count);
         }

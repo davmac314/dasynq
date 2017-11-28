@@ -364,7 +364,7 @@ namespace dprivate {
         void receive_timer_expiry(timer_handle_t & timer_handle, void * userdata, int intervals) noexcept
         {
             base_timer_watcher * watcher = static_cast<base_timer_watcher *>(userdata);
-            watcher->intervals = intervals;
+            watcher->intervals += intervals;
             queue_watcher(watcher);
         }
         
@@ -812,6 +812,16 @@ class event_loop
             const timespec &interval, clock_type clock) noexcept
     {
         loop_mech.set_timer_rel(callBack->timer_handle, timeout, interval, true, clock);
+    }
+
+    void set_timer_enabled(base_timer_watcher *callback, clock_type clock, bool enabled) noexcept
+    {
+        loop_mech.enable_timer(callback->timer_handle, enabled, clock);
+    }
+
+    void set_timer_enabled_nolock(base_timer_watcher *callback, clock_type clock, bool enabled) noexcept
+    {
+        loop_mech.enable_timer_nolock(callback->timer_handle, enabled, clock);
     }
 
     void stop_timer(base_timer_watcher *callback, clock_type clock) noexcept
@@ -1925,46 +1935,57 @@ class timer : private base_timer_watcher<typename EventLoop::mutex_t>
 {
     template <typename, typename> friend class timer_impl;
     using base_t = base_timer_watcher<typename EventLoop::mutex_t>;
+    using mutex_t = typename EventLoop::mutex_t;
 
     public:
     using event_loop_t = EventLoop;
     
-    void add_timer(EventLoop &eloop, clock_type clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)
+    void add_timer(event_loop_t &eloop, clock_type clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)
     {
         base_watcher::init();
         this->priority = prio;
         this->clock = clock;
+        this->intervals = 0;
         eloop.register_timer(this, clock);
     }
     
-    void arm_timer(EventLoop &eloop, const timespec &timeout) noexcept
+    void arm_timer(event_loop_t &eloop, const timespec &timeout) noexcept
     {
         eloop.set_timer(this, timeout, base_t::clock);
     }
     
-    void arm_timer(EventLoop &eloop, const timespec &timeout, const timespec &interval) noexcept
+    void arm_timer(event_loop_t &eloop, const timespec &timeout, const timespec &interval) noexcept
     {
         eloop.set_timer(this, timeout, interval, base_t::clock);
     }
 
     // Arm timer, relative to now:
-    void arm_timer_rel(EventLoop &eloop, const timespec &timeout) noexcept
+    void arm_timer_rel(event_loop_t &eloop, const timespec &timeout) noexcept
     {
         eloop.set_timer_rel(this, timeout, base_t::clock);
     }
     
-    void arm_timer_rel(EventLoop &eloop, const timespec &timeout,
+    void arm_timer_rel(event_loop_t &eloop, const timespec &timeout,
             const timespec &interval) noexcept
     {
         eloop.set_timer_rel(this, timeout, interval, base_t::clock);
     }
     
-    void stop_timer(EventLoop &eloop) noexcept
+    void stop_timer(event_loop_t &eloop) noexcept
     {
         eloop.stop_timer(this, base_t::clock);
     }
 
-    void deregister(EventLoop &eloop) noexcept
+    void set_enabled(event_loop_t &eloop, clock_type clock, bool enabled) noexcept
+    {
+        std::lock_guard<mutex_t> guard(eloop.get_base_lock());
+        eloop.set_timer_enabled_nolock(this, clock, enabled);
+        if (! enabled) {
+            eloop.dequeue_watcher(this);
+        }
+    }
+
+    void deregister(event_loop_t &eloop) noexcept
     {
         eloop.deregister(this, this->clock);
     }
@@ -1973,7 +1994,7 @@ class timer : private base_timer_watcher<typename EventLoop::mutex_t>
     static timer<EventLoop> *add_timer(EventLoop &eloop, clock_type clock, bool relative,
             struct timespec &timeout, struct timespec &interval, T watch_hndlr)
     {
-        class lambda_timer : public timer_impl<EventLoop, lambda_timer>
+        class lambda_timer : public timer_impl<event_loop_t, lambda_timer>
         {
             private:
             T watch_hndlr;
@@ -1984,7 +2005,7 @@ class timer : private base_timer_watcher<typename EventLoop::mutex_t>
                 //
             }
 
-            rearm timer_expiry(EventLoop &eloop, int intervals)
+            rearm timer_expiry(event_loop_t &eloop, int intervals)
             {
                 return watch_hndlr(eloop, intervals);
             }
@@ -2020,7 +2041,9 @@ class timer_impl : public timer<EventLoop>
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         loop.get_base_lock().unlock();
 
-        auto rearm_type = static_cast<Derived *>(this)->timer_expiry(loop, this->intervals);
+        auto intervals_report = this->intervals;
+        this->intervals = 0;
+        auto rearm_type = static_cast<Derived *>(this)->timer_expiry(loop, intervals_report);
 
         loop.get_base_lock().lock();
 
