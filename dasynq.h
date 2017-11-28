@@ -1752,22 +1752,15 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
         return kill(this->watch_pid, signo);
     }
 
-    // Reap a process after it has terminated. Some implementations may do this when the process
-    // termination is detected; in that case this will be a no-op.
-    void reap() noexcept
-    {
-        // nothing to do with this implementation.
-    }
-
     // Reserve resources for a child watcher with the given event loop.
     // Reservation can fail with std::bad_alloc. Some backends do not support
     // reservation (it will always fail) - check LoopTraits::supports_childwatch_reservation.
-    void reserve_watch(EventLoop &eloop)
+    void reserve_watch(event_loop_t &eloop)
     {
         eloop.reserve_child_watch(this);
     }
     
-    void unreserve(EventLoop &eloop)
+    void unreserve(event_loop_t &eloop)
     {
         eloop.unreserve(this);
     }
@@ -1776,7 +1769,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
     // Registration can fail with std::bad_alloc.
     // Note that in multi-threaded programs, use of this function may be prone to a
     // race condition such that the child terminates before the watcher is registered.
-    void add_watch(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY)
+    void add_watch(event_loop_t &eloop, pid_t child, int prio = DEFAULT_PRIORITY)
     {
         base_watcher::init();
         this->watch_pid = child;
@@ -1790,7 +1783,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
     // Note that in multi-threaded programs, use of this function may be prone to a
     // race condition such that the child terminates before the watcher is registered;
     // use the "fork" member function to avoid this.
-    void add_reserved(EventLoop &eloop, pid_t child, int prio = DEFAULT_PRIORITY) noexcept
+    void add_reserved(event_loop_t &eloop, pid_t child, int prio = DEFAULT_PRIORITY) noexcept
     {
         base_watcher::init();
         this->watch_pid = child;
@@ -1798,13 +1791,13 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
         eloop.registerReservedChild(this, child);
     }
     
-    void deregister(EventLoop &eloop, pid_t child) noexcept
+    void deregister(event_loop_t &eloop, pid_t child) noexcept
     {
         eloop.deregister(this, child);
     }
     
     // Stop watching the currently watched child, but retain watch reservation.
-    void stop_watch(EventLoop &eloop) noexcept
+    void stop_watch(event_loop_t &eloop) noexcept
     {
         eloop.stop_watch(this);
     }
@@ -1816,7 +1809,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
     // Returns:
     // - the child pid in the parent
     // - 0 in the child
-    pid_t fork(EventLoop &eloop, bool from_reserved = false, int prio = DEFAULT_PRIORITY)
+    pid_t fork(event_loop_t &eloop, bool from_reserved = false, int prio = DEFAULT_PRIORITY)
     {
         base_watcher::init();
         this->priority = prio;

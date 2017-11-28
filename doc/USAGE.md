@@ -286,7 +286,6 @@ MacOS, at least on version 10.12.6, appears to have a bug where signals generate
         public:
         rearm status_change(loop_t &, pid_t child, int status)
         {
-            reap(); // make certain child process has been reaped
             return rearm::DISARM; // or REMOVE, REMOVED, NOOP
         }
     };
@@ -340,13 +339,6 @@ theoretically actually deliver the signal to an unrelated process. To avoid that
 
 The return from this function is the same as for the POSIX kill() function, except that if the
 child has already been reaped, it will return -1 with `errno` set to `ESRCH`.
-
-To ensure that a child process is reaped, call the `reap` function from the callback:
-
-    my_child_watcher.reap();
- 
-Note that for some implementations, where children are reaped by event loop procesing, the `reap`
-function may do nothing.
 
 
 ## 3.4 Timers
