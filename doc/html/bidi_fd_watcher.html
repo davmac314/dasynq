@@ -142,9 +142,8 @@ rearm read_ready(event_loop_t & loop, int fd);
 rearm write_ready(event_loop_t & loop, int fd);
 </pre>
 
-<p>The callback functions must be public (or otherwise the <i class="code-name">bidi_fd_watcher_impl</i>
-instantiation which is subclassed must be declared as a <i class="code-name">friend</i>), but need not be
-virtual. It will be called with the following parameters:
+<p>The callback functions must be public, but need not be virtual. It will be called with the following
+parameters:</p>
 
 <ul>
 <li><i class="code-name">loop</i> &mdash; a reference to the event loop.</li>

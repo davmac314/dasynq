@@ -123,9 +123,8 @@ a signature compatible with the following:</p>
 rearm received(event_loop_t & loop, int signo, siginfo_p siginfo) noexcept;
 </pre>
 
-<p>The <i class="code-name">received</i> function must be public (or otherwise the
-<i class="code-name">signal_watcher_impl</i> instantiation which is subclassed must be declared as a
-<i class="code-name">friend</i>), but need not be virtual. It will be called with the following parameters:
+<p>The <i class="code-name">received</i> function must be public, but need not be virtual. It will be called
+with the following parameters:</p>
 
 <ul>
 <li><i class="code-name">loop</i> &mdash; a reference to the event loop.</li>
