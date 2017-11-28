@@ -15,6 +15,8 @@ using dasynq::test_io_engine;
 
 namespace dasynq {
     std::unordered_map<int, test_io_engine::fd_data> test_io_engine::fd_data_map;
+    time_val test_io_engine::cur_sys_time;
+    time_val test_io_engine::cur_mono_time;
 }
 
 // Set up two file descriptor watches on two different descriptors, and make sure the correct handler
@@ -238,75 +240,138 @@ static void testTimespecDiv()
     assert(rem.tv_nsec == 900000000);
 }
 
-static void test_timer_base_processing()
+static void test_timers_1()
 {
-    using dasynq::timer_handle_t;
-    using dasynq::timer_queue_t;
+    using dasynq::clock_type;
+    using dasynq::time_val;
+    using loop_t = Loop_t;
+    loop_t my_loop;
 
-    class tbase {
-        public:
-        std::vector<void *> received_expirations;
-
-        void receive_timer_expiry(dasynq::timer_handle_t & thandle, void *userdata, int expiry_count)
-        {
-            received_expirations.push_back(userdata);
-        }
-    };
-
-    class ttb_t : public dasynq::timer_base<tbase>
+    class my_timer : public loop_t::timer_impl<my_timer>
     {
         public:
-        void process(timer_queue_t &queue, struct timespec curtime)
+        rearm timer_expiry(loop_t &loop, int expiry_count)
         {
-            dasynq::timer_base<tbase>::process_timer_queue(queue, curtime);
+            expiries += expiry_count;
+            return rearm::REARM;
         }
+
+        int expiries = 0;
     };
 
-    ttb_t ttb;
-
-    timer_queue_t timer_queue;
-
     // First timer is a one-shot timer expiring at 3 seconds:
-    timer_handle_t hnd1;
-    timer_queue.allocate(hnd1);
-    timer_queue.node_data(hnd1).interval_time = {0, 0};
-    timer_queue.node_data(hnd1).userdata = &hnd1;
-    timer_queue.insert(hnd1, {3, 0});
+    my_timer timer_1;
+    struct timespec timeout_1 = { .tv_sec = 3, .tv_nsec = 0 };
+    timer_1.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_1.arm_timer(my_loop, timeout_1);
 
     // Second timer expires at 4 seconds and then every 1 second after:
-    timer_handle_t hnd2;
-    timer_queue.allocate(hnd2);
-    timer_queue.node_data(hnd2).interval_time = {1, 0};
-    timer_queue.node_data(hnd2).userdata = &hnd2;
-    timer_queue.insert(hnd2, {4, 0});
+    my_timer timer_2;
+    struct timespec timeout_2 = { .tv_sec = 4, .tv_nsec = 0 };
+    struct timespec interval_2 = { .tv_sec = 1, .tv_nsec = 0 };
+    timer_2.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_2.arm_timer(my_loop, timeout_2, interval_2);
 
-    ttb.process(timer_queue, {0, 0});
-    assert(ttb.received_expirations.empty());
+    test_io_engine::cur_mono_time = time_val(0, 0);
 
-    ttb.process(timer_queue, {1, 0});
-    assert(ttb.received_expirations.empty());
+    my_loop.poll();
+    assert(timer_1.expiries == 0);
+    assert(timer_2.expiries == 0);
 
-    ttb.process(timer_queue, {3, 0});
-    assert(ttb.received_expirations.size() == 1);
-    assert(ttb.received_expirations[0] == &hnd1);
+    // After 1 second, should be no expirations:
+    test_io_engine::cur_mono_time = time_val(1, 0);
+    my_loop.poll();
+    assert(timer_1.expiries == 0);
+    assert(timer_2.expiries == 0);
 
-    ttb.process(timer_queue, {4, 5});
-    assert(ttb.received_expirations.size() == 2);
-    assert(ttb.received_expirations[1] == &hnd2);
-    timer_queue.node_data(hnd2).enabled = true;
+    // After 3 seconds, should have one expiration on t1:
+    test_io_engine::cur_mono_time = time_val(3, 0);
+    my_loop.poll();
+    assert(timer_1.expiries == 1);
+    assert(timer_2.expiries == 0);
 
-    ttb.process(timer_queue, {5, 5});
-    assert(ttb.received_expirations.size() == 3);
-    assert(ttb.received_expirations[2] == &hnd2);
-    timer_queue.node_data(hnd2).enabled = true;
+    // After 4.5 seconds, should have an expiration on t2:
+    test_io_engine::cur_mono_time = time_val(4, 500000000);
+    my_loop.poll();
+    assert(timer_1.expiries == 1);
+    assert(timer_2.expiries == 1);
 
-    ttb.process(timer_queue, {6, 0});
-    assert(ttb.received_expirations.size() == 4);
-    assert(ttb.received_expirations[3] == &hnd2);
-    // don't re-enable the timer this time: shouldn't fire again
+    // After 5.5 seconds, a second expiration on t2:
+    test_io_engine::cur_mono_time = time_val(5, 500000000);
+    my_loop.poll();
+    assert(timer_1.expiries == 1);
+    assert(timer_2.expiries == 2);
 
-    ttb.process(timer_queue, {7, 0});
-    assert(ttb.received_expirations.size() == 4);
+    // After 6 seconds, a third expiration on t2:
+    test_io_engine::cur_mono_time = time_val(6, 0);
+    my_loop.poll();
+    assert(timer_1.expiries == 1);
+    assert(timer_2.expiries == 3);
+}
+
+static void test_timers_2()
+{
+    using dasynq::clock_type;
+    using dasynq::time_val;
+    using loop_t = Loop_t;
+    loop_t my_loop;
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        public:
+        rearm timer_expiry(loop_t &loop, int expiry_count)
+        {
+            expiries += expiry_count;
+            return handler_rearm;
+        }
+
+        int expiries = 0;
+        rearm handler_rearm = rearm::REARM;
+    };
+
+    // Create timer expiring at 1 second intervals:
+    my_timer timer_1;
+    struct timespec timeout_1 = { .tv_sec = 1, .tv_nsec = 0 };
+    struct timespec interval_1 = { .tv_sec = 1, .tv_nsec = 0 };
+    timer_1.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_1.arm_timer(my_loop, timeout_1, interval_1);
+
+    test_io_engine::cur_mono_time = time_val(0, 0);
+    my_loop.poll();
+    assert(timer_1.expiries == 0);
+
+    // Have the timer disarm after it fires once:
+    test_io_engine::cur_mono_time = time_val(1, 0);
+    timer_1.handler_rearm = rearm::DISARM;
+    my_loop.poll();
+    assert(timer_1.expiries == 1);
+
+    // Check that the timer doesn't fire when disabled:
+    test_io_engine::cur_mono_time = time_val(5, 0);
+    my_loop.poll();
+    assert(timer_1.expiries == 1);
+
+    // Re-enable timer and check that it fires immediately:
+    timer_1.set_enabled(my_loop, clock_type::MONOTONIC, true);
+    my_loop.poll();
+    assert(timer_1.expiries == 5);
+
+    // It's disabled again; check 2 more periods:
+    test_io_engine::cur_mono_time = time_val(7, 0);
+    my_loop.poll();
+    assert(timer_1.expiries == 5);
+
+    // Re-enable, and then disable, and wait two more periods:
+    timer_1.set_enabled(my_loop, clock_type::MONOTONIC, true);
+    timer_1.set_enabled(my_loop, clock_type::MONOTONIC, false);
+    test_io_engine::cur_mono_time = time_val(9, 0);
+    my_loop.poll();
+    assert(timer_1.expiries == 5);
+
+    // Now re-enable and check for the 4 missing periods reported:
+    timer_1.set_enabled(my_loop, clock_type::MONOTONIC, true);
+    my_loop.poll();
+    assert(timer_1.expiries == 9);
 }
 
 static void create_pipe(int filedes[2])
@@ -763,8 +828,12 @@ int main(int argc, char **argv)
     testTimespecDiv();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "test_timer_base_processing... ";
-    test_timer_base_processing();
+    std::cout << "test_timers_1... ";
+    test_timers_1();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_timers_2... ";
+    test_timers_2();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftestFdWatch1... ";

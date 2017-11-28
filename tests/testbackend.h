@@ -56,6 +56,9 @@ class test_io_engine
 
     static std::unordered_map<int, fd_data> fd_data_map;
 
+    static time_val cur_sys_time;
+    static time_val cur_mono_time;
+
     static void mark_fd_needs_emulation(int fd_num)
     {
         auto srch = fd_data_map.find(fd_num);
@@ -129,7 +132,7 @@ class test_loop_traits
     };    
 };
 
-template <class Base> class test_loop : public Base, io_receiver
+template <class Base> class test_loop : public timer_base<Base>, io_receiver
 {
     using timer_handle_t = timer_queue_t::handle_t;
     
@@ -143,6 +146,12 @@ template <class Base> class test_loop : public Base, io_receiver
 
     void pull_events(bool b)
     {
+        if (! this->queue_for_clock(clock_type::MONOTONIC).empty()) {
+            this->process_timer_queue(this->queue_for_clock(clock_type::MONOTONIC), test_io_engine::cur_mono_time);
+        }
+        if (! this->queue_for_clock(clock_type::SYSTEM).empty()) {
+            this->process_timer_queue(this->queue_for_clock(clock_type::SYSTEM), test_io_engine::cur_sys_time);
+        }
         test_io_engine::pull_events(*this);
     }
     
@@ -170,16 +179,6 @@ template <class Base> class test_loop : public Base, io_receiver
         fd_data data = {callback, eventmask, false};
         fd_data_map.insert({fd, data});
         return true;
-    }
-    
-    void enable_timer_nolock(timer_handle_t &hnd, bool enable, clock_type clock = clock_type::MONOTONIC)
-    {
-        // TODO
-    }
-    
-    void remove_timer_nolock(timer_handle_t &hnd, clock_type clock = clock_type::MONOTONIC)
-    {
-        // TODO
     }
     
     void enable_fd_watch_nolock(int fd_num, void *userdata, int events)
@@ -225,6 +224,33 @@ template <class Base> class test_loop : public Base, io_receiver
         // TODO
     }
     
+    void set_timer(timer_handle_t &timer_id, const time_val &timeouttv, const time_val &intervaltv,
+            bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
+    {
+        auto &timer_queue = this->queue_for_clock(clock);
+        timespec timeout = timeouttv;
+        timespec interval = intervaltv;
+
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+
+        auto &ts = timer_queue.node_data(timer_id);
+        ts.interval_time = interval;
+        ts.expiry_count = 0;
+        ts.enabled = enable;
+
+        if (timer_queue.is_queued(timer_id)) {
+            // Already queued; alter timeout
+            if (timer_queue.set_priority(timer_id, timeout)) {
+                // set_timer_from_queue();
+            }
+        }
+        else {
+            if (timer_queue.insert(timer_id, timeout)) {
+                // set_timer_from_queue();
+            }
+        }
+    }
+
     // Receive events from test queue:
 
     void receive_fd_event(int fd_num, int events)
