@@ -52,10 +52,22 @@ class kqueue_traits
         siginfo_t info;
         
         public:
+        // mandatory:
         int get_signo() { return info.si_signo; }
         int get_sicode() { return info.si_code; }
-        void * get_ssiaddr() { return info.si_addr; }
+        pid_t get_sipid() { return info.si_pid; }
+        uid_t get_siuid() { return info.si_uid; }
+        void * get_siaddr() { return info.si_addr; }
+        int get_sistatus() { return info.si_status; }
+        int get_sival_int() { return info.si_value.sival_int; }
+        void * get_sival_ptr() { return info.si_value.sival_ptr; }
         
+        // XSI
+        int get_sierrno() { return info.si_errno; }
+
+        // XSR (streams) OB (obselete)
+        int get_siband() { return info.si_band; }
+
         void set_signo(int signo) { info.si_signo = signo; }
     };    
 

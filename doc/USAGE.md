@@ -249,7 +249,7 @@ You can watch for POSIX signals (SIGTERM etc) using a signal watcher:
 
     class my_signal_watcher : public loop_t::signal_watcher_impl<my_signal_watcher>
     {
-        // SignalWatcher defines type "siginfo_p"
+        // signal_watcher defines type "siginfo_p"
         public:
         rearm received(loop_t &, int signo, siginfo_p siginfo)
         {

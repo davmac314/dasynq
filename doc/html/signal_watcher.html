@@ -28,7 +28,7 @@ template class. It represents an event watcher for POSIX signal reception events
 <h3>Types</h3>
 <ul>
 <li><i class="code-name">event_loop_t</i> &mdash; the event loop type that this watcher registers with.</li>
-<li><i class="code-name">siginfo_p</i> &mdash; a receiver type for signal parameters / information. May be
+<li><i class="code-name"><a href="#siginfo_p">siginfo_p</a></i> &mdash; a receiver type for signal parameters / information. May be
     a reference type.</li>
 </ul>
 
@@ -89,7 +89,7 @@ dynamically-allocated <i class="code-name">signal_watcher</i>. The first two par
 or lambda of the form:</p>
 
 <pre>
-[](event_loop_t &eloop, int signo, siginfo_p siginfo) -> rearm { ... }
+[](event_loop_t &eloop, int signo, <a href="#siginfo_p">siginfo_p</a> siginfo) -> rearm { ... }
 </pre>
 
 <p>It acts as the callback function for the generated watcher. The watcher will delete itself when it is
@@ -120,7 +120,7 @@ class my_watcher : public signal_watcher_impl<my_watcher>
 a signature compatible with the following:</p>
 
 <pre>
-rearm received(event_loop_t & loop, int signo, siginfo_p siginfo) noexcept;
+rearm received(event_loop_t & loop, int signo, <a href="#siginfo_p">siginfo_p</a> siginfo) noexcept;
 </pre>
 
 <p>The <i class="code-name">received</i> function must be public, but need not be virtual. It will be called
@@ -136,5 +136,50 @@ with the following parameters:</p>
 
 <p>A <i class="code-name">signal_watcher_impl</i> instantiation has no public or protected members, other than
 those inherited from <i class="code-name">signal_watcher</i>, which it publicly derives from.</p>
+
+<hr>
+<h2 id="siginfo_p">siginfo_p - dasynq::event_loop&lt;T&gt;::signal_watcher::siginfo_p</h2>
+
+<pre>
+class siginfo_p   // may be a typedef
+{
+    // mandatory functions:
+    int get_signo();      // si_signo : signal number
+    int get_sicode();     // si_code
+    pid_t get_sipid();    // si_pid
+    uid_t get_siuid();    // si_uid
+    void * get_siaddr();  // si_addr
+    int get_sistatus();   // si_status
+    int get_sival_int();  // si_value.sival_int
+    void * get_sival_ptr(); // si_value.sival_ptr
+
+    // optional functions as per POSIX:
+    int get_sierrno();    // si_errno
+    int get_siband();     // si_band
+    
+    // Linux-only functions:
+    int get_sifd();       // si_fd
+    int get_sitimerid();  // si_timerid
+    int get_sioverrun();  // si_overrun
+    int get_sitrapno();   // si_trapno
+    clock_t get_siutime(); // si_utime
+    clock_t get_sistime(); // si_stime
+    short get_siaddr_lsb(); // si_addr_lsb
+
+    // Other functions may be present.
+};
+</pre>
+
+<h2>Details</h2>
+
+<p>The <i class="code-name">siginfo_p</i> type is used to pass signal data as a function parameter. It may
+be a reference type. It is intended to be (or be a reference to) a wrapper around the POSIX <i class="code-name">siginfo_t</i>
+type; various functions are available to retrieve the standard <i class="code-name">si_</i>-prefixed  data
+members.</p>
+
+<p>Because different platforms tend to expose different members, this type may define different functions
+on different platforms. However, the "mandatory" functions should be available on all platforms, and other
+functions which provide access to POSIX-specified data members should be available if the corresponding
+POSIX functionality is present.</p>
 
 </body></html>

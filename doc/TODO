@@ -1,7 +1,6 @@
 Version 1.0:
 
 * Finish reference documentation (HTML format)
-  - Document siginfo_p
   - Document timers
   - Document child process watchers
 
@@ -17,16 +16,18 @@ Later:
 
 * Support disabling signal watchers? Issue currently is that signals are consumed by the event loop before
   watcher is enqueued, therefore a naive disable would actually lose signals. Probably should allow
-  re-enable with and without flushing currently queued signals.
+  re-enable with and without flushing currently queued signals; might require that the signal actually
+  be retrieved by the dispatch function.
 
-* More tests
+* More tests.
 
 * Maybe use pdfork on FreeBSD? allows safely signalling children without a mutex.
   However, requires an fd per child.
 
 * User notification mechanism (add a watch to the event loop which can be signalled manually).
 
-* kqueue: use EVDISPATCH where available. On OS X, potentially use EVDISPATCH2.
+* kqueue: use EVDISPATCH where available. On OS X, potentially use EVDISPATCH2 (which potentially
+  also allows removing the wait lock, though this is obviously considerable work).
 
 * poll() (i.e. "pure POSIX") backend?
 
