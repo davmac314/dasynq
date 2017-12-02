@@ -53,22 +53,22 @@ Additional template parameters are implementation internal.
 
 <h3>Types</h3>
 <ul>
-<li><i class="code-name"><a href="#loop_traits_t">loop_traits_t</a></i> [type] - loop traits.</li>
-<li><i class="code-name">mutex_t</i> [type] - alias for <i class="code-name">T_Mutex</i></li>
-<li><i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i> [type] - a watcher type for watching file descriptor events</li>
-<li><i class="code-name"><a href="fd_watcher.html#fd_watcher_impl">fd_watcher_impl</a></i> [template] - a template for implementing <i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i> subclasses</li>
-<li><i class="code-name"><a href="bidi_fd_watcher.html">bidi_fd_watcher</a></i> [type] - a watcher type for
+<li><i class="code-name"><a href="#loop_traits_t">loop_traits_t</a></i> &mdash; loop traits.</li>
+<li><i class="code-name">mutex_t</i> &mdash; alias for <i class="code-name">T_Mutex</i></li>
+<li><i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i> &mdash; a watcher type for watching file descriptor events</li>
+<li><i class="code-name"><a href="fd_watcher.html#fd_watcher_impl">fd_watcher_impl</a></i> [template] &mdash; a template for implementing <i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i> subclasses</li>
+<li><i class="code-name"><a href="bidi_fd_watcher.html">bidi_fd_watcher</a></i> &mdash; a watcher type for
     watching file descriptor events, supporting both input and output events simultaneously</li>
-<li><i class="code-name"><a href="bidi_fd_watcher.html#bidi_fd_watcher_impl">bidi_fd_watcher_impl</a></i> [template] - a template for implementing
+<li><i class="code-name"><a href="bidi_fd_watcher.html#bidi_fd_watcher_impl">bidi_fd_watcher_impl</a></i> [template] &mdash; a template for implementing
     <i class="code-name"><a href="bidi_fd_watcher.html">bidi_fd_watcher</a></i> subclasses</li>
-<li><i class="code-name"><a href="signal_watcher.html">signal_watcher</a></i> [type] - a watcher type for watching POSIX signal reception</li>
-<li><i class="code-name"><a href="signal_watcher.html#signal_watcher_impl">signal_watcher_impl</a></i> [template] - a template for implementing
+<li><i class="code-name"><a href="signal_watcher.html">signal_watcher</a></i> &mdash; a watcher type for watching POSIX signal reception</li>
+<li><i class="code-name"><a href="signal_watcher.html#signal_watcher_impl">signal_watcher_impl</a></i> [template] &mdash; a template for implementing
     <i class="code-name"><a href="signal_watcher.html">signal_watcher</a></i> subclasses</li>
-<li><i class="code-name">child_proc_watcher</i> [type] - a watcher type for watching child process status changes</li>
-<li><i class="code-name">child_proc_watcher_impl</i> [template] - a template for implementing
-    <i class="code-name">child_proc_watcher</i> subclasses</li>
-<li><i class="code-name">timer</i> [type] - a timer implementation and watcher for timer expiry</li>
-<li><i class="code-name">timer_impl</i> [type] - a template for implementing <i class="code-name">timer</i> subclasses</li>
+<li><i class="code-name"><a href="child_proc_watcher.html">child_proc_watcher</a></i> &mdash; a watcher type for watching child process status changes</li>
+<li><i class="code-name"><a href="child_proc_watcher.html#child_proc_watcher_impl">child_proc_watcher_impl</a></i> [template] &mdash; a template for implementing
+    <i class="code-name"><a href="child_proc_watcher.html">child_proc_watcher</a></i> subclasses</li>
+<li><i class="code-name">timer</i> &mdash; a timer implementation and watcher for timer expiry</li>
+<li><i class="code-name">timer_impl</i> [template] &mdash; a template for implementing <i class="code-name">timer</i> subclasses</li>
 </ul>
 
 <h3>Functions</h3>
@@ -85,6 +85,14 @@ Additional template parameters are implementation internal.
     time for the specified clock. The clock times may be cached for performance reasons; specify
     <i class="code-name">force_update</i> as true to avoid using a cached value (in general this should not be necessary).</li>
 </ul>
+
+<h3>Destructor</h3>
+<ul>
+<li><i class="code-name">~event_loop()</i> &mdash; the destructor does nothing other than deallocate
+    internal resources. Note in particular that watchers do <i>not</i> have their <i class="code-name">watch_removed</i>
+    functions called.</li>
+</ul>
+
 </div>
 
 <h2>Details and usage</h2>

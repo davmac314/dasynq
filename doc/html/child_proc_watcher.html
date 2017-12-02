@@ -1,0 +1,167 @@
+<html>
+<head><title>Dasynq manual - child_proc_watcher</title>
+  <link rel="stylesheet" href="style.css">  
+</head>
+<body>
+<h1>child_proc_watcher, child_proc_watcher_impl</h1>
+
+<pre>
+    // Members of dasynq::event_loop&lt;T&gt; instantiation:
+
+    class child_proc_watcher;
+
+    template &lt;class Derived&gt; class <a href="#child_proc_watcher_impl">child_proc_watcher_impl</a>; // : public child_proc_watcher;
+</pre>
+
+<h2>child_proc_watcher</h2>
+
+<p><b>Brief</b>: <i class="code-name">child_proc_watcher</i> is a member type of the
+<a href="event_loop.html"><i class="code-name">event_loop</i></a> template class. It represents an event
+watcher for child process termination. The <i class="code-name">child_proc_watcher</i> class should not be
+subclassed directly; the <a href="#child_proc_watcher_impl"><i class="code-name">child_proc_watcher_impl</i></a> template
+provides a means for subclassing.</p>
+
+<h2>Members</h2>
+
+<div class="small-indent">
+
+<h3>Types</h3>
+<ul>
+<li><i class="code-name">event_loop_t</i> &mdash; the event loop type that this watcher registers with.</li>
+</ul>
+
+<h3>Constructors</h3>
+<ul>
+<li><i class="code-name">child_proc_watcher()</i> &mdash; default constructor.</li>
+</ul>
+
+<h3>Functions</h3>
+<ul>
+<li><i class="code-name">void add_watch(event_loop_t &eloop, pid_t child, int prio = DEFAULT_PRIORITY)</i>
+    <br>&mdash; register a watcher with an event loop. <i class="code-name">child</i> specifies the child
+    process to watch. May throw <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
+<li><i class="code-name">void add_reserved(event_loop_t &eloop, pid_t child, int prio = DEFAULT_PRIORITY) noexcept</i>
+    <br>&mdash; add a watch on a child process from a watcher which is already holding a watch reservation on the event
+    loop (via the <i class="code-name">reserve_watch</i> function).</li>
+<li><i class="code-name">void deregister(event_loop_t &eloop) noexcept</i>
+    <br>&mdash; request removal from the event loop.</li>
+<li><i class="code-name">pid_t fork(event_loop_t &eloop, bool from_reserved = false, int prio = DEFAULT_PRIORITY)</i>
+    <br>&mdash; fork (as per POSIX <i class="code-name">fork</i>) and add a watch on the child process.
+    If a watch cannot be created, the child process is either not created or is terminated immediately
+    (before the function returns) and <i class="code-name">std::bad_alloc</i> or
+    <i class="code-name">std::system_error</i> is thrown; similarly if the fork cannot be performed.
+    Otherwise, the return is the child process ID in the parent process, and 0 in the child process.</li>
+<li><i class="code-name">void reserve_watch(event_loop_t &eloop)</i> &mdash; reserve a watch on the
+    specified event loop. The <i class="code-name">add_reserved</i> function can then be used at a
+    later point in time to watch a child process with no risk of failure due to resource limits. This
+    function may itself throw <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>    
+<li><i class="code-name">int send_signal(event_loop_t &loop, int signo) noexcept</i> &mdash; send the
+    specified signal to the process, if it has not yet terminated. Return value is as per POSIX
+    <i class="code-name">kill</i> function (including setting of <i class="code-name">errno</i>).</li>
+<li><i class="code-name">void stop_watch(event_loop_t &eloop) noexcept</i> &mdash; stop watching a child
+    process, but retain watch reservation so that another process can be watched at a later point in time
+    using the <i class="code-name">add_reserved</i> function. This can only be called if the watcher is
+    currently watching a process, but does not require that a watch was reserved previously.</li>
+<li><i class="code-name">void unreserve(event_loop_t &eloop)</i> &mdash; release a watch reservation.</li>
+<li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
+    removed from the event loop.</li>
+</ul>
+
+</div>
+
+<h2>Details and Usage</h2>
+
+<p>An application may wish to handle child process termination at the same time as other events. The
+<i class="code-name">child_proc_watcher</i> allows child process termination to be detected by an
+event loop.</p>
+
+<p>Note that creating multiple watchers for a single child process is not supported.</p> 
+
+<h3>Subclassing child_proc_watcher</h3>
+
+<p>To specify callback behaviour, <i class="code-name">child_proc_watcher</i> can be subclassed &mdash;
+however, it should not be directly subclassed; instead, use the <i class="code-name">child_proc_watcher_impl</i>
+implementation wrapper template.</p>
+
+<h3>Reaping of child processes</h3>
+
+<p>Processes which terminate may becomes "zombie" processes until their termination is acknowledged by their
+parent process, i.e. until they are <i>reaped</i>.</p> 
+
+<p>Child processes for which a watcher is added will be reaped automatically, either when their termination
+is detected or (if possible) immediately after the callback function returns. Note that the event loop
+may reap all child processes, even those that are not watched (as a necessity of implementation).</p>
+
+<h3>Reserving watchers</h3>
+
+<p>Since adding a watcher using <i class="code-name">add_watch</i> can fail, and because it requires that
+the child process has already been created, the awkward situation can arise that a child process is
+created but cannot be monitored. There are two ways to avoid this: the first is to <i>reserve</i> a
+watch (using the <i class="code-name">reserve_watch</i> function) and add the watch after creating
+the child process using the <i class="code-name">add_reserved</i> function instead of the
+<i class="code-name">add_watch</i> function.</p>
+
+<h3>&quot;Atomic&quot; fork</h3>
+
+<p>Another way of avoiding the problem of un-watchable child processes is to use the <i class="code-name">fork</i>
+member function in order to fork the child process. This forks and adds a child watcher; if the watcher
+cannot be added, the child process is either not created or is terminated immediately (before the
+<i class="code-name">fork</i> function returns).</p>
+
+<p>Note that, with a multi-threaded event loop, there is a race when creating a child process and watching
+it, because the child might be reaped before the watch is added (resulting either in failure when adding
+the watch, or the child termination never being reported via the callback). Using the <i class="code-name">fork</i>
+member function to create the child process also avoids this race.</p>
+
+<h3>Signalling child processes</h3>
+
+<p>Since child processes may be reaped "behind the scenes" by the event loop, signalling them becomes
+inherently race-prone; any signal sent to a process identified by its numerical process id (pid) could
+potentially be delivered instead to a new process which has been given the same pid after the original
+process terminated and was reaped. To avoid this, use the <i class="code-name">send_signal</i> member
+function, which guarantees to send a signal only if the process has not yet been reaped.</p>
+
+<hr>
+<h2 id="child_proc_watcher_impl">child_proc_watcher_impl</h2>
+
+<p><b>Brief</b>: The <i class="code-name">child_proc_watcher_impl</i> provides a basis for implementing
+<i class="code-name">child_proc_watcher</i>, using the "curiously recurring template pattern". Instead of
+subclassing <i class="code-name">child_proc_watcher</i> directly, subclass an instantiation of
+<i class="code-name">child_proc_watcher_impl</i> with the template parameter specified as the subclass itself.
+For example:</p>
+
+<pre>
+class my_watcher : public child_proc_watcher_impl<my_watcher>
+{
+    // ...
+}
+</pre>
+
+<h2>Details and Usage</h2>
+
+<p>The callback function must be provided in the subclass and named <i class="code-name">status_change</i>, with
+a signature compatible with the following:</p>
+
+<pre>
+rearm status_change(loop_t &, pid_t child, int status);
+</pre>
+
+<p>The <i class="code-name">status_change</i> function must be public, but need not be virtual. It will be called
+with the following parameters:</p>
+
+<ul>
+<li><i class="code-name">loop</i> &mdash; a reference to the event loop.</li>
+<li><i class="code-name">child</i> &mdash; the process ID (pid) of the watched child which has terminated.</li>
+<li><i class="code-name">status</i> &mdash; the status of the process, as returned by the POSIX <i class="code-name">wait</i>
+    function. The macros <i class="code-name">WIFEXITED</i>, <i class="code-name">WEXITSTATUS</i> etc. can
+    be used to determine the cause of termination and the exit status code if applicable. POSIX guarantees
+    that the value will be 0 if and only if the process terminates "normally" (i.e. not via a signal,
+    and not with an exit status other than 0).</li>
+</ul>
+
+<p>The return value specifies the <a href="dasynq-namespace.html"><i class="code-name">rearm</i></a> action.</p>
+
+<p>A <i class="code-name">child_proc_watcher_impl</i> instantiation has no public or protected members, other than
+those inherited from <i class="code-name">child_proc_watcher</i>, which it publicly derives from.</p>
+
+</body></html>
