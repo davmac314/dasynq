@@ -43,7 +43,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     
     void process_timer(clock_type clock, int fd) noexcept
     {
-        timer_queue &queue = queue_for_clock(clock);
+        timer_queue_t &queue = this->queue_for_clock(clock);
         struct timespec curtime;
         switch (clock) {
         case clock_type::SYSTEM:
@@ -96,7 +96,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     };
 
     template <typename T>
-    void receive_fd_event(T &loop_mech, typename Base::fd_r fd_r_a, void * userdata, int flags)
+    void receive_fd_event(T &loop_mech, typename traits_t::fd_r fd_r_a, void * userdata, int flags)
     {
         if (userdata == &timerfd_fd) {
             process_timer(clock_type::MONOTONIC, timerfd_fd);
@@ -144,7 +144,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         timer_queue_t & queue = this->queue_for_clock(clock);
         int fd = (clock == clock_type::MONOTONIC) ? timerfd_fd : systemtime_fd;
         if (queue.is_queued(timer_id)) {
-            bool was_first = (&timer_queue.get_root()) == &timer_id;
+            bool was_first = (&queue.get_root()) == &timer_id;
             queue.remove(timer_id);
             if (was_first) {
                 set_timer_from_queue(fd, queue);
@@ -159,7 +159,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     {
         timespec timeout = timeouttv;
         timespec interval = intervaltv;
-        timer_queue_t queue = queue_for_clock(clock);
+        timer_queue_t queue = this->queue_for_clock(clock);
 
         switch (clock) {
         case clock_type::SYSTEM:
@@ -178,7 +178,7 @@ template <class Base> class timer_fd_events : public timer_base<Base>
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         time_val alarmtime;
-        get_time(alarmtime, clock, false);
+        this->get_time(alarmtime, clock, false);
         alarmtime += timeout;
 
         set_timer(timer_id, alarmtime, interval, enable, clock);

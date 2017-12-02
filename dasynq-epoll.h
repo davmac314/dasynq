@@ -34,10 +34,10 @@ class EpollTraits
         int get_sicode() { return info.ssi_code; }
         pid_t get_sipid() { return info.ssi_pid; }
         uid_t get_siuid() { return info.ssi_uid; }
-        void * get_siaddr() { return info.ssi_addr; }
+        void * get_siaddr() { return reinterpret_cast<void *>(info.ssi_addr); }
         int get_sistatus() { return info.ssi_status; }
         int get_sival_int() { return info.ssi_int; }
-        void * get_sival_ptr() { return info.ssi_ptr; }
+        void * get_sival_ptr() { return reinterpret_cast<void *>(info.ssi_ptr); }
 
         // XSI
         int get_sierrno() { return info.ssi_errno; }
@@ -52,7 +52,8 @@ class EpollTraits
         uint32_t get_sitrapno() { return info.ssi_trapno; }
         uint32_t get_siutime() { return info.ssi_utime; }
         uint32_t get_sistime() { return info.ssi_stime; }
-        uint16_t get_siaddr_lsb() { return info.ssi_addr_lsb; }
+        // Field exposed by Linux kernel but not Glibc:
+        // uint16_t get_siaddr_lsb() { return info.ssi_addr_lsb; }
         
         void set_signo(int signo) { info.ssi_signo = signo; }
     };    

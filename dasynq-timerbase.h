@@ -2,6 +2,7 @@
 #define DASYNQ_TIMERBASE_H_INCLUDED
 
 #include <utility>
+#include <mutex>
 
 #include "dasynq-naryheap.h"
 
