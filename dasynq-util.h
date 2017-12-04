@@ -10,7 +10,7 @@ namespace dasynq {
 // argument which can set file/descriptor flags atomically. The emulated version that we generate cannot
 // do this atomically, of course.
 
-#if HAVE_PIPE2 == 0
+#if DASYNQ_HAVE_PIPE2 == 0
 inline int pipe2(int filedes[2], int flags)
 {
     if (pipe(filedes) == -1) {

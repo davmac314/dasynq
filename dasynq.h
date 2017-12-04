@@ -37,9 +37,9 @@
 // which can be used to register/de-regsiter/enable/disable event watchers, and which can process the queued events
 // by calling the watcher callbacks. The event_loop class also provides some synchronisation to ensure thread-safety.
 
-#if defined(DASYNQ_CUSTOM_LOOP_IMPLEMENTATION)
+#if DASYNQ_CUSTOM_LOOP_IMPLEMENTATION
 // Loop and LoopTraits defined already; used for testing
-#elif defined(DASYNQ_HAVE_KQUEUE)
+#elif DASYNQ_HAVE_KQUEUE
 #include "dasynq-kqueue.h"
 #if _POSIX_TIMERS > 0
 #include "dasynq-posixtimer.h"
@@ -57,7 +57,7 @@ namespace dasynq {
     template <typename T> using Loop = kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
     using LoopTraits = kqueue_traits;
 }
-#elif defined(DASYNQ_HAVE_EPOLL)
+#elif DASYNQ_HAVE_EPOLL
 #include "dasynq-epoll.h"
 #include "dasynq-timerfd.h"
 #include "dasynq-childproc.h"
@@ -65,6 +65,8 @@ namespace dasynq {
     template <typename T> using Loop = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
     using LoopTraits = EpollTraits;
 }
+#else
+#error No loop backened defined - see dasynq-config.h
 #endif
 
 #include <atomic>
