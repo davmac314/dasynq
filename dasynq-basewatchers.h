@@ -9,7 +9,7 @@
 namespace dasynq {
 
 // Forward declarations:
-template <typename T_Mutex, template <typename> class Loop = dasynq::Loop, typename LoopTraits = dasynq::LoopTraits>
+template <typename T_Mutex, template <typename> class Loop = dasynq::loop_t, typename LoopTraits = dasynq::loop_traits_t>
 class event_loop;
 
 inline namespace {

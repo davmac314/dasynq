@@ -16,7 +16,7 @@ namespace dasynq {
 
 template <class Base> class epoll_loop;
 
-class EpollTraits
+class epoll_traits
 {
     template <class Base> friend class epoll_loop;
 
@@ -100,8 +100,8 @@ template <class Base> class epoll_loop : public Base
     //   receive_signal(sigdata_t &, user *) noexcept
     //   receive_fd_event(fd_r, user *, int flags) noexcept
     
-    using sigdata_t = EpollTraits::sigdata_t;
-    using fd_r = typename EpollTraits::fd_r;
+    using sigdata_t = epoll_traits::sigdata_t;
+    using fd_r = typename epoll_traits::fd_r;
     
     void process_events(epoll_event *events, int r)
     {

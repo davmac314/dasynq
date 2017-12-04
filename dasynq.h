@@ -37,9 +37,7 @@
 // which can be used to register/de-regsiter/enable/disable event watchers, and which can process the queued events
 // by calling the watcher callbacks. The event_loop class also provides some synchronisation to ensure thread-safety.
 
-#if DASYNQ_CUSTOM_LOOP_IMPLEMENTATION
-// Loop and LoopTraits defined already; used for testing
-#elif DASYNQ_HAVE_KQUEUE
+#if DASYNQ_HAVE_KQUEUE
 #include "dasynq-kqueue.h"
 #if _POSIX_TIMERS > 0
 #include "dasynq-posixtimer.h"
@@ -54,16 +52,16 @@ namespace dasynq {
 #endif
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
-    using LoopTraits = kqueue_traits;
+    template <typename T> using loop_t = kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
+    using loop_traits_t = kqueue_traits;
 }
 #elif DASYNQ_HAVE_EPOLL
 #include "dasynq-epoll.h"
 #include "dasynq-timerfd.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using Loop = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
-    using LoopTraits = EpollTraits;
+    template <typename T> using loop_t = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
+    using loop_traits_t = epoll_traits;
 }
 #else
 #error No loop backened defined - see dasynq-config.h
@@ -342,7 +340,7 @@ namespace dprivate {
 
             queue_watcher(bwatcher);
             
-            if (! LoopTraits::has_separate_rw_fd_watches) {
+            if (! traits_t::has_separate_rw_fd_watches) {
                 // If this is a bidirectional fd-watch, it has been disabled in *both* directions
                 // as the event was delivered. However, the other direction should not be disabled
                 // yet, so we need to re-enable:
@@ -748,12 +746,12 @@ class event_loop
         }
     }
     
-    void registerReservedChild(base_child_watcher *callback, pid_t child) noexcept
+    void register_reserved_child(base_child_watcher *callback, pid_t child) noexcept
     {
         loop_mech.add_reserved_child_watch(callback->watch_handle, child, callback);
     }
 
-    void registerReservedChild_nolock(base_child_watcher *callback, pid_t child) noexcept
+    void register_reserved_child_nolock(base_child_watcher *callback, pid_t child) noexcept
     {
         loop_mech.add_reserved_child_watch_nolock(callback->watch_handle, child, callback);
     }
@@ -1790,7 +1788,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
         base_watcher::init();
         this->watch_pid = child;
         this->priority = prio;
-        eloop.registerReservedChild(this, child);
+        eloop.register_reserved_child(this, child);
     }
     
     void deregister(event_loop_t &eloop, pid_t child) noexcept
@@ -1841,7 +1839,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
             
             // Register this watcher.
             this->watch_pid = child;
-            eloop.registerReservedChild_nolock(this, child);
+            eloop.register_reserved_child_nolock(this, child);
             lock.unlock();
             return child;
         }
@@ -2025,7 +2023,7 @@ class timer : private base_timer_watcher<typename EventLoop::mutex_t>
     // Timer expired, and the given number of intervals have elapsed before
     // expiry event was queued. Normally intervals == 1 to indicate no
     // overrun.
-    // virtual rearm timer_expiry(EventLoop &eloop, int intervals) = 0;
+    // virtual rearm timer_expiry(event_loop_t &eloop, int intervals) = 0;
 };
 
 template <typename EventLoop, typename Derived>
