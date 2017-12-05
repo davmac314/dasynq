@@ -1166,8 +1166,12 @@ class event_loop
             // (Above variables are initialised only to silence compiler warnings).
             
             if (pqueue->watchType == watch_type_t::SECONDARYFD) {
-                // construct a pointer to the main watcher:
+                // construct a pointer to the main watcher (using char* arithmetic):
                 char * rp = (char *)pqueue;
+
+                // Here we take the offset of a member from a non-standard-layout class, which is
+                // specified to have undefined result by the C++ language standard, but which
+                // in practice works fine:
                 _Pragma ("GCC diagnostic push")
                 _Pragma ("GCC diagnostic ignored \"-Winvalid-offsetof\"")
                 rp -= offsetof(base_bidi_fd_watcher, out_watcher);
