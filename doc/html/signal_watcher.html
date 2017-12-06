@@ -65,14 +65,20 @@ created by libraries should always have all signals blocked, but there may be ba
 fail to adhere to this rule. Therefore, it is recommended to block required signals early in the application
 lifetime (before initialising other libraries) if possible.</p>
 
-<p>Note that signals are consumed before the watcher callback is called.</p>
+<p>Note that signals are consumed before the watcher callback is called. A watched signal should not be
+consumed by any means any other polling the event loop (i.e. should not be unblocked, and should not
+be consumed using <i class="code-name">sigwaitinfo</i> or similar functions).
+<br><span class="note"><i>Note:</i> Dasynq in general does its best to work correctly when signals are
+consumed outside the event loop. However on some systems, especially those lacking realtime signal
+extensions (such as MacOS and OpenBSD), an unavoidable race condition occurs when a watched signal is
+consumed in a different thread while the loop is being polled, which may lead to a deadlock).</span>
+</p>
 
 <h3>Subclassing signal_watcher</h3>
 
 <p>To specify callback behaviour, <i class="code-name">signal_watcher</i> can be subclassed &mdash; however, it should
 not be directly subclassed; instead, use the <i class="code-name">signal_watcher_impl</i> implementation wrapper
 template.</p>
-
 
 
 <h2 id="add_watch_2">add_watch (#2)</h2>
