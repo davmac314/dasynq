@@ -257,7 +257,7 @@ namespace dprivate {
     // protect their own internal data structures.
     template <typename T_Mutex, typename Traits> class event_dispatch
     {
-        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+        template <typename, typename> friend class dasynq::event_loop;
 
         public:
         using mutex_t = T_Mutex;
@@ -268,11 +268,11 @@ namespace dprivate {
         // queue data structure/pointer
         prio_queue event_queue;
         
-        using base_signal_watcher = dasynq::dprivate::base_signal_watcher<T_Mutex,Traits>;
-        using base_fd_watcher = dasynq::dprivate::base_fd_watcher<T_Mutex>;
-        using base_bidi_fd_watcher = dasynq::dprivate::base_bidi_fd_watcher<T_Mutex>;
-        using base_child_watcher = dasynq::dprivate::base_child_watcher<T_Mutex>;
-        using base_timer_watcher = dasynq::dprivate::base_timer_watcher<T_Mutex>;
+        using base_signal_watcher = dasynq::dprivate::base_signal_watcher<mutex_t, typename traits_t::sigdata_t>;
+        using base_fd_watcher = dasynq::dprivate::base_fd_watcher<mutex_t>;
+        using base_bidi_fd_watcher = dasynq::dprivate::base_bidi_fd_watcher<mutex_t>;
+        using base_child_watcher = dasynq::dprivate::base_child_watcher<mutex_t>;
+        using base_timer_watcher = dasynq::dprivate::base_timer_watcher<mutex_t>;
         
         // Add a watcher into the queueing system (but don't queue it). Call with lock held.
         //   may throw: std::bad_alloc
@@ -477,7 +477,6 @@ class event_loop
     using reaper_mutex_t = typename loop_mech_t::reaper_mutex_t;
 
     public:
-    using basic_traits_t = backend_traits_t;
     using loop_traits_t = typename loop_mech_t::traits_t;
     using mutex_t = T_Mutex;
     
@@ -485,7 +484,7 @@ class event_loop
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
     using base_watcher = dprivate::base_watcher;
-    using base_signal_watcher = dprivate::base_signal_watcher<T_Mutex, backend_traits_t>;
+    using base_signal_watcher = dprivate::base_signal_watcher<T_Mutex, typename loop_traits_t::sigdata_t>;
     using base_fd_watcher = dprivate::base_fd_watcher<T_Mutex>;
     using base_bidi_fd_watcher = dprivate::base_bidi_fd_watcher<T_Mutex>;
     using base_child_watcher = dprivate::base_child_watcher<T_Mutex>;
@@ -1263,7 +1262,7 @@ namespace dprivate {
 
 // Posix signal event watcher
 template <typename EventLoop>
-class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop::mutex_t, typename EventLoop::basic_traits_t>
+class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop::mutex_t, typename EventLoop::loop_traits_t::sigdata_t>
 {
     template <typename, typename> friend class signal_watcher_impl;
 
@@ -1272,7 +1271,7 @@ class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop:
     
     public:
     using event_loop_t = EventLoop;
-    using siginfo_p = typename dprivate::base_signal_watcher<T_Mutex, typename EventLoop::basic_traits_t>::siginfo_p;
+    using siginfo_p = typename signal_watcher::siginfo_p;
 
     // Register this watcher to watch the specified signal.
     // If an attempt is made to register with more than one event loop at
@@ -1362,7 +1361,7 @@ class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t
 
     protected:
     
-    // Set the types of event to watch. Only supported if basic_traits_t::has_bidi_fd_watch
+    // Set the types of event to watch. Only supported if loop_traits_t_t::has_bidi_fd_watch
     // is true; otherwise has unspecified behavior.
     // Only safe to call from within the callback handler (fdEvent). Might not take
     // effect until the current callback handler returns with REARM.
@@ -1379,7 +1378,7 @@ class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t
     // can be any combination of dasynq::IN_EVENTS / dasynq::OUT_EVENTS.
     // Exactly one of IN_EVENTS/OUT_EVENTS must be specified if the event
     // loop does not support bi-directional fd watchers (i.e. if
-    // ! basic_traits_t::has_bidi_fd_watch).
+    // ! loop_traits_t::has_bidi_fd_watch).
     //
     // Mechanisms supporting dual watchers allow for two watchers for a
     // single file descriptor (one watching read status and the other

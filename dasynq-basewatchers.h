@@ -62,7 +62,7 @@ namespace dprivate {
     class base_watcher
     {
         template <typename T_Mutex, typename Traits> friend class event_dispatch;
-        template <typename T_Mutex, template <typename> class, typename> friend class dasynq::event_loop;
+        template <typename T_Mutex, typename Traits> friend class dasynq::event_loop;
         friend inline void basewatcher_set_active(base_watcher &watcher, bool active);
         friend inline bool basewatcher_get_deleteme(const base_watcher &watcher);
         friend inline bool basewatcher_get_emulatefd(const base_watcher &watcher);
@@ -138,18 +138,18 @@ namespace dprivate {
     }
 
     // Base signal event - not part of public API
-    template <typename T_Mutex, typename Traits>
+    template <typename T_Mutex, typename T_Sigdata>
     class base_signal_watcher : public base_watcher
     {
-        friend class event_dispatch<T_Mutex, Traits>;
-        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+        template <typename, typename Traits> friend class event_dispatch;
+        template <typename, typename> friend class dasynq::event_loop;
 
         protected:
-        typename Traits::sigdata_t siginfo;
+        T_Sigdata siginfo;
         base_signal_watcher() : base_watcher(watch_type_t::SIGNAL) { }
 
         public:
-        using siginfo_t = typename Traits::sigdata_t;
+        using siginfo_t = T_Sigdata;
         typedef siginfo_t &siginfo_p;
     };
 
@@ -157,7 +157,7 @@ namespace dprivate {
     class base_fd_watcher : public base_watcher
     {
         template <typename, typename Traits> friend class event_dispatch;
-        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+        template <typename, typename> friend class dasynq::event_loop;
 
         protected:
         int watch_fd;
@@ -178,7 +178,7 @@ namespace dprivate {
     class base_bidi_fd_watcher : public base_fd_watcher<T_Mutex>
     {
         template <typename, typename Traits> friend class event_dispatch;
-        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+        template <typename, typename> friend class dasynq::event_loop;
 
         protected:
 
@@ -195,7 +195,7 @@ namespace dprivate {
     class base_child_watcher : public base_watcher
     {
         template <typename, typename Traits> friend class event_dispatch;
-        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+        template <typename, typename> friend class dasynq::event_loop;
 
         protected:
         pid_watch_handle_t watch_handle;
@@ -210,7 +210,7 @@ namespace dprivate {
     class base_timer_watcher : public base_watcher
     {
         template <typename, typename Traits> friend class event_dispatch;
-        template <typename, template <typename> class, typename> friend class dasynq::event_loop;
+        template <typename, typename> friend class dasynq::event_loop;
 
         protected:
         timer_handle_t timer_handle;
