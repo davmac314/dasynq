@@ -274,7 +274,7 @@ namespace dprivate {
         using base_child_watcher = dasynq::dprivate::base_child_watcher<T_Mutex>;
         using base_timer_watcher = dasynq::dprivate::base_timer_watcher<T_Mutex>;
         
-        // Add a watcher into the queuing system (but don't queue it). Call with lock held.
+        // Add a watcher into the queueing system (but don't queue it). Call with lock held.
         //   may throw: std::bad_alloc
         void prepare_watcher(base_watcher *bwatcher)
         {
@@ -353,6 +353,7 @@ namespace dprivate {
             }
         }
         
+        // Child process terminated. Called with both the main lock and the reaper lock held.
         void receive_child_stat(pid_t child, int status, void * userdata) noexcept
         {
             base_child_watcher * watcher = static_cast<base_child_watcher *>(userdata);
@@ -450,10 +451,10 @@ namespace dprivate {
 // This is the main event_loop implementation. It serves as an interface to the event loop
 // backend (of which it maintains an internal instance). It also serialises waits the backend
 // and provides safe deletion of watchers (see comments inline).
-template <typename T_Mutex, template <typename> class Loop, typename LoopTraits>
+template <typename T_Mutex, typename Traits>
 class event_loop
 {
-    using my_event_loop_t = event_loop<T_Mutex, Loop, LoopTraits>;
+    using my_event_loop_t = event_loop<T_Mutex, Traits>;
     friend class dprivate::fd_watcher<my_event_loop_t>;
     friend class dprivate::bidi_fd_watcher<my_event_loop_t>;
     friend class dprivate::signal_watcher<my_event_loop_t>;
@@ -469,12 +470,14 @@ class event_loop
     template <typename, typename> friend class dprivate::child_proc_watcher_impl;
     template <typename, typename> friend class dprivate::timer_impl;
 
+    using backend_traits_t = typename Traits::backend_traits_t;
+
     template <typename T, typename U> using event_dispatch = dprivate::event_dispatch<T,U>;
-    using loop_mech_t = Loop<event_dispatch<T_Mutex, LoopTraits>>;
+    using loop_mech_t = typename Traits::template backend_t<event_dispatch<T_Mutex, backend_traits_t>>;
     using reaper_mutex_t = typename loop_mech_t::reaper_mutex_t;
 
     public:
-    using basic_traits_t = LoopTraits;
+    using basic_traits_t = backend_traits_t;
     using loop_traits_t = typename loop_mech_t::traits_t;
     using mutex_t = T_Mutex;
     
@@ -482,7 +485,7 @@ class event_loop
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
     using base_watcher = dprivate::base_watcher;
-    using base_signal_watcher = dprivate::base_signal_watcher<T_Mutex,LoopTraits>;
+    using base_signal_watcher = dprivate::base_signal_watcher<T_Mutex, backend_traits_t>;
     using base_fd_watcher = dprivate::base_fd_watcher<T_Mutex>;
     using base_bidi_fd_watcher = dprivate::base_bidi_fd_watcher<T_Mutex>;
     using base_child_watcher = dprivate::base_child_watcher<T_Mutex>;
@@ -551,7 +554,7 @@ class event_loop
 
     void register_signal(base_signal_watcher *callBack, int signo)
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
 
         loop_mech.prepare_watcher(callBack);
@@ -571,7 +574,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         ed.issue_delete(callBack);
         
         release_lock(qnode);
@@ -579,7 +582,7 @@ class event_loop
 
     void register_fd(base_fd_watcher *callback, int fd, int eventmask, bool enabled, bool emulate = false)
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
 
         loop_mech.prepare_watcher(callback);
@@ -604,14 +607,14 @@ class event_loop
     
     void register_fd(base_bidi_fd_watcher *callback, int fd, int eventmask, bool emulate = false)
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
 
         loop_mech.prepare_watcher(callback);
         try {
             loop_mech.prepare_watcher(&callback->out_watcher);
             try {
-                if (LoopTraits::has_separate_rw_fd_watches) {
+                if (backend_traits_t::has_separate_rw_fd_watches) {
                     int r = loop_mech.add_bidi_fd_watch(fd, callback, eventmask | ONE_SHOT, emulate);
                     if (r & IN_EVENTS) {
                         callback->emulatefd = true;
@@ -673,7 +676,7 @@ class event_loop
     void deregister(base_fd_watcher *callback, int fd) noexcept
     {
         if (callback->emulatefd) {
-            auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+            auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
             ed.issue_delete(callback);
             return;
         }
@@ -683,7 +686,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         ed.issue_delete(callback);
         
         release_lock(qnode);        
@@ -691,7 +694,7 @@ class event_loop
     
     void deregister(base_bidi_fd_watcher *callback, int fd) noexcept
     {
-        if (LoopTraits::has_separate_rw_fd_watches) {
+        if (backend_traits_t::has_separate_rw_fd_watches) {
             loop_mech.remove_bidi_fd_watch(fd);
         }
         else {
@@ -701,7 +704,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        event_dispatch<T_Mutex, backend_traits_t> & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         ed.issue_delete(callback);
         
         release_lock(qnode);
@@ -709,7 +712,7 @@ class event_loop
     
     void reserve_child_watch(base_child_watcher *callback)
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
 
         loop_mech.prepare_watcher(callback);
@@ -724,7 +727,7 @@ class event_loop
     
     void unreserve(base_child_watcher *callback) noexcept
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
 
         loop_mech.unreserve_child_watch(callback->watch_handle);
@@ -733,7 +736,7 @@ class event_loop
     
     void register_child(base_child_watcher *callback, pid_t child)
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
         
         loop_mech.prepare_watcher(callback);
@@ -763,7 +766,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        event_dispatch<T_Mutex, backend_traits_t> & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         ed.issue_delete(callback);
         
         release_lock(qnode);
@@ -778,7 +781,7 @@ class event_loop
 
     void register_timer(base_timer_watcher *callback, clock_type clock)
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         std::lock_guard<mutex_t> guard(ed.lock);
     
         loop_mech.prepare_watcher(callback);
@@ -836,7 +839,7 @@ class event_loop
         waitqueue_node<T_Mutex> qnode;
         get_attn_lock(qnode);
         
-        event_dispatch<T_Mutex, LoopTraits> & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        event_dispatch<T_Mutex, backend_traits_t> & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         ed.issue_delete(callback);
         
         release_lock(qnode);
@@ -940,7 +943,7 @@ class event_loop
             if (rearm_type == rearm::REMOVE) {
                 bdfw->read_removed = 1;
                 
-                if (LoopTraits::has_separate_rw_fd_watches) {
+                if (backend_traits_t::has_separate_rw_fd_watches) {
                     bdfw->watch_flags &= ~IN_EVENTS;
                     if (! emulatedfd) {
                         loop_mech.remove_fd_watch_nolock(bdfw->watch_fd, IN_EVENTS);
@@ -970,7 +973,7 @@ class event_loop
                 bdfw->watch_flags &= ~IN_EVENTS;
 
                 if (! emulatedfd) {
-                    if (! LoopTraits::has_separate_rw_fd_watches) {
+                    if (! backend_traits_t::has_separate_rw_fd_watches) {
                         int watch_flags = bdfw->watch_flags;
                         // without separate r/w watches, enable_fd_watch actually sets
                         // which sides are enabled (i.e. can be used to disable):
@@ -987,7 +990,7 @@ class event_loop
                 bdfw->watch_flags |= IN_EVENTS;
                 
                 if (! emulatedfd) {
-                    if (! LoopTraits::has_separate_rw_fd_watches) {
+                    if (! backend_traits_t::has_separate_rw_fd_watches) {
                         int watch_flags = bdfw->watch_flags;
                         loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
                                 static_cast<base_watcher *>(bdfw),
@@ -1070,7 +1073,7 @@ class event_loop
         else if (rearm_type == rearm::REMOVE) {
             bdfw->write_removed = 1;
 
-            if (LoopTraits::has_separate_rw_fd_watches) {
+            if (backend_traits_t::has_separate_rw_fd_watches) {
                 bdfw->watch_flags &= ~OUT_EVENTS;
                 loop_mech.remove_fd_watch_nolock(bdfw->watch_fd, OUT_EVENTS);
                 return bdfw->read_removed ? rearm::REMOVE : rearm::NOOP;
@@ -1093,7 +1096,7 @@ class event_loop
         else if (rearm_type == rearm::DISARM) {
             bdfw->watch_flags &= ~OUT_EVENTS;
 
-            if (! LoopTraits::has_separate_rw_fd_watches) {
+            if (! backend_traits_t::has_separate_rw_fd_watches) {
                 int watch_flags = bdfw->watch_flags;
                 loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
                         static_cast<base_watcher *>(bdfw),
@@ -1106,7 +1109,7 @@ class event_loop
         else if (rearm_type == rearm::REARM) {
             bdfw->watch_flags |= OUT_EVENTS;
             
-            if (! LoopTraits::has_separate_rw_fd_watches) {
+            if (! backend_traits_t::has_separate_rw_fd_watches) {
                 int watch_flags = bdfw->watch_flags;
                 loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
                         static_cast<base_watcher *>(bdfw),
@@ -1147,7 +1150,7 @@ class event_loop
     //           no limit.
     bool process_events(int limit) noexcept
     {
-        auto & ed = (event_dispatch<T_Mutex, LoopTraits> &) loop_mech;
+        auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         ed.lock.lock();
         
         // So this pulls *all* currently pending events and processes them in the current thread.
@@ -1359,7 +1362,7 @@ class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t
 
     protected:
     
-    // Set the types of event to watch. Only supported if LoopTraits::has_bidi_fd_watch
+    // Set the types of event to watch. Only supported if basic_traits_t::has_bidi_fd_watch
     // is true; otherwise has unspecified behavior.
     // Only safe to call from within the callback handler (fdEvent). Might not take
     // effect until the current callback handler returns with REARM.
@@ -1376,7 +1379,7 @@ class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t
     // can be any combination of dasynq::IN_EVENTS / dasynq::OUT_EVENTS.
     // Exactly one of IN_EVENTS/OUT_EVENTS must be specified if the event
     // loop does not support bi-directional fd watchers (i.e. if
-    // ! LoopTraits::has_bidi_fd_watch).
+    // ! basic_traits_t::has_bidi_fd_watch).
     //
     // Mechanisms supporting dual watchers allow for two watchers for a
     // single file descriptor (one watching read status and the other
@@ -1758,7 +1761,7 @@ class child_proc_watcher : private dprivate::base_child_watcher<typename EventLo
 
     // Reserve resources for a child watcher with the given event loop.
     // Reservation can fail with std::bad_alloc. Some backends do not support
-    // reservation (it will always fail) - check LoopTraits::supports_childwatch_reservation.
+    // reservation (it will always fail) - check loop_traits_t::supports_childwatch_reservation.
     void reserve_watch(event_loop_t &eloop)
     {
         eloop.reserve_child_watch(this);

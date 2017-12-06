@@ -8,8 +8,16 @@
 
 namespace dasynq {
 
+template <typename T_Mutex> class default_traits
+{
+    public:
+    using mutex_t  = T_Mutex;
+    template <typename Base> using backend_t = dasynq::loop_t<Base>;
+    using backend_traits_t = dasynq::loop_traits_t;
+};
+
 // Forward declarations:
-template <typename T_Mutex, template <typename> class Loop = dasynq::loop_t, typename LoopTraits = dasynq::loop_traits_t>
+template <typename T_Mutex, typename Traits = default_traits<T_Mutex>>
 class event_loop;
 
 inline namespace {

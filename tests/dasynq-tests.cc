@@ -8,7 +8,14 @@
 #include "testbackend.h"
 #include "dasynq.h"
 
-using Loop_t = dasynq::event_loop<dasynq::null_mutex, dasynq::test_loop, dasynq::test_loop_traits>;
+class test_traits : public dasynq::default_traits<dasynq::null_mutex>
+{
+    public:
+    template <typename Base> using backend_t = dasynq::test_loop<Base>;
+    using backend_traits_t = dasynq::test_loop_traits;
+};
+
+using Loop_t = dasynq::event_loop<dasynq::null_mutex, test_traits>;
 
 using dasynq::rearm;
 using dasynq::test_io_engine;
