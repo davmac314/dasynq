@@ -1528,7 +1528,7 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
 
         dprivate::base_watcher * watcher = in ? this : &this->out_watcher;
 
-        if (! basewatcher_get_emulatefd(*watcher)) {
+        if (! watcher->emulatefd) {
             if (EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
                 eloop.set_fd_enabled_nolock(this, this->watch_fd, events | ONE_SHOT, b);
             }
@@ -1573,14 +1573,14 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoo
     void set_watches(event_loop_t &eloop, int new_flags) noexcept
     {
         std::lock_guard<mutex_t> guard(eloop.get_base_lock());
-        bool use_emulation = this->emulatefd || basewatcher_get_emulatefd(this->out_watcher);
+        bool use_emulation = this->emulatefd || this->out_watcher.emulatefd;
         if (use_emulation || EventLoop::loop_traits_t::has_separate_rw_fd_watches) {
             set_watch_enabled(eloop, true, (new_flags & IN_EVENTS) != 0);
             set_watch_enabled(eloop, false, (new_flags & OUT_EVENTS) != 0);
         }
         else {
             this->watch_flags = (this->watch_flags & ~IO_EVENTS) | new_flags;
-            eloop.set_fd_enabled((dprivate::base_watcher *) this, this->watch_fd, this->watch_flags & IO_EVENTS, true);
+            eloop.set_fd_enabled_nolock((dprivate::base_watcher *) this, this->watch_fd, this->watch_flags & IO_EVENTS, true);
         }
     }
     
@@ -1711,8 +1711,8 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
 
         if (rearm_type != rearm::REMOVED) {
             this->event_flags &= ~OUT_EVENTS;
-            basewatcher_set_active(outwatcher, false);
-            if (basewatcher_get_deleteme(outwatcher)) {
+            outwatcher.active = false;
+            if (outwatcher.deleteme) {
                 // We don't want a watch that is marked "deleteme" to re-arm itself.
                 rearm_type = rearm::REMOVE;
             }

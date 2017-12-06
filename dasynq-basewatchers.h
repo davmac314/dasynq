@@ -61,13 +61,7 @@ namespace dprivate {
     // Represents a queued event notification. Various event watchers derive from this type.
     class base_watcher
     {
-        template <typename T_Mutex, typename Traits> friend class event_dispatch;
-        template <typename T_Mutex, typename Traits> friend class dasynq::event_loop;
-        friend inline void basewatcher_set_active(base_watcher &watcher, bool active);
-        friend inline bool basewatcher_get_deleteme(const base_watcher &watcher);
-        friend inline bool basewatcher_get_emulatefd(const base_watcher &watcher);
-
-        protected:
+        public:
         watch_type_t watchType;
         int active : 1;    // currently executing handler?
         int deleteme : 1;  // delete when handler finished?
@@ -82,8 +76,6 @@ namespace dprivate {
         {
             p.priority = prio;
         }
-
-        public:
 
         // Perform initialisation necessary before registration with an event loop
         void init()
@@ -121,21 +113,6 @@ namespace dprivate {
             // delete this;
         }
     };
-
-    inline void basewatcher_set_active(base_watcher &watcher, bool active)
-    {
-        watcher.active = active;
-    }
-
-    inline bool basewatcher_get_deleteme(const base_watcher &watcher)
-    {
-        return watcher.deleteme;
-    }
-
-    inline bool basewatcher_get_emulatefd(const base_watcher &watcher)
-    {
-        return watcher.emulatefd;
-    }
 
     // Base signal event - not part of public API
     template <typename T_Mutex, typename T_Sigdata>
