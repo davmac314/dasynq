@@ -564,7 +564,7 @@ class event_loop
 
         loop_mech.prepare_watcher(callBack);
         try {
-            loop_mech.add_signal_watch(signo, callBack);
+            loop_mech.add_signal_watch_nolock(signo, callBack);
         }
         catch (...) {
             loop_mech.release_watcher(callBack);
@@ -791,7 +791,7 @@ class event_loop
     
         loop_mech.prepare_watcher(callback);
         try {
-            loop_mech.add_timer(callback->timer_handle, callback, clock);
+            loop_mech.add_timer_nolock(callback->timer_handle, callback, clock);
         }
         catch (...) {
             loop_mech.release_watcher(callback);

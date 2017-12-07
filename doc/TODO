@@ -49,3 +49,6 @@ Later:
 * Event loop construction with eg child_proc and itimer masks two signals separately. This could
   be combined into a single operation.
 
+* kqueue pulls signals when they are added. This is probably bad, especially because signals can
+  be added as part of loop initialisation.
+

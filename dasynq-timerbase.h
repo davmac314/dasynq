@@ -390,9 +390,8 @@ template <typename Base> class timer_base : public Base
     }
 #endif
 
-    void add_timer(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
+    void add_timer_nolock(timer_handle_t &h, void *userdata, clock_type clock = clock_type::MONOTONIC)
     {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         this->queue_for_clock(clock).allocate(h, userdata);
     }
 

@@ -486,12 +486,17 @@ template <class Base> class kqueue_loop : public Base
     {
         disable_fd_watch(fd, flags);
     }
-    
+
     // Note signal should be masked before call.
     void add_signal_watch(int signo, void *userdata)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
-        
+        add_signal_watch_nolock(signo, userdata);
+    }
+
+    // Note signal should be masked before call.
+    void add_signal_watch_nolock(int signo, void *userdata)
+    {
         prepare_signal(signo);
 
         // We need to register the filter with the kqueue early, to avoid a race where we miss

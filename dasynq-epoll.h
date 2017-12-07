@@ -269,12 +269,17 @@ template <class Base> class epoll_loop : public Base
     {
         disable_fd_watch(fd, flags);
     }
-    
+
     // Note signal should be masked before call.
     void add_signal_watch(int signo, void *userdata)
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        add_signal_watch_nolock(signo, userdata);
+    }
 
+    // Note signal should be masked before call.
+    void add_signal_watch_nolock(int signo, void *userdata)
+    {
         sigdataMap[signo] = userdata;
 
         // Modify the signal fd to watch the new signal
