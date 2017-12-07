@@ -67,10 +67,12 @@ template <class Base> class itimer_events : public timer_base<Base>
         }
 #endif
 
-        newalarm.it_interval.tv_sec = interval_tv.seconds();
-        newalarm.it_interval.tv_usec = interval_tv.nseconds() / 1000;
+        newalarm.it_value.tv_sec = interval_tv.seconds();
+        newalarm.it_value.tv_usec = interval_tv.nseconds() / 1000;
+        newalarm.it_interval.tv_sec = 0;
+        newalarm.it_interval.tv_usec = 0;
 
-        if (interval_set && newalarm.it_interval.tv_sec == 0 && newalarm.it_interval.tv_usec == 0) {
+        if (interval_set && newalarm.it_value.tv_sec == 0 && newalarm.it_value.tv_usec == 0) {
             // We passed the timeout: set alarm to expire immediately (we must use {0,1} as
             // {0,0} disables the timer).
             // TODO: it would be better if we just processed the appropriate timers here,
