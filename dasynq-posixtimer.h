@@ -44,18 +44,21 @@ template <class Base> class posix_timer_events : public timer_base<Base>
     template <typename T>
     bool receive_signal(T & loop_mech, sigdata_t &siginfo, void *userdata)
     {
+        auto &real_timer_queue = this->queue_for_clock(clock_type::SYSTEM);
+        auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
+
         if (siginfo.get_signo() == SIGALRM) {
-            struct timespec curtime;
+            time_val curtime;
 
             if (! real_timer_queue.empty()) {
-                clock_gettime(CLOCK_REALTIME, &curtime);
-                timer_base<Base>::process_timer_queue(real_timer_queue, curtime);
+                this->get_time(curtime, clock_type::SYSTEM, true);
+                this->process_timer_queue(real_timer_queue, curtime.get_timespec());
                 set_timer_from_queue(real_timer, real_timer_queue);
             }
 
             if (! mono_timer_queue.empty()) {
-                clock_gettime(CLOCK_MONOTONIC, &curtime);
-                timer_base<Base>::process_timer_queue(mono_timer_queue, curtime);
+                this->get_time(curtime, clock_type::MONOTONIC, true);
+                this->process_timer_queue(mono_timer_queue, curtime);
                 set_timer_from_queue(mono_timer, mono_timer_queue);
             }
 
