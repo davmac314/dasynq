@@ -255,9 +255,9 @@ namespace dprivate {
     // In general the methods should be called with lock held. In practice this means that the
     // event loop backend implementations must obtain the lock; they are also free to use it to
     // protect their own internal data structures.
-    template <typename T_Mutex, typename Traits> class event_dispatch
+    template <typename T_Mutex, typename Traits, typename LoopTraits> class event_dispatch
     {
-        template <typename, typename> friend class dasynq::event_loop;
+        friend class dasynq::event_loop<T_Mutex, LoopTraits>;;
 
         public:
         using mutex_t = T_Mutex;
@@ -304,6 +304,11 @@ namespace dprivate {
 
         template <typename T> void init(T *loop) noexcept { }
         
+        void sigmaskf(int how, const sigset_t *set, sigset_t *oset)
+        {
+            LoopTraits::sigmaskf(how, set, oset);
+        }
+
         // Receive a signal; return true to disable signal watch or false to leave enabled.
         // Called with lock held.
         template <typename T>
@@ -472,11 +477,12 @@ class event_loop
 
     using backend_traits_t = typename Traits::backend_traits_t;
 
-    template <typename T, typename U> using event_dispatch = dprivate::event_dispatch<T,U>;
+    template <typename T, typename U> using event_dispatch = dprivate::event_dispatch<T,U,Traits>;
     using loop_mech_t = typename Traits::template backend_t<event_dispatch<T_Mutex, backend_traits_t>>;
     using reaper_mutex_t = typename loop_mech_t::reaper_mutex_t;
 
     public:
+    using traits_t = Traits;
     using loop_traits_t = typename loop_mech_t::traits_t;
     using mutex_t = T_Mutex;
     

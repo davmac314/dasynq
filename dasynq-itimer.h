@@ -126,9 +126,9 @@ template <class Base> class itimer_events : public timer_base<Base>
     template <typename T> void init(T *loop_mech)
     {
         sigset_t sigmask;
-        sigprocmask(SIG_UNBLOCK, nullptr, &sigmask);
+        this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);
         sigaddset(&sigmask, SIGALRM);
-        sigprocmask(SIG_SETMASK, &sigmask, nullptr);
+        this->sigmaskf(SIG_SETMASK, &sigmask, nullptr);
         loop_mech->add_signal_watch(SIGALRM, nullptr);
         Base::init(loop_mech);
     }

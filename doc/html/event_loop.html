@@ -115,6 +115,17 @@ the watcher instance; consult the documentation for the various watcher types. I
 than registration can not fail and will not throw exceptions. This means that critical watchers can be registered early
 and then enabled when needed; resource issues will be identified early, at the time of registration.</p>
 
+<h3>Event loop initialisation</h3>
+
+<p>Because the event loop may need to mask certain signals for the whole process, and because there is no
+straight-forward way to do this once multiple threads have been created, the event loop must be initialised
+in the initial application thread. An event loop with a <i class="code-name">null_mutex</i> mutex type will
+use <i>sigprocmask</i> to mask signals and therefore has (according to POSIX) unpredictable behaviour in
+multi-threaded applications; an event loop with any other mutex type will instead use
+<i class="code-name">pthread_sigmask</i>, which requires linking against the pthreads library. It is
+therefore not possible to use a single-threaded event loop in a multi-threaded program, even if it would be
+used only from a single thread.</p>
+
 <h3>Watcher state cycle</h3>
 
 <p>Watchers are initially in a <i>waiting</i> state once enabled.
@@ -169,7 +180,7 @@ reconstructed in the child before it is used again.</p>
 <p>The event loop may internally use certain signals, including <i class="code-name">SIGCHLD</i> and
 <i class="code-name">SIGALRM</i>. Blocking or installing handlers for these signals may interfere with the
 function of the event loop. Other signals should be safe for application use, although these can be handled
-easily using the event loop's support via signal watchers.</p>  
+easily using the event loop's support via signal watchers.</p>
 
 <hr>
 <h2 id="loop_traits_t">loop_traits_t (dasynq::event_loop&lt;T&gt;::loop_traits_t)</h2>

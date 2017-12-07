@@ -88,9 +88,9 @@ template <class Base> class posix_timer_events : public timer_base<Base>
     template <typename T> void init(T *loop_mech)
     {
         sigset_t sigmask;
-        sigprocmask(SIG_UNBLOCK, nullptr, &sigmask);
+        this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);
         sigaddset(&sigmask, SIGALRM);
-        sigprocmask(SIG_SETMASK, &sigmask, nullptr);
+        this->sigmaskf(SIG_SETMASK, &sigmask, nullptr);
         loop_mech->add_signal_watch(SIGALRM, nullptr);
 
         struct sigevent timer_sigevent;
@@ -161,7 +161,6 @@ template <class Base> class posix_timer_events : public timer_base<Base>
         }
         set_timer(timer_id, curtime, interval, enable, clock);
     }
-
 
     void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {

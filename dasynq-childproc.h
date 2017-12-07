@@ -180,6 +180,14 @@ template <class Base> class child_proc_events : public Base
 
     template <typename T> void init(T *loop_mech)
     {
+        // Mask SIGCHLD:
+        sigset_t sigmask;
+        this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);
+        sigaddset(&sigmask, SIGCHLD);
+        this->sigmaskf(SIG_SETMASK, &sigmask, nullptr);
+
+        // On some systems a SIGCHLD handler must be established, or SIGCHLD will not be
+        // generated:
         struct sigaction chld_action;
         chld_action.sa_handler = sigchld_handler;
         sigemptyset(&chld_action.sa_mask);

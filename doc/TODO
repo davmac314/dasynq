@@ -2,7 +2,6 @@ Version 1.0:
 
 * Finish reference documentation (HTML format)
   - Document timers
-  - Document child process watchers
 
 * check for uses of sigprocmask, use pthread_sigmask when required.
 
@@ -43,3 +42,10 @@ Later:
 * Cache current clock times. The API allows for this but it hasn't been implemented.
 
 * Use eventfd (when available) as interrupt mechanism instead of a pipe.
+
+* base_watcher heap handle: does it contain a reference (pointer) to the base_watcher? Can this
+  be removed? (perhaps conditionally depending on the chosen queue implementation)
+
+* Event loop construction with eg child_proc and itimer masks two signals separately. This could
+  be combined into a single operation.
+
