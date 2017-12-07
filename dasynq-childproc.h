@@ -3,6 +3,8 @@
 
 namespace dasynq {
 
+namespace dprivate {
+
 // Map of pid_t to void *, with possibility of reserving entries so that mappings can
 // be later added with no danger of allocator exhaustion (bad_alloc).
 class pid_map
@@ -76,7 +78,9 @@ inline void sigchld_handler(int signum)
     // hurt in any case).
 }
 
-using pid_watch_handle_t = pid_map::pid_handle_t;
+} // dprivate namespace
+
+using pid_watch_handle_t = dprivate::pid_map::pid_handle_t;
 
 template <class Base> class child_proc_events : public Base
 {
@@ -90,7 +94,7 @@ template <class Base> class child_proc_events : public Base
     };
 
     private:
-    pid_map child_waiters;
+    dprivate::pid_map child_waiters;
     reaper_mutex_t reaper_lock; // used to prevent reaping while trying to signal a process
     
     protected:
@@ -104,7 +108,7 @@ template <class Base> class child_proc_events : public Base
             pid_t child;
             reaper_lock.lock();
             while ((child = waitpid(-1, &status, WNOHANG)) > 0) {
-                pid_map::entry ent = child_waiters.remove(child);
+                auto ent = child_waiters.remove(child);
                 if (ent.first) {
                     Base::receive_child_stat(child, status, ent.second);
                 }
@@ -189,7 +193,7 @@ template <class Base> class child_proc_events : public Base
         // On some systems a SIGCHLD handler must be established, or SIGCHLD will not be
         // generated:
         struct sigaction chld_action;
-        chld_action.sa_handler = sigchld_handler;
+        chld_action.sa_handler = dprivate::sigchld_handler;
         sigemptyset(&chld_action.sa_mask);
         chld_action.sa_flags = 0;
         sigaction(SIGCHLD, &chld_action, nullptr);
