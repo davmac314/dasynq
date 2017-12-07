@@ -8,14 +8,32 @@
 #include "testbackend.h"
 #include "dasynq.h"
 
-class test_traits : public dasynq::default_traits<dasynq::null_mutex>
+class checking_mutex
+{
+    bool is_locked = false;
+
+    public:
+    void lock()
+    {
+        if (is_locked) throw "mutex already locked";
+        is_locked = true;
+    }
+
+    void unlock()
+    {
+        if (! is_locked) throw "mutex not locked";
+        is_locked = false;
+    }
+};
+
+class test_traits : public dasynq::default_traits<checking_mutex>
 {
     public:
     template <typename Base> using backend_t = dasynq::test_loop<Base>;
     using backend_traits_t = dasynq::test_loop_traits;
 };
 
-using Loop_t = dasynq::event_loop<dasynq::null_mutex, test_traits>;
+using Loop_t = dasynq::event_loop<checking_mutex, test_traits>;
 
 using dasynq::rearm;
 using dasynq::test_io_engine;
@@ -397,7 +415,7 @@ static void create_bidi_pipe(int filedes[2])
 
 void ftestFdWatch1()
 {
-    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
 
     bool seen1 = false;
@@ -452,7 +470,7 @@ void ftestFdWatch1()
 
 void ftestBidiFdWatch1()
 {
-    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
 
     bool flags1[3] = { false, false, false };  // in, out, removed
@@ -508,7 +526,7 @@ void ftestBidiFdWatch1()
 
 void ftestBidiFdWatch2()
 {
-    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
 
     bool flags1[3] = { false, false, false };  // in, out, removed
@@ -576,7 +594,7 @@ void ftestBidiFdWatch2()
 
 void ftestBidiFdWatch3()
 {
-    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
 
     bool flags1[3] = { false, false, false };  // in, out, removed
@@ -650,7 +668,7 @@ void ftestBidiFdWatch3()
 
 void ftestSigWatch1()
 {
-    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
 
     bool seen1 = false;
@@ -702,7 +720,7 @@ void ftestSigWatch1()
 
 void ftestSigWatch2()
 {
-    using Loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
 
     bool seen1 = false;
@@ -791,7 +809,7 @@ void ftestMultiThread1()
 // Compilation test only; not called
 void ctest_child_watch()
 {
-    using loop_t = dasynq::event_loop<dasynq::null_mutex>;
+    using loop_t = dasynq::event_loop<std::mutex>;
     loop_t my_loop;
 
     class my_child_proc_watcher : public loop_t::child_proc_watcher_impl<my_child_proc_watcher>
