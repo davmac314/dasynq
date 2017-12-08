@@ -119,7 +119,9 @@ and then enabled when needed; resource issues will be identified early, at the t
 
 <p>Because the event loop may need to mask certain signals for the whole process, and because there is no
 straight-forward way to do this once multiple threads have been created, the event loop must be initialised
-in the initial application thread. An event loop with a <i class="code-name">null_mutex</i> mutex type will
+in the initial application thread &mdash; or alternatively, these signals must be blocked by the
+application on the initial thread (the signals in question are <i class="code-name">SIGCHLD</i> and
+<i class="code-name">SIGALRM</i>). An event loop with a <i class="code-name">null_mutex</i> mutex type will
 use <i>sigprocmask</i> to mask signals and therefore has (according to POSIX) unpredictable behaviour in
 multi-threaded applications; an event loop with any other mutex type will instead use
 <i class="code-name">pthread_sigmask</i>, which requires linking against the pthreads library. It is

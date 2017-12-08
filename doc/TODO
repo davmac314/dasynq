@@ -49,6 +49,13 @@ Later:
 * Event loop construction with eg child_proc and itimer masks two signals separately. This could
   be combined into a single operation.
 
-* kqueue pulls signals when they are added. This is probably bad, especially because signals can
-  be added as part of loop initialisation.
+* Add a "user triggered" event watcher.
+
+* Allow creating multiple event loops in an application. This may necessitate allowing the
+  construction of limited functionality event loops, eg event loops that cannot be used to watch
+  child process status.
+
+  - further, allow "embedding" event loops, if possible.
+
+
 

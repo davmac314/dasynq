@@ -1,5 +1,6 @@
 Dasynq is an event-loop library, which can be used to listen for and react to multiple types of
 _event_. This document provides an overview of how to use the library in your own programs.
+Consult the reference manual for more complete information on the various classes and functions.
 
 ## 1. Basics
 
@@ -548,15 +549,16 @@ including Mac OS X up to at least 10.12 and OpenBSD up to at least 6.1 - there i
 between `MONOTONIC` and `SYSTEM` timers. On these systems you should use only relative timers
 and be aware that timers may not function correctly if the system time is adjusted.
 
+The event loop should be initialised on the initial application thread, before any other
+threads have been created, in order to ensure that it can block signals that it uses
+internally.
+
 The event loop may not function correctly in the child process after a `fork()` operation
 (including a call to `child_proc_watcher::fork`). It is recommended to re-create the event loop
 in the child process, if it is needed.
 
 The implementation may use `SIGCHLD` to detect child process termination. Therefore you should not
 try to watch `SIGCHLD` independently, and should not try to add a watch for the `SIGCHLD` signal.
+Similarly, the implementation may use `SIGALRM` to implement timers.
 
 Creating two event loop instances in a single application is not likely to work well, or at all.
-(This limitation may be lifted in a future release).
-
-Watchers can be registered with only one event loop at any given time. You must not attempt to
-register and already-registered watcher with the same or another event loop.
