@@ -39,14 +39,14 @@ template class. It represents an event watcher for POSIX signal reception events
 
 <h3>Functions</h3>
 <ul>
-<li>(#1) <i class="code-name">void add_watch(event_loop_t &eloop, int signo, int prio = DEFAULT_PRIORITY)</i>
+<li>(#1) <i class="code-name">void add_watch(event_loop_t &amp;eloop, int signo, int prio = DEFAULT_PRIORITY)</i>
     <br>&mdash; register a watcher with an event loop. <i class="code-name">signo</i> specifies the signal
     to watch. May throw <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
 <li>(#2) <i class="code-name">template &lt;typename T&gt;
-    <br>static signal_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &eloop, int signo, T watch_hndlr)</i>
+    <br>static signal_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &amp;eloop, int signo, T watch_hndlr)</i>
     <br>&mdash; add a dynamically-allocated watch with the specified callback. The watch is automatically
     deleted when removed. See <a href="#add_watch_2">details</a> below.</li>
-<li><i class="code-name">void deregister(EventLoop &eloop) noexcept</i>
+<li><i class="code-name">void deregister(event_loop_t &amp;eloop) noexcept</i>
     <br>&mdash; request removal from the event loop.</li>
 <li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
     removed from the event loop.</li>
@@ -86,7 +86,7 @@ template.</p>
 <pre>
 // member of dasynq::event_loop&lt;T&gt;::signal_watcher
 template &lt;typename T&gt;
-static signal_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &eloop, int signo, T watch_hndlr);
+static signal_watcher&lt;event_loop_t&gt; *add_watch(event_loop_t &amp;eloop, int signo, T watch_hndlr);
 </pre>
 
 <p>This variant of the <i class="code-name">add_watch</i> function can be used to create and register a
@@ -95,7 +95,7 @@ dynamically-allocated <i class="code-name">signal_watcher</i>. The first two par
 or lambda of the form:</p>
 
 <pre>
-[](event_loop_t &eloop, int signo, <a href="#siginfo_p">siginfo_p</a> siginfo) -> rearm { ... }
+[](event_loop_t &amp;eloop, int signo, <a href="#siginfo_p">siginfo_p</a> siginfo) -> rearm { ... }
 </pre>
 
 <p>It acts as the callback function for the generated watcher. The watcher will delete itself when it is
@@ -114,7 +114,7 @@ subclassing <i class="code-name">signal_watcher</i> directly, subclass an instan
 For example:</p>
 
 <pre>
-class my_watcher : public signal_watcher_impl<my_watcher>
+class my_watcher : public signal_watcher_impl&lt;my_watcher&gt;
 {
     // ...
 }
@@ -126,7 +126,7 @@ class my_watcher : public signal_watcher_impl<my_watcher>
 a signature compatible with the following:</p>
 
 <pre>
-rearm received(event_loop_t & loop, int signo, <a href="#siginfo_p">siginfo_p</a> siginfo) noexcept;
+rearm received(event_loop_t &amp; loop, int signo, <a href="#siginfo_p">siginfo_p</a> siginfo) noexcept;
 </pre>
 
 <p>The <i class="code-name">received</i> function must be public, but need not be virtual. It will be called

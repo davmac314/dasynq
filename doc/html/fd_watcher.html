@@ -175,7 +175,7 @@ subclassing <i class="code-name">fd_watcher</i> directly, subclass an instantiat
 For example:</p>
 
 <pre>
-class my_watcher : public fd_watcher_impl<my_watcher>
+class my_watcher : public fd_watcher_impl&lt;my_watcher&gt;
 {
     // ...
 }
@@ -187,7 +187,7 @@ class my_watcher : public fd_watcher_impl<my_watcher>
 a signature compatible with the following:</p>
 
 <pre>
-rearm fd_event(event_loop_t & loop, int fd, int flags);
+rearm fd_event(event_loop_t &amp; loop, int fd, int flags);
 </pre>
 
 <p>The <i class="code-name">fd_event</i> function must be public, but need not be virtual. It will be called
