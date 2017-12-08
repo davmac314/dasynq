@@ -1,0 +1,133 @@
+<html>
+<head><title>Dasynq manual - timer</title>
+  <link rel="stylesheet" href="style.css">  
+</head>
+<body>
+<h1>timer, timer_impl</h1>
+
+<pre>
+    // Members of dasynq::event_loop&lt;T&gt; instantiation:
+
+    class timer;
+
+    template &lt;class Derived&gt; class <a href="#timer_impl">timer_impl</a>; // : public timer;
+</pre>
+
+<h2>timer</h2>
+
+<p><b>Brief</b>: <i class="code-name">timer</i> is a member type of the <a href="event_loop.html"><i class="code-name">event_loop</i></a>
+template class. It represents an event watcher which receives callbacks upon the passing of a certain
+period of time, or at a certain time, against either the system clock (which can potentially have its time
+altered during system operation) or a monotonic clock which is not adjustable. The <i class="code-name">timer</i>
+class should not be subclassed directly; the <a href="#timer_impl"><i class="code-name">timer_impl</i></a>
+template provides a means for subclassing.</p>
+
+<h2>Members</h2>
+
+<div class="small-indent">
+
+<h3>Types</h3>
+<ul>
+<li><i class="code-name">event_loop_t</i> &mdash; the event loop type that this watcher registers with.</li>
+</ul>
+
+<h3>Constructors</h3>
+<ul>
+<li><i class="code-name">timer()</i> &mdash; default constructor.</li>
+</ul>
+
+<h3>Functions</h3>
+<ul>
+<li><i class="code-name">void add_timer(event_loop_t &amp;eloop, <a href="dasynq-namespace.html#clock_type">clock_type</a> clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)</i>
+    <br>&mdash; register a timer using the specified clock with an event loop. May throw
+    <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
+<li>(#1) <i class="code-name">void arm_timer(event_loop_t &amp;eloop, const timespec &timeout) noexcept</i>
+    <br>&mdash; arm a one-shot timer with the specified absolute timeout.</li>
+<li>(#2) <i class="code-name">void arm_timer(event_loop_t &amp;eloop, const timespec &timeout, const timespec &interval) noexcept</i>
+    <br>&mdash; arm a periodic timer with the specified initial absolute timeout and the specified interval period.</li>
+<li>(#1) <i class="code-name">void arm_timer_rel(event_loop_t &amp;eloop, const timespec &timeout) noexcept</i>
+    <br>&mdash; arm a one-shot timer with the specified relative timeout.</li>
+<li>(#2) <i class="code-name">void arm_timer_rel(event_loop_t &amp;eloop, const timespec &timeout, const timespec &interval) noexcept</i>
+    <br>&mdash; arm a periodic timer with the specified initial relative timeout and the specified interval period.</li>
+<li><i class="code-name">void stop_timer(event_loop_t &amp;eloop) noexcept</i>
+    <br>&mdash; stop a timer, so that it stops counting intervals.</li>
+<li><i class="code-name">void set_enabled(event_loop_t &amp;eloop, bool enable) noexcept</i>
+    &mdash; enable or disable the watcher. A disabled <i class="code-name">timer</i> watcher does not have
+    its callback called upon timer expiration, but the underlying timer continues to count (and repeat if
+    periodic). A disabled timer watcher that has timeouts pending when enabled will report them as soon as
+    the event loop is polled.</li>
+<li><i class="code-name">void deregister(event_loop_t &amp;eloop) noexcept</i>
+    <br>&mdash; request removal from the event loop.</li>
+<li><i class="code-name">virtual void watch_removed() noexcept</i> &mdash; called when the watcher has been
+    removed from the event loop.</li>
+</ul>
+</div>
+
+<h2>Details and Usage</h2>
+
+<p>A <i class="code-name">timer</i> represents a timer which expires at some point in time and an associated
+watcher which receives callback notifications for timer expiry. Timers can be <i>one-shot</i> (stop
+automatically after expiry) or <i>periodic</i> (on expiry, the timeout is incremented by a specified
+interval).</p>
+
+<p>A timer can run on one of two clocks, specified by a <i class="code-name"><a href="dasynq-namespace.html#clock_type">clock_type</a></i>.
+The <i class="code-name">SYSTEM</i> clock is the current "wall clock" time according to the system; its time
+value should normally only increase at a constant rate, but may be altered by large amounts in either
+direction if the system clock is altered. The <i class="code-name">MONOTONIC</i> clock always increments
+at a constant rate and cannot be altered otherwise.</p>
+
+<p>When a timer is set, the initial timeout can be specified either as an absolute time, or to a time that
+is relative to the current time. While setting relative times to the <i class="code-name">SYSTEM</i> clock
+is supported, be aware that it rarely makes sense to do so; the timer is not guaranteed to expire after
+the specified interval (if the system clock is adjusted, the adjustment will also be applied to the
+timeout). Use a timer against the <i class="code-name">MONOTONIC</i> clock if you need a specific interval
+of time.</p> 
+
+<h3>Subclassing timer</h3>
+
+<p>To specify callback behaviour, <i class="code-name">timer</i> can be subclassed &mdash; however, it should
+not be directly subclassed; instead, use the <i class="code-name">timer_impl</i> implementation wrapper
+template.</p>
+
+<hr>
+<h2 id="timer_impl">timer_impl</h2>
+
+<p><b>Brief</b>: The <i class="code-name">timer_impl</i> provides a basis for implementing
+<i class="code-name">timer</i>, using the "curiously recurring template pattern". Instead of
+subclassing <i class="code-name">timer</i> directly, subclass an instantiation of
+<i class="code-name">timer_impl</i> with the template parameter specified as the subclass itself.
+For example:</p>
+
+<pre>
+class my_timer : public timer_impl&lt;my_timer&gt;
+{
+    // ...
+}
+</pre>
+
+<h2>Details and Usage</h2>
+
+<p>The callback function must be provided in the subclass and named <i class="code-name">fd_event</i>, with
+a signature compatible with the following:</p>
+
+<pre>
+rearm timer_expiry(event_loop_t &amp;loop, int expiry_count);
+</pre>
+
+<p>The <i class="code-name">timer_expiry</i> function must be public, but need not be virtual. It will be called
+with the following parameters:</p>
+
+<ul>
+<li><i class="code-name">loop</i> &mdash; a reference to the event loop.</li>
+<li><i class="code-name">expiry_count</i> &mdash; the number of times the timer expired before the watcher was
+    queued for processing. Normally, this should be one, and for a one-shot timer it can only be one. However,
+    for periodic timers, under a heavy system load or if the timer was disabled for a period, it may report
+    a higher value.</li>
+</ul>
+
+<p>The return value specifies the <a href="dasynq-namespace.html"><i class="code-name">rearm</i></a> action.</p>
+
+<p>An <i class="code-name">timer_impl</i> instantiation has no public or protected members, other than
+those inherited from <i class="code-name">timer_watcher</i>, which it publicly derives from.</p>
+
+</body></html>
