@@ -36,7 +36,7 @@ namespace dasynq {
     };
     
     // clock types
-    enum class clock_type
+    enum class <a href="#clock_type">clock_type</a>
     {
         SYSTEM,    // wall-time clock, time may jump if set by user
         MONOTONIC  // monotonically increasing clock without jumps
@@ -70,6 +70,30 @@ namespace dasynq {
 }
 </pre>
 
+<hr><h1 id="clock_type">clock_type</h1>
+
+<pre>
+#include "dasynq.h"
+
+namespace dasynq {
+    enum class clock_type
+    {
+        SYSTEM,    // wall-time clock, time may jump if set by user
+        MONOTONIC  // monotonically increasing clock without jumps
+    };
+}
+</pre>
+
+<p><b>Brief</b>: The <i class="code-name">clock_type</i> enumeration is used to differentiate between two
+different types of clock: the <i>system</i> clock, which represents an adjustable "wall clock" time, or
+the <i>monotonic</i> clock, a non-adjustable clock tracking time elapsed since some fixed (but arbitrary)
+point in time.</p>
+
+<h2>Details</h2>
+
+<p>Not all systems support the monotonic clock. In Dasynq, using the <i class="code-name">MONOTONIC</i>
+clock on such systems will instead refer to the <i class="code-name">SYSTEM</i> clock.</p> 
+
 <hr><h1 id="time_val">time_val</h1>
 
 <pre>
@@ -81,8 +105,10 @@ namespace dasynq {
 </pre>
 
 <p><b>Brief</b>: The <i class="code-name">time_val</i> class represents high-precision clock times, and supports
-arithmetic operations on them. Times are represented as a combination of seconds and nanoseconds. In addition to
-the public members listed below, a number of arithmetic and comparison operators are defined as non-member functions.</p>
+arithmetic operations on them. It acts as a wrapper to a <i class="code-name">struct timespec</i> object, so
+that times are represented as a combination of seconds and nanoseconds. In addition to the public members
+listed below, a number of arithmetic and comparison operators are defined as non-member functions. Noe that
+<i class="code-name">time_val</i> cannot be used to represent negative time intervals.</p>
 
 <h2>Public members</h2>
 
@@ -97,6 +123,10 @@ the public members listed below, a number of arithmetic and comparison operators
 <li><i class="code-name">nsecond_t nseconds() const</i><br>
     <i class="code-name">nsecond_t & nseconds()</i> - access the nanoseconds value</li>
 <li><i class="code-name">operator timespec() const</i> - conversion to <i class="code-name">struct timespec</i></li>
+<li><i class="code-name">timespec & get_timespec() noexcept</i> - access to wrapped
+    <i class="code-name">struct timespec</i> object.</li>
+<li><i class="code-name">const timespec & get_timespec() const noexcept</i> - access to wrapped
+    <i class="code-name">struct timespec</i> object.</li>    
 </ul>
 
 <hr><h1 id="rearm">rearm &mdash; dasynq::rearm</h1>
