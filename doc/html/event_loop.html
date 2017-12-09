@@ -3,6 +3,7 @@
   <link rel="stylesheet" href="style.css">  
 </head>
 <body>
+<div class="content">
 <h1>event_loop, event_loop_n, event_loop_th</h1>
 
 <pre>
@@ -67,8 +68,8 @@ Additional template parameters are implementation internal.
 <li><i class="code-name"><a href="child_proc_watcher.html">child_proc_watcher</a></i> &mdash; a watcher type for watching child process status changes</li>
 <li><i class="code-name"><a href="child_proc_watcher.html#child_proc_watcher_impl">child_proc_watcher_impl</a></i> [template] &mdash; a template for implementing
     <i class="code-name"><a href="child_proc_watcher.html">child_proc_watcher</a></i> subclasses</li>
-<li><i class="code-name">timer</i> &mdash; a timer implementation and watcher for timer expiry</li>
-<li><i class="code-name">timer_impl</i> [template] &mdash; a template for implementing <i class="code-name">timer</i> subclasses</li>
+<li><i class="code-name"><a href="timer.html">timer</a></i> &mdash; a timer implementation and watcher for timer expiry</li>
+<li><i class="code-name"><a href="timer.html#timer_impl">timer_impl</a></i> [template] &mdash; a template for implementing <i class="code-name">timer</i> subclasses</li>
 </ul>
 
 <h3>Functions</h3>
@@ -203,4 +204,5 @@ might not differentiate between the system and monotonic clock, and timers again
 not expire at the correct time if the system time is altered after the timer is set.</li>
 </ul>
 
+</div>
 </body></html>

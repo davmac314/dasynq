@@ -1,41 +1,59 @@
 body {
+    margin-top: 0;
+    margin-bottom: 0;
+    background: #999;
+    height: 100%;
+}
+
+.content {
+    background: #fff8ed;
     margin-right: auto;
     margin-left: auto;
-    background: #fff8ed;
     max-width: 60em;
+    box-shadow: 0 0 2em #000; 
+    padding-left: 1.5em;
+    padding-right: 1.5em;
+    padding-bottom: 2em;
+    min-height: 100%;
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
+h1, h2, h3 {
+    font-stretch: condensed;
 }
 
 pre {
-	background: #e3edef;
-	padding: 0.2em;
-	border: 1px solid #a9b0b2;
-	border-radius: 0.2em;
+    background: #e3edef;
+    padding: 0.2em;
+    border: 1px solid #a9b0b2;
+    border-radius: 0.2em;
 }
 
 .small-indent {
-	padding-left: 1em;
+    padding-left: 1em;
 }
 
 .note {
-	display: inline-block;
+    display: inline-block;
     background: #e4e8ba;	
-	padding: 0.2em;
-	border: 1px solid #807844;
-	border-radius: 0.2em;
-	margin-top: 0.2em;
+    padding: 0.2em;
+    border: 1px solid #807844;
+    border-radius: 0.2em;
+    margin-top: 0.2em;
 }
 
 .code-name {
-	font-family: monospace;
-	font-style: normal;
-	font-weight: bold;
-	color: #493a18;
-	background: #eccfd7;
-	border-radius: 0.2em;
-	padding-left: 0.1em;
-	padding-right: 0.1em;
+    font-family: monospace;
+    font-style: normal;
+    font-weight: bold;
+    color: #493a18;
+    background: #eccfd7;
+    border-radius: 0.2em;
+    padding-left: 0.1em;
+    padding-right: 0.1em;
 }
 
 a {
-	color: #9b7569;	
+    color: #9b7569;	
 }
