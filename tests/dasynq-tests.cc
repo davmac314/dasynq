@@ -760,7 +760,7 @@ void ftestSigWatch2()
     swatch->deregister(my_loop);
 }
 
-void ftestMultiThread1()
+void ftest_multi_thread1()
 {
     using Loop_t = dasynq::event_loop<std::mutex>;
     Loop_t my_loop;
@@ -804,6 +804,45 @@ void ftestMultiThread1()
     close(pipe1[1]);
     close(pipe2[0]);
     close(pipe2[1]);
+}
+
+void ftest_multi_thread2()
+{
+    using Loop_t = dasynq::event_loop<std::mutex>;
+    Loop_t my_loop;
+
+    bool seen1 = false;
+
+    int pipe1[2];
+    //int pipe2[2];
+    create_pipe(pipe1);
+
+    auto fwatch = Loop_t::fd_watcher::add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS,
+            [&seen1](Loop_t &eloop, int fd, int flags) -> rearm {
+        seen1 = true;
+        return rearm::REMOVE;
+    });
+
+    char wbuf[1] = {'a'};
+    write(pipe1[1], wbuf, 1);
+
+    struct timespec t200ms;
+    t200ms.tv_sec = 0;
+    t200ms.tv_nsec = 200 * 1000 * 1000;
+    nanosleep(&t200ms, nullptr);
+
+    std::thread t([&my_loop,fwatch]() -> void {
+        fwatch->deregister(my_loop);
+    });
+
+    t.join();
+
+    my_loop.poll();
+
+    assert(!seen1);
+
+    close(pipe1[0]);
+    close(pipe1[1]);
 }
 
 void ftest_child_watch()
@@ -890,8 +929,12 @@ int main(int argc, char **argv)
     ftestSigWatch2();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestMultiThread1... ";
-    ftestMultiThread1();
+    std::cout << "ftest_multi_thread1... ";
+    ftest_multi_thread1();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftest_multi_thread2... ";
+    ftest_multi_thread2();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_child_watch... ";
