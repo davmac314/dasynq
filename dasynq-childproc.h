@@ -122,9 +122,8 @@ template <class Base> class child_proc_events : public Base
     }
     
     public:
-    void reserve_child_watch(pid_watch_handle_t &handle)
+    void reserve_child_watch_nolock(pid_watch_handle_t &handle)
     {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         child_waiters.reserve(handle);
     }
     
@@ -139,9 +138,8 @@ template <class Base> class child_proc_events : public Base
         child_waiters.unreserve(handle);
     }
 
-    void add_child_watch(pid_watch_handle_t &handle, pid_t child, void *val)
+    void add_child_watch_nolock(pid_watch_handle_t &handle, pid_t child, void *val)
     {
-        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         child_waiters.add(handle, child, val);
     }
     

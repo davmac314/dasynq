@@ -722,7 +722,7 @@ class event_loop
 
         loop_mech.prepare_watcher(callback);
         try {
-            loop_mech.reserve_child_watch(callback->watch_handle);
+            loop_mech.reserve_child_watch_nolock(callback->watch_handle);
         }
         catch (...) {
             loop_mech.release_watcher(callback);
@@ -746,7 +746,7 @@ class event_loop
         
         loop_mech.prepare_watcher(callback);
         try {
-            loop_mech.add_child_watch(callback->watch_handle, child, callback);
+            loop_mech.add_child_watch_nolock(callback->watch_handle, child, callback);
         }
         catch (...) {
             loop_mech.release_watcher(callback);
