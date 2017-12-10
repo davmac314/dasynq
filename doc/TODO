@@ -1,11 +1,4 @@
-Version 1.0:
-
-* Finish reference documentation (HTML format)
-  - Document timers
-
-* check for uses of sigprocmask, use pthread_sigmask when required.
-
-Later:
+For later versions:
 
 * STOP rearm for timers. Instead of just disabling a timer, actually stop (but don't deallocate) it.
 
@@ -49,13 +42,8 @@ Later:
 * Event loop construction with eg child_proc and itimer masks two signals separately. This could
   be combined into a single operation.
 
-* Add a "user triggered" event watcher.
-
 * Allow creating multiple event loops in an application. This may necessitate allowing the
   construction of limited functionality event loops, eg event loops that cannot be used to watch
   child process status.
 
   - further, allow "embedding" event loops, if possible.
-
-
-

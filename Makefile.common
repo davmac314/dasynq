@@ -3,9 +3,12 @@
 HEADERDIR=/usr/include/dasynq
 LIBDIR=/usr/lib
 
+VERSION=1.0
+
 export CXX CXXOPTS CXXLINKOPTS CXXTESTOPTS CXXTESTLINKOPTS THREADOPT SANITIZE
 
 all:
+	@echo "Dasynq version $(VERSION)."
 	@echo "This is a header-only library. Use \"$(MAKE) check\" to build and run tests."
 
 check:
@@ -18,7 +21,7 @@ dasynq.pc:
 	@echo "# Dasynq - event loop library" >> dasynq.pc
 	@echo "Name: Dasynq" >> dasynq.pc
 	@echo "Description:  Event-loop library, C++" >> dasynq.pc
-	@echo "Version: 0.9" >> dasynq.pc
+	@echo "Version: $(VERSION)" >> dasynq.pc
 	@echo "URL: http://github.com/davmac314/dasynq" >> dasynq.pc
 	@echo "Libs: $(CXXLINKOPT)" >> dasynq.pc
 	@echo "Cflags: $(CXXOPTS) -I$(HEADERDIR)" >> dasynq.pc
