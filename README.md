@@ -1,18 +1,18 @@
 # Dasynq
 
-_Version 0.9_
+_Version 1.0_
 
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries, it is
 crossplatform / portable. Unlike most other such libraries, it is intended to be completely usable in
 a multi-threaded client program, and it is written in C++; furthermore the API is designed to allow
-the creation of extremely robust clients.
+the creation of extremely robust clients, by allowing allocation of resources up front (before they
+are needed in critical sections). However, it is also designed to be lightweight, and it does not
+require the use of threads (and so does not require linking against a thread library).
 
 The existing backends include **epoll** and **kqueue**, meaning that it works on Linux and various
 BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called).
 
-*Dasynq is currently in a pre-release state*. The implementation is largely complete but has not been
-widely tested in production. It is distributed under the terms of the Apache License, version 2.0,
-as found in the LICENSE file.
+Dasynq is distributed under the terms of the Apache License, version 2.0, as found in the LICENSE file.
 
 Dasynq is written in C++11, using POSIX functions and some OS-specific system calls.
 
@@ -50,7 +50,9 @@ during program execution.
 
 ## Using Dasynq
 
-See doc/USAGE.md for details on how to use the Dasynq API.
+See [doc/USAGE.md](doc/USAGE.md) for a quick guide on how to use the Dasynq API. A full reference manual
+can be found in the [doc/html](doc/html) folder of the repository / source bundle, or
+[online](http://davmac.org/projects/dasynq/doc/).
 
 GNU make is required to run the test suite / automated install.
 
@@ -65,6 +67,10 @@ etc).
 
 On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too old (4.2 in OpenBSD 6.1;
 4.9+ is required). The existing makefile sample (Makefile.openbsd) has appropriate settings.
+
+Linux, OpenBSD, FreeBSD and MacOS are supported "out of the box". For other systems you may need to edit
+the `dasynq-config.h` file (see instructions within). Currently either epoll or kqueue are required; in
+many BSD variants it may be possible to build by defining `DASYNQ_HAVE_KQUEUE` to `1`.
 
 After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq,
 assuming you have pkg-config installed:
