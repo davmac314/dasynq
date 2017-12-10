@@ -577,6 +577,10 @@ class btree_set
 
     ~btree_set()
     {
+        while (left_sept != nullptr) {
+            remove(*(left_sept->hn_p[0]));
+        }
+
         while (sn_reserve != nullptr) {
             auto *next = sn_reserve->parent;
             delete sn_reserve;
