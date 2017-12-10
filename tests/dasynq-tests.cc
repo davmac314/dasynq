@@ -46,7 +46,7 @@ namespace dasynq {
 
 // Set up two file descriptor watches on two different descriptors, and make sure the correct handler
 // is triggered when input is available on each.
-void testFdWatch1()
+void test_fd_watch1()
 {
     test_io_engine::clear_fd_data();
     Loop_t my_loop;
@@ -86,7 +86,7 @@ void testFdWatch1()
 
 // Set up a handler which auto-rearms, and make sure it still receives events.
 // Set up a 2nd handler which disarms, and make sure it receives no further events.
-void testFdWatch2()
+void test_fd_watch2()
 {
     test_io_engine::clear_fd_data();
     Loop_t my_loop;
@@ -127,7 +127,7 @@ void testFdWatch2()
     watcher2->deregister(my_loop);
 }
 
-void testFdWatch3()
+void test_fd_watch3()
 {
     test_io_engine::clear_fd_data();
     Loop_t my_loop;
@@ -168,7 +168,7 @@ void testFdWatch3()
     watcher1.deregister(my_loop);
 }
 
-void testFdEmu()
+void test_fd_emu()
 {
     test_io_engine::clear_fd_data();
     Loop_t my_loop;
@@ -413,7 +413,7 @@ static void create_bidi_pipe(int filedes[2])
     }
 }
 
-void ftestFdWatch1()
+void ftest_fd_watch1()
 {
     using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
@@ -468,7 +468,7 @@ void ftestFdWatch1()
     close(pipe2[1]);
 }
 
-void ftestBidiFdWatch1()
+void ftest_bidi_fd_watch1()
 {
     using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
@@ -524,7 +524,7 @@ void ftestBidiFdWatch1()
     close(pipe1[1]);
 }
 
-void ftestBidiFdWatch2()
+void ftest_bidi_fd_watch2()
 {
     using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
@@ -592,7 +592,7 @@ void ftestBidiFdWatch2()
     close(pipe1[1]);
 }
 
-void ftestBidiFdWatch3()
+void ftest_bidi_fd_watch3()
 {
     using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
@@ -666,7 +666,7 @@ void ftestBidiFdWatch3()
     close(pipe1[1]);
 }
 
-void ftestSigWatch1()
+void ftest_sig_watch1()
 {
     using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
@@ -718,7 +718,7 @@ void ftestSigWatch1()
     assert(seen2);
 }
 
-void ftestSigWatch2()
+void ftest_sig_watch2()
 {
     using Loop_t = dasynq::event_loop<checking_mutex>;
     Loop_t my_loop;
@@ -877,20 +877,20 @@ void ftest_child_watch()
 
 int main(int argc, char **argv)
 {
-    std::cout << "testFdWatch1... ";
-    testFdWatch1();
+    std::cout << "test_fd_watch1... ";
+    test_fd_watch1();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "testFdWatch2... ";
-    testFdWatch2();
+    std::cout << "test_fd_watch2... ";
+    test_fd_watch2();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "testFdWatch3... ";
-    testFdWatch3();
+    std::cout << "test_fd_watch3... ";
+    test_fd_watch3();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "testFdEmu... ";
-    testFdEmu();
+    std::cout << "test_fd_emu... ";
+    test_fd_emu();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "testTimespecDiv... ";
@@ -905,28 +905,28 @@ int main(int argc, char **argv)
     test_timers_2();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestFdWatch1... ";
-    ftestFdWatch1();
+    std::cout << "ftest_fd_watch1... ";
+    ftest_fd_watch1();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestBidiFdWatch1... ";
-    ftestBidiFdWatch1();
+    std::cout << "ftest_bidi_fd_watch1... ";
+    ftest_bidi_fd_watch1();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestBidiFdWatch2... ";
-    ftestBidiFdWatch2();
+    std::cout << "ftest_bidi_fd_watch2... ";
+    ftest_bidi_fd_watch2();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestBidiFdWatch3... ";
-    ftestBidiFdWatch3();
+    std::cout << "ftest_bidi_fd_watch3... ";
+    ftest_bidi_fd_watch3();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestSigWatch1... ";
-    ftestSigWatch1();
+    std::cout << "ftest_sig_watch1... ";
+    ftest_sig_watch1();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftestSigWatch2... ";
-    ftestSigWatch2();
+    std::cout << "ftest_sig_watch2... ";
+    ftest_sig_watch2();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_multi_thread1... ";
