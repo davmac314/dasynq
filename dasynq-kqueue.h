@@ -58,7 +58,11 @@ class kqueue_traits
         int get_sierrno() { return info.si_errno; }
 
         // XSR (streams) OB (obselete)
+#if !defined(__OpenBSD__)
+        // Note: OpenBSD doesn't have this; most other systems do. Technically it is part of the STREAMS
+        // interface.
         int get_siband() { return info.si_band; }
+#endif
 
         void set_signo(int signo) { info.si_signo = signo; }
     };    

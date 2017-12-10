@@ -162,7 +162,7 @@ class siginfo_p   // may be a typedef
 
     // optional functions as per POSIX:
     int get_sierrno();    // si_errno
-    int get_siband();     // si_band
+    int get_siband();     // si_band (not available on OpenBSD)
     
     // Linux-only functions:
     int get_sifd();       // si_fd
