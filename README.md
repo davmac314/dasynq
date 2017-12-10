@@ -16,6 +16,8 @@ Dasynq is distributed under the terms of the Apache License, version 2.0, as fou
 
 Dasynq is written in C++11, using POSIX functions and some OS-specific system calls.
 
+See the [web site](http://davmac.org/projects/dasynq/) for more information.
+
 
 ## Event loops
 
