@@ -862,9 +862,9 @@ void ftest_child_watch()
         }
     };
 
-    pid_t fake_child_pid = 0;
+    pid_t child_pid = 0;
     my_child_proc_watcher my_child_watcher;
-    my_child_watcher.add_watch(my_loop, fake_child_pid);
+    my_child_watcher.add_watch(my_loop, child_pid);
 
     if (my_child_watcher.fork(my_loop, false) == 0) {
         // child
@@ -873,6 +873,7 @@ void ftest_child_watch()
 
     my_loop.run();
     assert(my_child_watcher.did_exit);
+    my_child_watcher.deregister(my_loop, child_pid);
 }
 
 int main(int argc, char **argv)
