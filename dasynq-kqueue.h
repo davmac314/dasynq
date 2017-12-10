@@ -4,14 +4,6 @@
 #include <unordered_map>
 #include <vector>
 
-#ifdef __OpenBSD__
-#include <sys/signal.h> // for __thrsigdivert aka sigtimedwait
-#include <sys/syscall.h>
-extern "C" { 
-    int __thrsigdivert(sigset_t set, siginfo_t *info, const struct timespec * timeout);
-}
-#endif
-
 #include <sys/event.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -98,24 +90,7 @@ class kqueue_traits
     const static bool has_separate_rw_fd_watches = true;
 };
 
-#if defined(__OpenBSD__) && _POSIX_REALTIME_SIGNALS <= 0
-// OpenBSD has no sigtimedwait (or sigwaitinfo) but does have "__thrsigdivert", which is
-// essentially an incomplete version of the same thing. Discussion with OpenBSD developer
-// Ted Unangst suggested that the siginfo_t structure returned might not always have all fields
-// set correctly. Furthermore there is a bug (at least in 5.9)  such that specifying a zero
-// timeout (or indeed any timeout less than a tick) results in NO timeout. We get around this by
-// instead specifying an *invalid* timeout, which won't error out if a signal is pending.
-static inline int sigtimedwait(const sigset_t *ssp, siginfo_t *info, struct timespec *timeout)
-{
-    // We know that we're only called with a timeout of 0 (which doesn't work properly) and
-    // that we safely overwrite the timeout. So, we set tv_nsec to an invalid value, which
-    // will cause EINVAL to be returned, but will still pick up any pending signals *first*.
-    timeout->tv_nsec = 1000000001;
-    return __thrsigdivert(*ssp, info, timeout);
-}
-#endif
-
-#if defined(__OpenBSD__) || _POSIX_REALTIME_SIGNALS > 0
+#if _POSIX_REALTIME_SIGNALS > 0
 static inline void prepare_signal(int signo) { }
 static inline void unprep_signal(int signo) { }
 
@@ -256,7 +231,7 @@ template <class Base> class kqueue_loop : public Base
         bool enable_filt = true;
         sigdata_t siginfo;
 
-#if defined(__OpenBSD__) || _POSIX_REALTIME_SIGNALS > 0
+#if _POSIX_REALTIME_SIGNALS > 0
         struct timespec timeout = {0, 0};
         sigset_t sigw_mask;
         sigemptyset(&sigw_mask);
