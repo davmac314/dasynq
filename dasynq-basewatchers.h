@@ -17,7 +17,7 @@ namespace dprivate {
         sigprocmask(how, set, oset);
     }
 
-    template <> void sigmaskf<null_mutex>(int how, const sigset_t *set, sigset_t *oset)
+    template <> inline void sigmaskf<null_mutex>(int how, const sigset_t *set, sigset_t *oset)
     {
         pthread_sigmask(how, set, oset);
     }
