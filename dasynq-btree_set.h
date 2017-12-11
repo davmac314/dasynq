@@ -1,7 +1,6 @@
 #ifndef DASYNQ_BTREE_SET_H
 #define DASYNQ_BTREE_SET_H
 
-#include <vector>
 #include <functional>
 
 namespace dasynq {
