@@ -14,12 +14,12 @@ namespace dprivate {
     // specialised to call one or the other depending on the mutex type:
     template <typename T_Mutex> void sigmaskf(int how, const sigset_t *set, sigset_t *oset)
     {
-        sigprocmask(how, set, oset);
+        pthread_sigmask(how, set, oset);
     }
 
     template <> inline void sigmaskf<null_mutex>(int how, const sigset_t *set, sigset_t *oset)
     {
-        pthread_sigmask(how, set, oset);
+        sigprocmask(how, set, oset);
     }
 }
 
