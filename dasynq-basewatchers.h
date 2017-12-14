@@ -51,7 +51,7 @@ namespace dprivate {
     // (non-public API)
 
     class base_watcher;
-    using prio_queue = NaryHeap<dprivate::base_watcher *, int>;
+    using prio_queue = nary_heap<dprivate::base_watcher *, int>;
 
     template <typename T_Loop> class fd_watcher;
     template <typename T_Loop> class bidi_fd_watcher;

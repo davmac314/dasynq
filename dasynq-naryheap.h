@@ -28,7 +28,7 @@ namespace dasynq {
  * Compare : functional object type to compare priorities
  */
 template <typename T, typename P, typename Compare = std::less<P>, int N = 16>
-class NaryHeap
+class nary_heap
 {
     public:
     struct handle_t;
@@ -361,12 +361,12 @@ class NaryHeap
         }
     }
 
-    NaryHeap()
+    nary_heap()
     {
         // Nothing required
     }
 
-    NaryHeap(const NaryHeap &) = delete;
+    nary_heap(const nary_heap &) = delete;
 };
 
 }
