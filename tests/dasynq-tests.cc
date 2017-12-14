@@ -862,11 +862,10 @@ void ftest_child_watch()
         }
     };
 
-    pid_t child_pid = 0;
+    pid_t child_pid;
     my_child_proc_watcher my_child_watcher;
-    my_child_watcher.add_watch(my_loop, child_pid);
 
-    if (my_child_watcher.fork(my_loop, false) == 0) {
+    if ((child_pid = my_child_watcher.fork(my_loop, false)) == 0) {
         // child
         _exit(0);
     }
