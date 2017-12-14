@@ -360,6 +360,13 @@ class NaryHeap
             return bubble_down(heap_index);
         }
     }
+
+    NaryHeap()
+    {
+        // Nothing required
+    }
+
+    NaryHeap(const NaryHeap &) = delete;
 };
 
 }
