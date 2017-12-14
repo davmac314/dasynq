@@ -450,6 +450,9 @@ namespace dprivate {
                 lock.unlock();
             }
         }
+
+        event_dispatch() {  }
+        event_dispatch(const event_dispatch &) = delete;
     };
 }
 
@@ -1259,6 +1262,9 @@ class event_loop
     {
         loop_mech.get_time(tv, clock, force_update);
     }
+
+    event_loop() { }
+    event_loop(const event_loop &other) = delete;
 };
 
 typedef event_loop<null_mutex> event_loop_n;
