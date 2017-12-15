@@ -72,11 +72,6 @@ using namespace dasynq;
 
 event_loop_n eloop;
 
-#include <vector>
-
-using namespace std;
-
-
 
 class Pipeio : public event_loop_n::fd_watcher_impl<Pipeio>
 {
@@ -91,7 +86,7 @@ class PTimer : public event_loop_n::timer_impl<PTimer>
     public:
     rearm timer_expiry(event_loop_n &eloop, int intervals)
     {
-    	return rearm::DISARM;
+        return rearm::DISARM;
     }
 };
 
@@ -245,7 +240,7 @@ main (int argc, char **argv)
 #ifdef USE_PIPES
         if (pipe(cp) == -1) {
 #else
-        if (socketpair(AF_UNIX, SOCK_STREAM | SOCK_NONBLOCK | SOCK_CLOEXEC, 0, cp) == -1) {
+        if (socketpair(AF_UNIX, SOCK_STREAM, 0, cp) == -1) {
 #endif
             perror("pipe");
             exit(1);
