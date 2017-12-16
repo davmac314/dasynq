@@ -228,18 +228,13 @@ class nary_heap
         // bvec[hvec[hidx].data_index].heap_index = -1;
         hvec[hidx].hnd_p->heap_index = -1;
         if (hvec.size() != hidx + 1) {
-            // replace the first element with the last:
-            // bvec[hvec.back().data_index].heap_index = hidx;
-
-            //hvec.back().hnd_p->heap_index = hidx;
-            //hvec[hidx] = hvec.back();
-            //hvec.pop_back();
+            // replace the removed element with the last:
+            hvec[hidx] = hvec.back();
+            hvec[hidx].hnd_p->heap_index = hidx;
+            hvec.pop_back();
 
             // Now bubble up:
-            //bubble_up(hidx);
-
-            bubble_up(hidx, hvec.size() - 2, *(hvec.back().hnd_p), hvec.back().data);
-            hvec.pop_back();
+            bubble_up(hidx);
         }
         else {
             hvec.pop_back();
