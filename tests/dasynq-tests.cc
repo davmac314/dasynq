@@ -216,7 +216,58 @@ void test_fd_emu()
     watcher1.deregister(my_loop);
 }
 
-static void testTimespecDiv()
+void test_limited_run()
+{
+    test_io_engine::clear_fd_data();
+    Loop_t my_loop;
+
+    int trigger_count = 0;;
+
+    class my_watcher : public Loop_t::fd_watcher_impl<my_watcher>
+    {
+        public:
+        int &trigger;
+
+        my_watcher(int &trigger_count) : trigger(trigger_count) { }
+
+        rearm fd_event(Loop_t &eloop, int fd, int flags)
+        {
+            // Process I/O here
+            trigger++;
+            return rearm::DISARM;  // disable watcher
+        }
+    };
+
+    my_watcher watcher1(trigger_count), watcher2(trigger_count), watcher3(trigger_count), watcher4(trigger_count);
+    watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS);
+    watcher2.add_watch(my_loop, 1, dasynq::IN_EVENTS);
+    watcher3.add_watch(my_loop, 2, dasynq::IN_EVENTS);
+    watcher4.add_watch(my_loop, 3, dasynq::IN_EVENTS);
+
+    test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
+    test_io_engine::trigger_fd_event(1, dasynq::IN_EVENTS);
+    test_io_engine::trigger_fd_event(2, dasynq::IN_EVENTS);
+    test_io_engine::trigger_fd_event(3, dasynq::IN_EVENTS);
+
+    my_loop.run(2);
+
+    assert(trigger_count = 2);
+
+    my_loop.run(1);
+
+    assert(trigger_count = 3);
+
+    my_loop.run(1);
+
+    assert(trigger_count = 4);
+
+    watcher1.deregister(my_loop);
+    watcher2.deregister(my_loop);
+    watcher3.deregister(my_loop);
+    watcher4.deregister(my_loop);
+}
+
+static void test_timespec_div()
 {
     using dasynq::divide_timespec;
 
@@ -893,8 +944,12 @@ int main(int argc, char **argv)
     test_fd_emu();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "testTimespecDiv... ";
-    testTimespecDiv();
+    std::cout << "test_limited_run... ";
+    test_limited_run();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_timespec_div... ";
+    test_timespec_div();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "test_timers_1... ";
