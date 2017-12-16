@@ -1161,13 +1161,14 @@ class event_loop
         auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
         ed.lock.lock();
         
-        // So this pulls *all* currently pending events and processes them in the current thread.
-        // That's probably good for throughput, but maybe the behaviour should be configurable.
+        if (limit == 0) {
+            return false;
+        }
         
         base_watcher * pqueue = ed.pull_event();
         bool active = false;
         
-        while (pqueue != nullptr && limit != 0) {
+        while (pqueue != nullptr) {
         
             pqueue->active = true;
             active = true;
@@ -1196,8 +1197,11 @@ class event_loop
             }
 
             pqueue->dispatch(this);
+            if (limit > 0) {
+                limit--;
+                if (limit == 0) break;
+            }
             pqueue = ed.pull_event();
-            if (limit > 0) limit--;
         }
         
         ed.lock.unlock();
