@@ -9,7 +9,7 @@ namespace dasynq {
 // Let this be a stable priority queue implementation...
 
 template <typename T, typename P, typename Compare = std::less<P>, int N = 8>
-class BTreeQueue
+class btree_queue
 {
     struct HeapNode;
     
@@ -168,7 +168,7 @@ class BTreeQueue
     
     static void init_handle(handle_t &hn) noexcept
     {
-        // nothing to do
+        hn.prev_sibling = nullptr;
     }
     
     // Allocate a slot, but do not incorporate into the heap:
@@ -650,7 +650,7 @@ class BTreeQueue
         return root_sept == nullptr;
     }
     
-    ~BTreeQueue()
+    ~btree_queue()
     {
         while (sn_reserve != nullptr) {
             auto *next = sn_reserve->parent;

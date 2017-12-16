@@ -10,22 +10,22 @@ queue yields a "handle" which can be used to remove or modify the item later.
 The results here may not reflect those of well-written implementations which
 do away with this requirement.
 
-The queue implementations are:
+The queue implementations are (please forgive naming inconsistency):
 
  * **BinaryHeap**, a traditional binary heap implementation.
- * **NaryHeap**, an N-ary heap which organises as a heap of fixed-size binary
+ * **nary_heap**, an N-ary heap which organises as a heap of fixed-size binary
    heaps. It is designed to offer better cache locality than BinaryHeap.
  * **DaryHeap**, a D-ary heap (a generalised binary heap for N>2). This should
    offer better cache locality than a regular BinaryHeap, and requires less
-   handle updates than either a BinaryHeap or NaryHeap, but has some overhead
+   handle updates than either a BinaryHeap or nary_heap, but has some overhead
    in some operations.
  * **PairingHeap**, a more complex (but still relatively simple) heap
    implementation with theoretically better bounds on operation times
    than a binary heap
- * **BTreeQueue**, an in-memory B-Tree implementation.
+ * **btree_queue**, an in-memory B-Tree implementation.
 
-The BinaryHeap, NaryHeap and PairingHeap are not stable - insertion order for
-elements with different priority is not preserved. There is a StableQueue
+The BinaryHeap, nary_heap, DaryHeap and PairingHeap are not stable - insertion order
+for elements with different priority is not preserved. There is a StableQueue
 template wrapper which creates a stable priority queue from an unstable queue
 by adding an insertion "time" (an unsigned long long value which is
 incremented on each insertion; a 64-bit value will not wrap for over 113 years
@@ -55,14 +55,14 @@ The results are as follows (run on my personal desktop, compiled with -O3):
 
 |                |   (A) |   (B) |   (C) |   (D) |   (E) |
 | -------------- | ----- | ----- | ----- | ----- | ----- |
-| Ordered fill   |  1265 |  1035 |   973 |   788 |   802 |
-| Random f/dq    |  8829 |  2803 |  5278 | 11672 |  4632 |
-| Random f/r rm  |  3362 |  2611 |  2628 |  2029 |  6167 |
-| Cycle f/dq     |   452 |   606 |   406 |   179 |   458 |
-| Flat pri f/dq  |  1395 |  1111 |   973 |   708 |   213 |
+| Ordered fill   |  1224 |   869 |   887 |   734 |   787 |
+| Random f/dq    |  4438 |  2471 |  3491 |  9529 |  4515 |
+| Random f/r rm  |  1172 |  1520 |   951 |   954 |  5655 |
+| Cycle f/dq     |   418 |   617 |   426 |   170 |   503 |
+| Flat pri f/dq  |  1562 |  1388 |  1591 |   696 |   178 |
 
  * (A) Stable BinaryHeap
- * (B) Stable NaryHeap (N=16)
+ * (B) Stable nary_heap (N=16)
  * (C) Stable DaryHeap (N=4)
  * (D) Stable PairingHeap
  * (E) BTreeQueue (naturally stable)
@@ -70,10 +70,10 @@ The results are as follows (run on my personal desktop, compiled with -O3):
 
 Note that the stable BinaryHeap is generally the worst performer, although it
 beats the PairingHeap in the important "random fill/dequeue" test and edges
-out the NaryHeap in the "cyclic fill/dequeue" test. It is beaten in all tests
-by the the D-ary heap, however.
+out the nary_heap in the "cyclic fill/dequeue" test. It is beaten in nearly all
+tests by the the D-ary heap, however, and in most by the nary_heap.
 
-Against expectations, the BTreeQueue performs quite well, coming first or
+Against expectations, the btree_queue performs quite well, coming first or
 second in 4 out of 5 tests. Its "flat priority" performance clearly outperforms
 the heap-based queues (probably because it essentially degenerates to a linked-
 list for this usage pattern, which is quite efficient). However, its "random
@@ -84,18 +84,18 @@ For unstable heaps, the results are as follows:
 
 |                |   (A) |   (B) |   (C) |   (D) |   (E) |
 | -------------- | ----- | ----- | ----- | ----- | ----- |
-| Ordered fill   |  1031 |   901 |   926 |   569 |   802 |
-| Random f/dq    |  6863 |  2419 |  4082 | 10989 |  4632 |
-| Random f/rr    |  2881 |  2450 |  2465 |  1834 |  6167 |
-| Cycle f/dq     |   446 |   552 |   517 |   171 |   458 |
-| Flat pri f/dq  |   203 |   210 |   236 |    73 |   213 |
+| Ordered fill   |   983 |   865 |   754 |   538 |   787 |
+| Random f/dq    |  3469 |  2093 |  3143 |  9174 |  4515 |
+| Random f/rr    |  1064 |  1260 |   869 |   770 |  5655 |
+| Cycle f/dq     |   456 |   570 |   407 |   169 |   503 |
+| Flat pri f/dq  |   155 |   155 |   167 |    74 |   178 |
 
  * (A) BinaryHeap
- * (B) NaryHeap (N=16)
+ * (B) nary_heap (N=16)
  * (C) DaryHeap (N=4)
  * (D) PairingHeap
  * (E) BTreeQueue (stable)
 
 
-When stability is not required, the NaryHeap contends for the pole position,
-though it does win every test.
+When stability is not required, the nary_heap contends for the pole position,
+though it does not win every test.
