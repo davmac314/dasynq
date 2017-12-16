@@ -337,7 +337,7 @@ class nary_heap
         return hvec.empty();
     }
 
-    bool is_queued(handle_t hnd)
+    bool is_queued(handle_t & hnd)
     {
         return hnd.heap_index != (hindex_t) -1;
     }
