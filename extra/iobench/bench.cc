@@ -64,7 +64,7 @@
 
 static int count, writes, fired;
 static int *pipes;
-static int num_pipes, num_active, num_writes;
+static int num_pipes, num_active, num_writes, proc_limit;
 static int timers, native;
 static int set_prios;
 
@@ -145,20 +145,20 @@ run_once(void)
     fired = 0;
     space = num_pipes / num_active;
     space = space * 2;
-    for (i = 0; i < num_active; i++, fired++)
+    for (i = 0; i < num_active; i++, fired++) {
     	write(pipes[i * space + 1], "e", 1);
+    }
     
     count = 0;
-    writes = num_writes;
+    writes = num_writes - fired;
     
     {
         int xcount = 0;
         gettimeofday(&ts, NULL);
         do {
-            // event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
-            eloop.run();
+            eloop.run(proc_limit);
             xcount++;
-        } while (count != fired);
+        } while (count != num_writes);
         gettimeofday(&te, NULL);
         
         //if (xcount != count) fprintf(stderr, "Xcount: %d, Rcount: %d\n", xcount, count);
@@ -193,7 +193,9 @@ main (int argc, char **argv)
     num_pipes = 100;
     num_active = 1;
     num_writes = num_pipes;
-    while ((c = getopt(argc, argv, "n:a:w:tep")) != -1) {
+    proc_limit = -1;
+
+    while ((c = getopt(argc, argv, "n:a:w:l:tep")) != -1) {
         switch (c) {
             case 'n':
                 num_pipes = atoi(optarg);
@@ -203,6 +205,9 @@ main (int argc, char **argv)
                 break;
             case 'w':
                 num_writes = atoi(optarg);
+                break;
+            case 'l':
+                proc_limit = atoi(optarg);
                 break;
             case 'e':
                 native = 1;
@@ -215,7 +220,7 @@ main (int argc, char **argv)
                 break;
             default:
                 fprintf(stderr, "Illegal argument \"%c\"\n", c);
-		exit(1);
+                exit(1);
         }
     }
 
@@ -226,9 +231,8 @@ main (int argc, char **argv)
 
     evio = new Pipeio[num_pipes];
     evto = new PTimer[num_pipes];
-    //events = calloc(num_pipes, sizeof(struct event));
     pipes = (int *) calloc(num_pipes * 2, sizeof(int));
-    if ( /* events == NULL || */ pipes == NULL) {
+    if (pipes == NULL) {
         perror("malloc");
         exit(1);
     }

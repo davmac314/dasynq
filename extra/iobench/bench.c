@@ -69,43 +69,50 @@
 #endif
 #include <event.h>
 
+typedef struct io_block_s {
+    struct event event;
+#if NATIVE
+    struct ev_io io;
+    struct ev_timer timer;
+#endif
+    struct io_block_s * next;  // next non-busy block
+    int idx;
+} io_block;
 
 static int count, writes, fired;
 static int *pipes;
 static int num_pipes, num_active, num_writes;
-static struct event *events;
+//static struct event *events;
+static io_block *io_blocks;
 static int timers, native;
-static struct ev_io *evio;
-static struct ev_timer *evto;
 static int set_prios;
 
 
 void
 read_cb(int fd, short which, void *arg)
 {
-	int idx = (int) arg, widx = idx + 1;
+    io_block * block = arg;
+	int idx = block->idx, widx = idx + 1;
 	u_char ch;
 
-        if (timers)
-          {
-            if (native)
-              {
+    if (timers) {
+        if (native) {
 #if NATIVE
-                evto [idx].repeat = 10. + drand48 ();
-                ev_timer_again (EV_DEFAULT_UC_ &evto [idx]);
+            block->timer.repeat = 10. + drand48 ();
+            ev_timer_again (EV_DEFAULT_UC_ &block->timer);
 #else
-                abort ();
+            abort ();
 #endif
-              }
-            else
-              {
-                struct timeval tv;
-                event_del (&events [idx]);
-                tv.tv_sec  = 10;
-                tv.tv_usec = drand48() * 1e6;
-                event_add(&events[idx], &tv);
-              }
-          }
+        }
+        else
+        {
+            struct timeval tv;
+            event_del (&io_blocks[idx].event);
+            tv.tv_sec  = 10;
+            tv.tv_usec = drand48() * 1e6;
+            event_add(&io_blocks[idx].event, &tv);
+        }
+    }
 
 	count += read(fd, &ch, sizeof(ch));
 	if (writes) {
@@ -121,13 +128,13 @@ read_cb(int fd, short which, void *arg)
 void
 read_thunk(struct ev_io *w, int revents)
 {
-  read_cb (w->fd, revents, w->data);
+    read_cb (w->fd, revents, w->data);
 }
 
 void
 timer_cb (struct ev_timer *w, int revents)
 {
-  /* nop */
+    /* nop */
 }
 #endif
 
@@ -141,37 +148,35 @@ run_once(void)
 
     // Set up event watches:
 	for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2)
-	  {
-          if (native)
-            {
+	{
+        if (native) {
 #if NATIVE
-              //if (ev_is_active (&evio [i]))
-              //  ev_io_stop (&evio [i]);
+            //if (ev_is_active (&evio [i]))
+            //  ev_io_stop (&evio [i]);
 
-              ev_io_set (&evio [i], cp [0], EV_READ);
-              ev_io_start (EV_DEFAULT_UC_ &evio [i]);
+            ev_io_set (&io_blocks[i].io, cp [0], EV_READ);
+            ev_io_start (EV_DEFAULT_UC_ &io_blocks[i].io);
+            printf("started evio %p with data = %p\n", &io_blocks[i].io, io_blocks[i].io.data); // DAV
 
-              evto [i].repeat = 10. + drand48 ();
-              ev_timer_again (EV_DEFAULT_UC_ &evto [i]);
+            io_blocks[i].timer.repeat = 10. + drand48 ();
+            ev_timer_again (EV_DEFAULT_UC_ &io_blocks[i].timer);
 #else
-              abort ();
+            abort ();
 #endif
+        }
+        else
+        {
+            event_set(&io_blocks[i].event, cp[0], EV_READ | EV_PERSIST, read_cb, &io_blocks[i]);
+            if (set_prios) {
+                event_priority_set(&io_blocks[i].event, drand48() * EV_MAXPRI);
             }
-          else
-            {
-              //event_del(&events[i]);
-              event_set(&events[i], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) i);
-              if (set_prios) {
-                  event_priority_set(&events[i], drand48() * 1000);
-              }
-              if (timers)
-                {
-                  tv.tv_sec  = 10.;
-                  tv.tv_usec = drand48() * 1e6;
-                }
-		      event_add(&events[i], timers ? &tv : 0);
+            if (timers) {
+                tv.tv_sec  = 10.;
+                tv.tv_usec = drand48() * 1e6;
             }
-	  }
+		    event_add(&io_blocks[i].event, timers ? &tv : 0);
+        }
+	}
 
 	event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
 
@@ -179,18 +184,19 @@ run_once(void)
 	fired = 0;
 	space = num_pipes / num_active;
 	space = space * 2;
-	for (i = 0; i < num_active; i++, fired++)
+	for (i = 0; i < num_active; i++, fired++) {
 		write(pipes[i * space + 1], "e", 1);
+	}
 
 	count = 0;
-	writes = num_writes;
+	writes = num_writes - fired;
 	{
 	    int xcount = 0;
 	    gettimeofday(&ts, NULL);
 	    do {
 	        event_loop(EVLOOP_ONCE | EVLOOP_NONBLOCK);
 	        xcount++;
-	    } while (count != fired);
+	    } while (count != num_writes);
 	    gettimeofday(&te, NULL);
 
 	    //if (xcount != count) fprintf(stderr, "Xcount: %d, Rcount: %d\n", xcount, count);
@@ -207,12 +213,12 @@ run_once(void)
 	for (int j = 0; j < num_pipes; j++, cp += 2) {
         if (native) {
 #if NATIVE
-            ev_io_stop(EV_DEFAULT_UC_ &evio[j]);
+            ev_io_stop(EV_DEFAULT_UC_ &io_blocks[j].io);
 #endif
         }
         else {
-            event_del(&events[j]);
-            event_set(&events[j], cp[0], EV_READ | EV_PERSIST, read_cb, (void *) j);
+            event_del(&io_blocks[j].event);
+            event_set(&io_blocks[j].event, cp[0], EV_READ | EV_PERSIST, read_cb, &io_blocks[j]);
         }
     }
 
@@ -264,13 +270,9 @@ main (int argc, char **argv)
     }
 #endif
 
-#if NATIVE
-    evio = calloc(num_pipes, sizeof(struct ev_io));
-    evto = calloc(num_pipes, sizeof(struct ev_timer));
-#endif
-    events = calloc(num_pipes, sizeof(struct event));
+    io_blocks = calloc(num_pipes, sizeof(*io_blocks));
     pipes = calloc(num_pipes * 2, sizeof(int));
-    if (events == NULL || pipes == NULL) {
+    if (io_blocks == NULL || pipes == NULL) {
         perror("malloc");
         exit(1);
     }
@@ -279,11 +281,13 @@ main (int argc, char **argv)
 
     // Open as many pipes/sockets as required; allocate watchers and timers:
     for (cp = pipes, i = 0; i < num_pipes; i++, cp += 2) {
+        io_blocks[i].idx = i;
         if (native) {
 #if NATIVE
-            ev_init (&evto [i], timer_cb);
-            ev_init (&evio [i], read_thunk);
-            evio [i].data = (void *)i;
+            ev_init (&io_blocks[i].timer, timer_cb);
+            ev_init (&io_blocks[i].io, read_thunk);
+            io_blocks[i].io.data = &io_blocks[i];
+            printf("set pipe data %d to %p\n", i, &io_blocks[i]); // DAV
 #endif
         }
         else {
