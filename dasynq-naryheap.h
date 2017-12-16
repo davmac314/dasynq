@@ -1,7 +1,7 @@
 #ifndef DASYNC_NARYHEAP_H_INCLUDED
 #define DASYNC_NARYHEAP_H_INCLUDED
 
-#include <vector>
+#include "dasynq-svec.h"
 #include <type_traits>
 #include <functional>
 #include <limits>
@@ -51,7 +51,7 @@ class nary_heap
         HeapNode() { }
     };
 
-    std::vector<HeapNode> hvec;
+    svector<HeapNode> hvec;
 
     using hindex_t = typename decltype(hvec)::size_type;
 
@@ -225,7 +225,6 @@ class nary_heap
 
     void remove_h(hindex_t hidx)
     {
-        // bvec[hvec[hidx].data_index].heap_index = -1;
         hvec[hidx].hnd_p->heap_index = -1;
         if (hvec.size() != hidx + 1) {
             // replace the removed element with the last:
@@ -290,7 +289,7 @@ class nary_heap
         // repeatedly as nodes get added and removed.
 
         if (num_nodes < hvec.capacity() / 4) {
-            hvec.shrink_to_fit();
+            hvec.shrink_to(num_nodes * 2);
         }
     }
 
