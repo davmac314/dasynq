@@ -65,7 +65,14 @@ class nary_heap
     // separate container, and have the handle be an index into that container).
     struct handle_t
     {
-        T hd;
+        union hd_u_t {
+            // The data member is kept in a union so it doesn't get constructed/destructed
+            // automatically, and we can construct it lazily.
+            public:
+            hd_u_t() { }
+            ~hd_u_t() { }
+            T hd;
+        } hd_u;
         hindex_t heap_index;
     };
 
@@ -244,14 +251,14 @@ class nary_heap
 
     T & node_data(handle_t & index) noexcept
     {
-        return index.hd;
+        return index.hd_u.hd;
     }
 
     // Allocate a slot, but do not incorporate into the heap:
     //  u... : parameters for data constructor T::T(...)
     template <typename ...U> void allocate(handle_t & hnd, U... u)
     {
-        new (& hnd.hd) T(u...);
+        new (& hnd.hd_u.hd) T(u...);
         hnd.heap_index = -1;
         hindex_t max_allowed = hvec.max_size();
 
@@ -281,6 +288,7 @@ class nary_heap
     void deallocate(handle_t & index) noexcept
     {
         num_nodes--;
+        index.hd_u.~hd_u_t();
 
         // shrink the capacity of hvec if num_nodes is sufficiently less than its current capacity. Why
         // capacity/4? Because in general, capacity must be at least doubled when it is exceeded to get
