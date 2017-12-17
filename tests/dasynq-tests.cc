@@ -251,15 +251,15 @@ void test_limited_run()
 
     my_loop.run(2);
 
-    assert(trigger_count = 2);
+    assert(trigger_count == 2);
 
     my_loop.run(1);
 
-    assert(trigger_count = 3);
+    assert(trigger_count == 3);
 
     my_loop.run(1);
 
-    assert(trigger_count = 4);
+    assert(trigger_count == 4);
 
     watcher1.deregister(my_loop);
     watcher2.deregister(my_loop);
