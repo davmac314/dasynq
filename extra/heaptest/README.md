@@ -55,11 +55,11 @@ The results are as follows (run on my personal desktop, compiled with -O3):
 
 |                |   (A) |   (B) |   (C) |   (D) |   (E) |
 | -------------- | ----- | ----- | ----- | ----- | ----- |
-| Ordered fill   |  1224 |   869 |   887 |   734 |   787 |
-| Random f/dq    |  4438 |  2471 |  3491 |  9529 |  4515 |
-| Random f/r rm  |  1172 |  1520 |   951 |   954 |  5655 |
-| Cycle f/dq     |   418 |   617 |   426 |   170 |   503 |
-| Flat pri f/dq  |  1562 |  1388 |  1591 |   696 |   178 |
+| Ordered fill   |  1224 |   880 |   887 |   734 |   787 |
+| Random f/dq    |  4438 |  4114 |  3491 |  9529 |  4515 |
+| Random f/r rm  |  1172 |  1331 |   951 |   954 |  5655 |
+| Cycle f/dq     |   418 |   716 |   426 |   170 |   503 |
+| Flat pri f/dq  |  1562 |  1427 |  1591 |   696 |   178 |
 
  * (A) Stable BinaryHeap
  * (B) Stable nary_heap (N=16)
@@ -77,18 +77,18 @@ Against expectations, the btree_queue performs quite well, coming first or
 second in 4 out of 5 tests. Its "flat priority" performance clearly outperforms
 the heap-based queues (probably because it essentially degenerates to a linked-
 list for this usage pattern, which is quite efficient). However, its "random
-remove" time is somewhat high and it is handily beaten by the N-ary heap in the
+remove" time is somewhat high and it is handily beaten by the D-ary heap in the
 important "random fill/dequeue" test.
 
 For unstable heaps, the results are as follows:
 
 |                |   (A) |   (B) |   (C) |   (D) |   (E) |
 | -------------- | ----- | ----- | ----- | ----- | ----- |
-| Ordered fill   |   983 |   865 |   754 |   538 |   787 |
-| Random f/dq    |  3469 |  2093 |  3143 |  9174 |  4515 |
-| Random f/rr    |  1064 |  1260 |   869 |   770 |  5655 |
-| Cycle f/dq     |   456 |   570 |   407 |   169 |   503 |
-| Flat pri f/dq  |   155 |   155 |   167 |    74 |   178 |
+| Ordered fill   |   983 |   917 |   754 |   538 |   787 |
+| Random f/dq    |  3469 |  3638 |  3143 |  9174 |  4515 |
+| Random f/rr    |  1064 |  1183 |   869 |   770 |  5655 |
+| Cycle f/dq     |   456 |   775 |   407 |   169 |   503 |
+| Flat pri f/dq  |   155 |   165 |   167 |    74 |   178 |
 
  * (A) BinaryHeap
  * (B) nary_heap (N=16)
@@ -97,5 +97,6 @@ For unstable heaps, the results are as follows:
  * (E) BTreeQueue (stable)
 
 
-When stability is not required, the nary_heap contends for the pole position,
-though it does not win every test.
+When stability is not required, the DaryHeap contends for the pole position,
+though only due to the PairingHeap's time for the important Random fill/dequeue
+test. Otherwise, the PairingHeap performs best in every test.
