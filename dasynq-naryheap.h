@@ -119,6 +119,7 @@ class nary_heap
                     pos = mh_index + mh_base;
                     hvec[pos].hnd_p = ohndl;
                     ohndl->heap_index = pos;
+                    hvec[pos].data = op;
                     return false;
                 }
 
@@ -147,6 +148,7 @@ class nary_heap
 
         hvec[pos].hnd_p = ohndl;
         ohndl->heap_index = pos;
+        hvec[pos].data = op;
 
         return pos == 0;
     }

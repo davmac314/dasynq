@@ -450,6 +450,67 @@ static void test_timers_2()
     assert(timer_1.expiries == 9);
 }
 
+static void test_timers_3()
+{
+    // Create a lot of timers, test they come out in the right
+    // order:
+
+    using dasynq::clock_type;
+    using dasynq::time_val;
+    using loop_t = Loop_t;
+    loop_t my_loop;
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        public:
+        rearm timer_expiry(loop_t &loop, int expiry_count)
+        {
+            expiries += expiry_count;
+            return handler_rearm;
+        }
+
+        int expiries = 0;
+        rearm handler_rearm = rearm::DISARM;
+    };
+
+    my_timer timers[100];
+
+    // Create a series of timers, each expiring 1ns after the previous:
+
+    struct timespec timeout_1 = { .tv_sec = 1, .tv_nsec = 0 };
+
+    for (auto & t : timers) {
+        t.add_timer(my_loop, clock_type::MONOTONIC);
+        t.arm_timer(my_loop, timeout_1);
+        timeout_1.tv_nsec++;
+    }
+
+    test_io_engine::cur_mono_time = time_val(0, 0);
+    my_loop.poll();
+    for (auto &  t : timers) {
+        assert(t.expiries == 0);
+    }
+
+    for (int i = 0; i < 100; i++) {
+        test_io_engine::cur_mono_time = time_val(1, i);
+        my_loop.poll();
+        assert(timers[i].expiries == 1);
+    }
+
+    // Now try in reverse order:
+    timeout_1.tv_sec = 2;
+    for (int i = 0; i < 100; i++) {
+        timeout_1.tv_nsec = 99 - i;
+        timers[i].arm_timer(my_loop, timeout_1);
+    }
+
+    for (int i = 0; i < 100; i++) {
+        test_io_engine::cur_mono_time = time_val(2, i);
+        my_loop.poll();
+        assert(timers[99 - i].expiries == 2);
+    }
+}
+
 static void create_pipe(int filedes[2])
 {
     if (pipe(filedes) == -1) {
@@ -958,6 +1019,10 @@ int main(int argc, char **argv)
 
     std::cout << "test_timers_2... ";
     test_timers_2();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_timers_3... ";
+    test_timers_3();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_fd_watch1... ";
