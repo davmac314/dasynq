@@ -43,48 +43,58 @@ Benchmark arguments;
  * -e          :   use native libev API instead of libevent API (seemingly broken?)
 
 ## Results
- 
+
+The benchmark program was run on Linux. Both Dasynq and Libev use an epoll backend.
+
+The libev sources should be extracted to the "libev" folder before building the
+benchmark programs.
+
 The results are in the format "total-time  loop-time", where total-time includes the setup time
 required to enable the event watchers. There are two runs, so there are two sets of values
 printed (one per line).
 
 For 1000 pipes, with 200 active, 10000 writes, and timers enabled, typical values are:
  
- * evbench:  11005    10605
- * dbench:   12568    11981
+ * evbench:   9513     9167
+ * dbench:   10020     9562
  
-That is to say, the performance is essentially identical. With timers disabled, the results are
-not much different:
+That is to say, the performance is quite close. With timers disabled, libev pulls ahead
+somewhat:
 
- * evbench:   9608     9208
- * dbench:   10197     9783
+ * evbench:   7802     7465
+ * dbench:    9398     9004
 
-On increasing the number of active pipes to 800, however, Libev pulls ahead somewhat:
+I believe that most of the performance of libev comes from its practice of not actually disabling
+event watchers when delivering events. This is feasible for a single-threaded event-loop, but not
+workable for a multi-threaded loop.
 
- * evbench:   7290     6585
- * dbench:    9670     8914
+On increasing the number of active pipes to 800, Libev retains that lead:
+
+ * evbench:   6700     6077
+ * dbench:    8543     7913
  
 Astute readers will notice that both event loops perform **better** with a higher number of active
 pipes; most likely, this is because fewer total polls are required (since each poll should return
-all active events). 
+all active events).
 
-If we enable different priorities as well as timers, it appears that Libev gains the upper hand by
-an even more significant margin:
+If we enable different priorities as well as timers, Libev still retains its advantage:
 
- * evbench:  10071     9337
- * dbench:   12810    11964
+ * evbench:   8518     7890
+ * dbench:   11466    10727
 
 However, we can make the footings even again by limiting the number of events processed per poll
 iteration by Dasynq (note that the total number of events processed remains the same). Using
 `-l 16` argument, we get the following:
 
- * dbench:   10308     9401
+ * dbench:    9410     8683
 
 Limiting events processed between polls this way means that high-priority events are able to starve
 low priority events, that is, priority is actually priority, and not just a simple ordering of
 processing between polls. While limiting the processing of events means that the notification
-mechanism must be polled more times to retrieve the same number of events, it seems that in this
-benchmark the locality benefits outweigh this cost.
+mechanism must be polled more times to retrieve the same number of events, it seems that this has a
+positive effect on the queue throughput. This is how Dasynq is designed to be used.
+
+## Discussion
 
 While in general Libev appears slightly faster, it is important to realise that the robustness
 guarantees that Dasynq provides come with a small performance cost. Dasynq also provides true

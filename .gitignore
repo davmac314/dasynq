@@ -1,3 +1,6 @@
 *.o
 dasynq-test
 /dasynq.pc
+/extra/iobench/libev/**
+/.project
+/.cproject

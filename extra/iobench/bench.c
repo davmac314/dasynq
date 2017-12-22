@@ -37,6 +37,10 @@
 
 #define EV_MINPRI 0
 #define EV_MAXPRI 1000
+#define NATIVE 1
+
+#include "ev.c"
+#include "event.c"
 
 #define	timersub(tvp, uvp, vvp)						\
 	do {								\
@@ -63,11 +67,6 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
-
-#if NATIVE
-# include "ev.h"
-#endif
-#include <event.h>
 
 typedef struct io_block_s {
     struct event event;
@@ -156,8 +155,6 @@ run_once(void)
 
             ev_io_set (&io_blocks[i].io, cp [0], EV_READ);
             ev_io_start (EV_DEFAULT_UC_ &io_blocks[i].io);
-            printf("started evio %p with data = %p\n", &io_blocks[i].io, io_blocks[i].io.data); // DAV
-
             io_blocks[i].timer.repeat = 10. + drand48 ();
             ev_timer_again (EV_DEFAULT_UC_ &io_blocks[i].timer);
 #else
@@ -287,7 +284,6 @@ main (int argc, char **argv)
             ev_init (&io_blocks[i].timer, timer_cb);
             ev_init (&io_blocks[i].io, read_thunk);
             io_blocks[i].io.data = &io_blocks[i];
-            printf("set pipe data %d to %p\n", i, &io_blocks[i]); // DAV
 #endif
         }
         else {

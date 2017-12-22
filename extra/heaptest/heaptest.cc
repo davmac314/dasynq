@@ -12,14 +12,14 @@
 #include <iostream>
 
 template <typename A, typename B, typename C> using Nary = dasynq::nary_heap<A,B,C, 16>;
-template <typename A, typename B, typename C> using Dary = dasynq::DaryHeap<A,B,C, 4>;
+template <typename A, typename B, typename C> using Dary = dasynq::dary_heap<A,B,C, 4>;
 
 int main(int argc, char **argv)
 {
     // Template arguments are: data type, priority type, comparator
     // dasynq::BinaryHeap<int, int, std::less<int>> heap;
     // dasynq::nary_heap<int, int> heap;
-    // dasynq::DaryHeap<int, int, std::less<int>, 4> heap;
+    // dasynq::dary_heap<int, int, std::less<int>, 4> heap;
     // dasynq::PairingHeap<int, int> heap;
     // dasynq::btree_queue<int, int, std::less<int>, 16> heap;
     
