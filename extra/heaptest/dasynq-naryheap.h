@@ -55,7 +55,6 @@ class nary_heap
 
     using hindex_t = typename decltype(hvec)::size_type;
 
-    int root_node = -1;
     hindex_t num_nodes = 0;
 
     public:
@@ -290,7 +289,7 @@ class nary_heap
     void deallocate(handle_t & index) noexcept
     {
         num_nodes--;
-        index.hd_u.~hd_u_t();
+        index.hd_u.hd.~T();
 
         // shrink the capacity of hvec if num_nodes is sufficiently less than its current capacity. Why
         // capacity/4? Because in general, capacity must be at least doubled when it is exceeded to get
