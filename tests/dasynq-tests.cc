@@ -511,6 +511,50 @@ static void test_timers_3()
     }
 }
 
+static void test_timers_4()
+{
+    // Test that we can re-arm a lone timer:
+
+    using dasynq::clock_type;
+    using dasynq::time_val;
+    using loop_t = Loop_t;
+    loop_t my_loop;
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        public:
+        rearm timer_expiry(loop_t &loop, int expiry_count)
+        {
+            expiries += expiry_count;
+            return handler_rearm;
+        }
+
+        int expiries = 0;
+        rearm handler_rearm = rearm::DISARM;
+    };
+
+    my_timer timer;
+
+    // Create a series of timers, each expiring 1ns after the previous:
+
+    struct timespec timeout = { .tv_sec = 1, .tv_nsec = 0 };
+
+    timer.add_timer(my_loop, clock_type::MONOTONIC);
+    timer.arm_timer(my_loop, timeout);
+
+    timeout.tv_sec++;
+
+    timer.arm_timer(my_loop, timeout);
+
+    test_io_engine::cur_mono_time = time_val(1, 0);
+    my_loop.poll();
+    assert(timer.expiries == 0);
+
+    test_io_engine::cur_mono_time = time_val(2, 0);
+    my_loop.poll();
+    assert(timer.expiries == 1);
+}
+
 static void create_pipe(int filedes[2])
 {
     if (pipe(filedes) == -1) {
@@ -1023,6 +1067,10 @@ int main(int argc, char **argv)
 
     std::cout << "test_timers_3... ";
     test_timers_3();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_timers_4... ";
+    test_timers_4();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_fd_watch1... ";

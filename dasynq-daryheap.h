@@ -111,8 +111,12 @@ class dary_heap
 
     void bubble_up(hindex_t pos, handle_t &h, const P &p) noexcept
     {
-        Compare lt;
         hindex_t rmax = hvec.size() - 1;
+        if (rmax == 0) {
+            return;
+        }
+
+        Compare lt;
         hindex_t max = (rmax - 1) / N;
 
         while (pos <= max) {
