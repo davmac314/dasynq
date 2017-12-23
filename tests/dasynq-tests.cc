@@ -553,6 +553,16 @@ static void test_timers_4()
     test_io_engine::cur_mono_time = time_val(2, 0);
     my_loop.poll();
     assert(timer.expiries == 1);
+
+    // Now try reducing timeout:
+    timeout.tv_sec = 4;
+    timer.arm_timer(my_loop, timeout);
+    timeout.tv_sec = 3;
+    timer.arm_timer(my_loop, timeout);
+
+    test_io_engine::cur_mono_time = time_val(3, 0);
+    my_loop.poll();
+    assert(timer.expiries == 2);
 }
 
 static void create_pipe(int filedes[2])
