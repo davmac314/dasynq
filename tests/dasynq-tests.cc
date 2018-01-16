@@ -316,6 +316,29 @@ static void test_timespec_div()
     assert(rem.tv_nsec == 900000000);
 }
 
+static void test_time_val_sub()
+{
+    using dasynq::time_val;
+
+    time_val t1 = {0, 0};
+    time_val t2 = {0, 0};
+    time_val t3 = t2 - t1;
+
+    assert(t3 == time_val(0, 0));
+
+    t1 = {0, 1};
+    t2 = {1, 0};
+    t3 = t2 - t1;
+
+    assert(t3 == time_val(0, 999999999));
+
+    t1 = {3, 4};
+    t2 = {5, 7};
+    t3 = t2 - t1;
+
+    assert(t3 == time_val(2, 3));
+}
+
 static void test_timers_1()
 {
     using dasynq::clock_type;
@@ -1065,6 +1088,10 @@ int main(int argc, char **argv)
 
     std::cout << "test_timespec_div... ";
     test_timespec_div();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_timeval_sub... ";
+    test_time_val_sub();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "test_timers_1... ";
