@@ -64,7 +64,23 @@ namespace dasynq {
     using loop_traits_t = epoll_traits;
 }
 #else
-#error No loop backened defined - see dasynq-config.h
+#include "dasynq-select.h"
+#if _POSIX_TIMERS > 0
+#include "dasynq-posixtimer.h"
+namespace dasynq {
+    template <typename T> using timer_events = posix_timer_events<T>;
+}
+#else
+#include "dasynq-itimer.h"
+namespace dasynq {
+    template <typename T> using timer_events = itimer_events<T>;
+}
+#endif
+#include "dasynq-childproc.h"
+namespace dasynq {
+    template <typename T> using loop_t = select_events<interrupt_channel<timer_events<child_proc_events<T>>>>;
+    using loop_traits_t = select_traits;
+}
 #endif
 
 #include <atomic>
