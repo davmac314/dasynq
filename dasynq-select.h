@@ -10,6 +10,7 @@
 
 #include <unistd.h>
 #include <signal.h>
+#include <setjmp.h>
 
 #include "dasynq-config.h"
 
@@ -81,51 +82,39 @@ class select_traits
     const static bool has_separate_rw_fd_watches = true;
 };
 
-#if _POSIX_REALTIME_SIGNALS > 0
-static inline void prepare_signal(int signo) { }
-static inline void unprep_signal(int signo) { }
-
-inline bool get_siginfo(int signo, siginfo_t *siginfo)
-{
-    struct timespec timeout;
-    timeout.tv_sec = 0;
-    timeout.tv_nsec = 0;
-
-    sigset_t mask;
-    sigemptyset(&mask);
-    sigaddset(&mask, signo);
-    return (sigtimedwait(&mask, siginfo, &timeout) != -1);
-}
-#else
-
-// If we have no sigtimedwait implementation, we have to retrieve signal data by establishing a
-// signal handler.
-
 // We need to declare and define a non-static data variable, "siginfo_p", in this header, without
 // violating the "one definition rule". The only way to do that is via a template, even though we
 // don't otherwise need a template here:
-template <typename T = decltype(nullptr)> class sig_capture_templ
+template <typename T = decltype(nullptr)> class select_sig_capture_templ
 {
     public:
-    static siginfo_t * siginfo_p;
+    static siginfo_t siginfo_cap;
+    static sigjmp_buf rjmpbuf;
 
-    static void signalHandler(int signo, siginfo_t *siginfo, void *v)
+    static void signal_handler(int signo, siginfo_t *siginfo, void *v)
     {
-        *siginfo_p = *siginfo;
+        siginfo_cap = *siginfo;
+        siglongjmp(rjmpbuf, 1);
     }
 };
-template <typename T> siginfo_t * sig_capture_templ<T>::siginfo_p = nullptr;
+template <typename T> siginfo_t select_sig_capture_templ<T>::siginfo_cap;
+template <typename T> sigjmp_buf select_sig_capture_templ<T>::rjmpbuf;
 
-using sig_capture = sig_capture_templ<>;
+using sel_sig_capture = select_sig_capture_templ<>;
 
 inline void prepare_signal(int signo)
 {
     struct sigaction the_action;
-    the_action.sa_sigaction = sig_capture::signalHandler;
+    the_action.sa_sigaction = sel_sig_capture::signal_handler;
     the_action.sa_flags = SA_SIGINFO;
     sigfillset(&the_action.sa_mask);
 
     sigaction(signo, &the_action, nullptr);
+}
+
+inline sigjmp_buf &get_sigreceive_jmpbuf()
+{
+    return sel_sig_capture::rjmpbuf;
 }
 
 inline void unprep_signal(int signo)
@@ -133,18 +122,10 @@ inline void unprep_signal(int signo)
     signal(signo, SIG_DFL);
 }
 
-inline bool get_siginfo(int signo, siginfo_t *siginfo)
+inline siginfo_t * get_siginfo()
 {
-    sig_capture::siginfo_p = siginfo;
-
-    sigset_t mask;
-    sigfillset(&mask);
-    sigdelset(&mask, signo);
-    sigsuspend(&mask);
-    return true;
+    return &sel_sig_capture::siginfo_cap;
 }
-
-#endif
 
 template <class Base> class select_events : public Base
 {
@@ -153,6 +134,9 @@ template <class Base> class select_events : public Base
     fd_set write_set;
     //fd_set error_set;  // logical OR of both the above
     int max_fd = 0; // highest fd in any of the sets
+
+    sigset_t active_sigmask; // mask out unwatched signals i.e. active=0
+    void * sig_userdata[NSIG];
 
     // userdata pointers in read and write respectively, for each fd:
     std::vector<void *> rd_udata;
@@ -173,7 +157,7 @@ template <class Base> class select_events : public Base
 
         // Note: if error is set, report read and write.
 
-        // DAV need a way for non-oneshot fds
+        // TODO need a way for non-oneshot fds
 
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, read_set_p) || FD_ISSET(i, error_set_p)) {
@@ -192,43 +176,6 @@ template <class Base> class select_events : public Base
         }
     }
 
-    // Pull a signal from pending, and report it, until it is no longer pending or the watch
-    // should be disabled. Call with lock held.
-    // Returns:  true if watcher should be enabled, false if disabled.
-    bool pull_signal(int signo, void *userdata)
-    {
-        bool enable_filt = true;
-        sigdata_t siginfo;
-
-#if _POSIX_REALTIME_SIGNALS > 0
-        struct timespec timeout = {0, 0};
-        sigset_t sigw_mask;
-        sigemptyset(&sigw_mask);
-        sigaddset(&sigw_mask, signo);
-        int rsigno = sigtimedwait(&sigw_mask, &siginfo.info, &timeout);
-        while (rsigno > 0) {
-            if (Base::receive_signal(*this, siginfo, userdata)) {
-                enable_filt = false;
-                break;
-            }
-            rsigno = sigtimedwait(&sigw_mask, &siginfo.info, &timeout);
-        }
-#else
-        // we have no sigtimedwait.
-        sigset_t pending_sigs;
-        sigpending(&pending_sigs);
-        while (sigismember(&pending_sigs, signo)) {
-            get_siginfo(signo, &siginfo.info);
-            if (Base::receive_signal(*this, siginfo, userdata)) {
-                enable_filt = false;
-                break;
-            }
-            sigpending(&pending_sigs);
-        }
-#endif
-        return enable_filt;
-    }
-
     public:
 
     /**
@@ -240,6 +187,7 @@ template <class Base> class select_events : public Base
     {
         FD_ZERO(&read_set);
         FD_ZERO(&write_set);
+        sigfillset(&active_sigmask);
         Base::init(this);
     }
 
@@ -394,57 +342,28 @@ template <class Base> class select_events : public Base
     // Note signal should be masked before call.
     void add_signal_watch_nolock(int signo, void *userdata)
     {
-        /*
+        sig_userdata[signo] = userdata;
+        sigdelset(&active_sigmask, signo);
         prepare_signal(signo);
 
-        // We need to register the filter with the kqueue early, to avoid a race where we miss
-        // signals:
-        struct kevent evt;
-        EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ADD | EV_DISABLE, 0, 0, userdata);
-        if (kevent(kqfd, &evt, 1, nullptr, 0, nullptr) == -1) {
-            throw new std::system_error(errno, std::system_category());
-        }
-        // TODO use EV_DISPATCH if available (not on OpenBSD/OS X)
-
-        // The signal might be pending already but won't be reported by kqueue in that case. We can queue
-        // it immediately (note that it might be pending multiple times, so we need to re-check once signal
-        // processing finishes if it is re-armed).
-
-        bool enable_filt = pull_signal(signo, userdata);
-
-        if (enable_filt) {
-            evt.flags = EV_ENABLE;
-            if (kevent(kqfd, &evt, 1, nullptr, 0, nullptr) == -1) {
-                throw new std::system_error(errno, std::system_category());
-            }
-        }
-        */
+        // TODO signal any active poll thread
     }
 
     // Note, called with lock held:
     void rearm_signal_watch_nolock(int signo, void *userdata) noexcept
     {
-        /*
-        if (pull_signal(signo, userdata)) {
-            struct kevent evt;
-            EV_SET(&evt, signo, EVFILT_SIGNAL, EV_ENABLE, 0, 0, userdata);
-            // TODO use EV_DISPATCH if available (not on OpenBSD)
+        sig_userdata[signo] = userdata;
+        sigdelset(&active_sigmask, signo);
 
-            kevent(kqfd, &evt, 1, nullptr, 0, nullptr);
-        }
-        */
+        // TODO signal any active poll thread
     }
 
     void remove_signal_watch_nolock(int signo) noexcept
     {
-        /*
         unprep_signal(signo);
-
-        struct kevent evt;
-        EV_SET(&evt, signo, EVFILT_SIGNAL, EV_DELETE, 0, 0, 0);
-
-        kevent(kqfd, &evt, 1, nullptr, 0, nullptr);
-        */
+        sigaddset(&active_sigmask, signo);
+        sig_userdata[signo] = nullptr;
+        // No need to signal other threads
     }
 
     void remove_signal_watch(int signo) noexcept
@@ -480,27 +399,42 @@ template <class Base> class select_events : public Base
         FD_ZERO(&err_set);
 
         sigset_t sigmask;
-        // TODO fill sigmask properly
-        sigprocmask(SIG_UNBLOCK, nullptr, &sigmask);
+        sigprocmask(SIG_UNBLOCK, nullptr, &sigmask); // TODO use traits-supplied function
+        // This is horrible, but hopefully will be optimised well. POSIX gives no way to combine signal
+        // sets other than this.
+        for (int i = 1; i < NSIG; i++) {
+            if (! sigismember(&active_sigmask, i)) {
+                sigdelset(&sigmask, i);
+            }
+        }
 
-        // TODO pre-check signals?
+        volatile bool was_signalled = false;
+
+        // using sigjmp/longjmp is ugly, but there is no other way. If a signal that we're watching is
+        // received during polling, it will longjmp back to here:
+        if (sigsetjmp(get_sigreceive_jmpbuf(), 1) != 0) {
+            auto * sinfo = get_siginfo();
+            sigdata_t sigdata;
+            sigdata.info = *sinfo;
+            void *udata = sig_userdata[sinfo->si_signo];
+            if (udata != nullptr && Base::receive_signal(*this, sigdata, udata)) {
+                sigaddset(&sigmask, sinfo->si_signo);
+                sigaddset(&active_sigmask, sinfo->si_signo);
+            }
+            was_signalled = true;
+        }
+
+        if (was_signalled) {
+            do_wait = false;
+        }
 
         int r = pselect(max_fd + 1, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts, &sigmask);
         if (r == -1 || r == 0) {
             // signal or no events
-            // TODO event with EINTR we may want to poll once more
             return;
         }
 
-        do {
-            process_events(&read_set_c, &write_set_c, &err_set);
-
-            FD_COPY(&read_set, &read_set_c);
-            FD_COPY(&write_set, &write_set_c);
-            FD_ZERO(&err_set);
-
-            r = pselect(max_fd + 1, &read_set_c, &write_set_c, &err_set, &ts, &sigmask);
-        } while (r > 0);
+        process_events(&read_set_c, &write_set_c, &err_set);
     }
 };
 
