@@ -152,7 +152,7 @@ template <class Base> class select_events : public Base
     fd_set read_set;
     fd_set write_set;
     //fd_set error_set;  // logical OR of both the above
-    int max_fd; // highest fd in any of the sets
+    int max_fd = 0; // highest fd in any of the sets
 
     // userdata pointers in read and write respectively, for each fd:
     std::vector<void *> rd_udata;
@@ -186,7 +186,7 @@ template <class Base> class select_events : public Base
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, write_set_p) || FD_ISSET(i, error_set_p)) {
                 // report write
-                Base::receive_fd_event(*this, fd_r(i), wr_udata[i], IN_EVENTS);
+                Base::receive_fd_event(*this, fd_r(i), wr_udata[i], OUT_EVENTS);
                 FD_CLR(i, &write_set);
             }
         }
@@ -330,6 +330,8 @@ template <class Base> class select_events : public Base
             FD_CLR(fd, &write_set);
         }
 
+        // TODO potentially reduce size of userdata vectors
+
         // TODO signal any other currently polling thread
     }
 
@@ -342,13 +344,22 @@ template <class Base> class select_events : public Base
     {
         FD_CLR(fd, &read_set);
         FD_CLR(fd, &write_set);
+        
+        // TODO potentially reduce size of userdata vectors
 
         // TODO signal any other currently polling thread
     }
 
     void enable_fd_watch(int fd, void *userdata, int flags)
     {
-        // TODO
+        if (flags & IN_EVENTS) {
+            FD_SET(fd, &read_set);
+        }
+        else {
+            FD_SET(fd, &write_set);
+        }
+
+        // TODO signal other polling thread
     }
 
     void enable_fd_watch_nolock(int fd, void *userdata, int flags)
@@ -358,7 +369,14 @@ template <class Base> class select_events : public Base
 
     void disable_fd_watch(int fd, int flags)
     {
-        // TODO
+        if (flags & IN_EVENTS) {
+            FD_CLR(fd, &read_set);
+        }
+        else {
+            FD_CLR(fd, &write_set);
+        }
+
+        // TODO signal other polling thread? maybe not - do it lazily
     }
 
     void disable_fd_watch_nolock(int fd, int flags)
@@ -462,7 +480,8 @@ template <class Base> class select_events : public Base
         FD_ZERO(&err_set);
 
         sigset_t sigmask;
-        // TODO fill sigmask
+        // TODO fill sigmask properly
+        sigprocmask(SIG_UNBLOCK, nullptr, &sigmask);
 
         // TODO pre-check signals?
 
