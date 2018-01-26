@@ -370,6 +370,8 @@ namespace dprivate {
                     // We need to re-enable the other channel now:
                     loop_mech.enable_fd_watch_nolock(bfdw->watch_fd, userdata,
                         (bfdw->watch_flags & in_out_mask) | ONE_SHOT);
+                    // We are the polling thread: don't need to interrupt polling, even if it would
+                    // normally be required.
                 }
             }
         }
@@ -561,8 +563,7 @@ class event_loop
     // - The mutex only protects manipulation of the wait queues, and so should not
     //   be highly contended.
     
-    mutex_t wait_lock;  // wait lock, used to prevent multiple threads from waiting
-                        // on the event queue simultaneously.
+    mutex_t wait_lock;  // protects the wait/attention queues
     waitqueue<mutex_t> attn_waitqueue;
     waitqueue<mutex_t> wait_waitqueue;
     
@@ -622,6 +623,9 @@ class event_loop
                     }
                 }
             }
+            else if (enabled && backend_traits_t::interrupt_after_fd_add) {
+                interrupt_if_necessary();
+            }
         }
         catch (...) {
             loop_mech.release_watcher(callback);
@@ -638,6 +642,7 @@ class event_loop
         try {
             loop_mech.prepare_watcher(&callback->out_watcher);
             try {
+                bool do_interrupt = false;
                 if (backend_traits_t::has_separate_rw_fd_watches) {
                     int r = loop_mech.add_bidi_fd_watch(fd, callback, eventmask | ONE_SHOT, emulate);
                     if (r & IN_EVENTS) {
@@ -646,11 +651,18 @@ class event_loop
                             requeue_watcher(callback);
                         }
                     }
+                    else if ((eventmask & IN_EVENTS) && backend_traits_t::interrupt_after_fd_add) {
+                        do_interrupt = true;
+                    }
+
                     if (r & OUT_EVENTS) {
                         callback->out_watcher.emulatefd = true;
                         if (eventmask & OUT_EVENTS) {
                             requeue_watcher(&callback->out_watcher);
                         }
+                    }
+                    else if ((eventmask & OUT_EVENTS) && backend_traits_t::interrupt_after_fd_add) {
+                        do_interrupt = true;
                     }
                 }
                 else {
@@ -664,6 +676,13 @@ class event_loop
                             requeue_watcher(&callback->out_watcher);
                         }
                     }
+                    else if (backend_traits_t::interrupt_after_fd_add) {
+                        do_interrupt = true;
+                    }
+                }
+
+                if (do_interrupt) {
+                    interrupt_if_necessary();
                 }
             }
             catch (...) {
@@ -681,6 +700,9 @@ class event_loop
     {
         if (enabled) {
             loop_mech.enable_fd_watch(fd, watcher, watch_flags | ONE_SHOT);
+            if (backend_traits_t::interrupt_after_fd_add) {
+                interrupt_if_necessary();
+            }
         }
         else {
             loop_mech.disable_fd_watch(fd, watch_flags);
@@ -691,6 +713,9 @@ class event_loop
     {
         if (enabled) {
             loop_mech.enable_fd_watch_nolock(fd, watcher, watch_flags | ONE_SHOT);
+            if (backend_traits_t::interrupt_after_fd_add) {
+                interrupt_if_necessary();
+            }
         }
         else {
             loop_mech.disable_fd_watch_nolock(fd, watch_flags);
@@ -890,6 +915,16 @@ class event_loop
         }
     }
 
+    // Interrupt the current poll-waiter, if necessary - that is, if the loop is multi-thread safe, and if
+    // there is currently another thread polling the backend event mechanism.
+    void interrupt_if_necessary()
+    {
+ 	    std::lock_guard<mutex_t> guard(wait_lock);
+        if (! attn_waitqueue.is_empty()) {  // (always false for single-threaded loops)
+            loop_mech.interrupt_wait();
+        }
+    }
+
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
     // mechanism). This can be used to safely remove watches, since it is certain that
     // notification callbacks won't be run while the attention lock is held.
@@ -979,7 +1014,8 @@ class event_loop
                         if (bdfw->watch_flags & IN_EVENTS) {
                             bdfw->watch_flags &= ~IN_EVENTS;
                             if (! emulatedfd) {
-                                loop_mech.enable_fd_watch_nolock(bdfw->watch_fd, bdfw, bdfw->watch_flags);
+                                set_fd_enabled_nolock(bdfw, bdfw->watch_fd, bdfw->watch_flags,
+                                        bdfw->watch_flags != 0);
                             }
                         }
                         return rearm::NOOP;
@@ -998,12 +1034,8 @@ class event_loop
 
                 if (! emulatedfd) {
                     if (! backend_traits_t::has_separate_rw_fd_watches) {
-                        int watch_flags = bdfw->watch_flags;
-                        // without separate r/w watches, enable_fd_watch actually sets
-                        // which sides are enabled (i.e. can be used to disable):
-                        loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
-                                static_cast<base_watcher *>(bdfw),
-                                (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                        int watch_flags = bdfw->watch_flags  & (IN_EVENTS | OUT_EVENTS);
+                        set_fd_enabled_nolock(bdfw, bdfw->watch_fd, watch_flags, watch_flags != 0);
                     }
                     else {
                         loop_mech.disable_fd_watch_nolock(bdfw->watch_fd, IN_EVENTS);
@@ -1016,14 +1048,11 @@ class event_loop
                 if (! emulatedfd) {
                     if (! backend_traits_t::has_separate_rw_fd_watches) {
                         int watch_flags = bdfw->watch_flags;
-                        loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
-                                static_cast<base_watcher *>(bdfw),
-                                (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                        set_fd_enabled_nolock(bdfw, bdfw->watch_fd,
+                                watch_flags & (IN_EVENTS | OUT_EVENTS), true);
                     }
                     else {
-                        loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
-                                static_cast<base_watcher *>(bdfw),
-                                IN_EVENTS | ONE_SHOT);
+                        set_fd_enabled_nolock(bdfw, bdfw->watch_fd, IN_EVENTS, true);
                     }
                 }
                 else {
@@ -1055,8 +1084,8 @@ class event_loop
                 }
             }
             else  if (rearm_type == rearm::REARM) {
-                loop_mech.enable_fd_watch_nolock(bfw->watch_fd, bfw,
-                        (bfw->watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                set_fd_enabled_nolock(bfw, bfw->watch_fd,
+                        bfw->watch_flags & (IN_EVENTS | OUT_EVENTS), true);
             }
             else if (rearm_type == rearm::DISARM) {
                 loop_mech.disable_fd_watch_nolock(bfw->watch_fd, bfw->watch_flags);
@@ -1106,7 +1135,7 @@ class event_loop
                 if (! bdfw->read_removed) {
                     if (bdfw->watch_flags & OUT_EVENTS) {
                         bdfw->watch_flags &= ~OUT_EVENTS;
-                        loop_mech.enable_fd_watch_nolock(bdfw->watch_fd, bdfw, bdfw->watch_flags);
+                        set_fd_enabled_nolock(bdfw, bdfw->watch_fd, bdfw->watch_flags, true);
                     }
                     return rearm::NOOP;
                 }
@@ -1122,9 +1151,7 @@ class event_loop
 
             if (! backend_traits_t::has_separate_rw_fd_watches) {
                 int watch_flags = bdfw->watch_flags;
-                loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
-                        static_cast<base_watcher *>(bdfw),
-                        (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                set_fd_enabled_nolock(bdfw, bdfw->watch_fd, watch_flags & (IN_EVENTS | OUT_EVENTS), true);
             }
             else {
                 loop_mech.disable_fd_watch_nolock(bdfw->watch_fd, OUT_EVENTS);
@@ -1135,14 +1162,10 @@ class event_loop
             
             if (! backend_traits_t::has_separate_rw_fd_watches) {
                 int watch_flags = bdfw->watch_flags;
-                loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
-                        static_cast<base_watcher *>(bdfw),
-                        (watch_flags & (IN_EVENTS | OUT_EVENTS)) | ONE_SHOT);
+                set_fd_enabled_nolock(bdfw, bdfw->watch_fd, watch_flags & (IN_EVENTS | OUT_EVENTS), true);
             }
             else {
-                loop_mech.enable_fd_watch_nolock(bdfw->watch_fd,
-                        static_cast<base_watcher *>(bdfw),
-                        OUT_EVENTS | ONE_SHOT);
+                set_fd_enabled_nolock(bdfw, bdfw->watch_fd, OUT_EVENTS | ONE_SHOT, true);
             }
         }
         return rearm_type;

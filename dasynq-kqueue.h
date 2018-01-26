@@ -90,8 +90,9 @@ class kqueue_traits
         }
     };
     
-    const static bool has_bidi_fd_watch = false;
-    const static bool has_separate_rw_fd_watches = true;
+    constexpr static bool has_bidi_fd_watch = false;
+    constexpr static bool has_separate_rw_fd_watches = true;
+    constexpr static bool interrupt_after_fd_add = false;
 };
 
 #if _POSIX_REALTIME_SIGNALS > 0

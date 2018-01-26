@@ -107,6 +107,7 @@ class test_loop_traits
     };
     
     constexpr static bool has_separate_rw_fd_watches = false;
+    constexpr static bool interrupt_after_fd_add = false;
     
     class fd_r;
 

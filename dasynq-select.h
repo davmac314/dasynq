@@ -78,8 +78,10 @@ class select_traits
         }
     };
 
-    const static bool has_bidi_fd_watch = false;
-    const static bool has_separate_rw_fd_watches = true;
+    constexpr static bool has_bidi_fd_watch = false;
+    constexpr static bool has_separate_rw_fd_watches = true;
+    // requires interrupt after adding/enabling an fd:
+    constexpr static bool interrupt_after_fd_add = true;
 };
 
 // We need to declare and define a non-static data variable, "siginfo_p", in this header, without
@@ -129,7 +131,6 @@ inline siginfo_t * get_siginfo()
 
 template <class Base> class select_events : public Base
 {
-    // These are protected by the "only poll from a single thread" guarantee - but not by any mutex.
     fd_set read_set;
     fd_set write_set;
     //fd_set error_set;  // logical OR of both the above
@@ -205,20 +206,6 @@ template <class Base> class select_events : public Base
     // throws:  std::system_error or std::bad_alloc on failure
     bool add_fd_watch(int fd, void *userdata, int flags, bool enabled = true, bool soft_fail = false)
     {
-        /*
-        if (! soft_fail) {
-            // Check now if it's a regular file
-            struct stat statbuf;
-            if (fstat(fd, &statbuf) == -1) {
-                throw new std::system_error(errno, std::system_category());
-            }
-            if ((statbuf.st_mode & S_IFMT) == S_IFREG) {
-                // Regular file: emulation required
-                throw new std::system_error(errno, std::system_category());
-            }
-        }
-        */
-
         if (flags & IN_EVENTS) {
             FD_SET(fd, &read_set);
             if (fd >= rd_udata.size()) {
@@ -235,8 +222,6 @@ template <class Base> class select_events : public Base
         }
 
         max_fd = std::max(fd, max_fd);
-
-        // TODO signal any other currently polling thread
 
         return true;
     }
@@ -263,7 +248,6 @@ template <class Base> class select_events : public Base
 
         max_fd = std::max(fd, max_fd);
 
-        // TODO signal any other currently polling thread
         return 0;
     }
 
@@ -306,8 +290,6 @@ template <class Base> class select_events : public Base
         else {
             FD_SET(fd, &write_set);
         }
-
-        // TODO signal other polling thread
     }
 
     void enable_fd_watch_nolock(int fd, void *userdata, int flags)
