@@ -84,10 +84,13 @@ class select_traits
     constexpr static bool interrupt_after_fd_add = true;
 };
 
+namespace dprivate {
+namespace select_mech {
+
 // We need to declare and define a non-static data variable, "siginfo_p", in this header, without
 // violating the "one definition rule". The only way to do that is via a template, even though we
 // don't otherwise need a template here:
-template <typename T = decltype(nullptr)> class select_sig_capture_templ
+template <typename T = decltype(nullptr)> class sig_capture_templ
 {
     public:
     static siginfo_t siginfo_cap;
@@ -99,15 +102,15 @@ template <typename T = decltype(nullptr)> class select_sig_capture_templ
         siglongjmp(rjmpbuf, 1);
     }
 };
-template <typename T> siginfo_t select_sig_capture_templ<T>::siginfo_cap;
-template <typename T> sigjmp_buf select_sig_capture_templ<T>::rjmpbuf;
+template <typename T> siginfo_t sig_capture_templ<T>::siginfo_cap;
+template <typename T> sigjmp_buf sig_capture_templ<T>::rjmpbuf;
 
-using sel_sig_capture = select_sig_capture_templ<>;
+using sig_capture = sig_capture_templ<>;
 
 inline void prepare_signal(int signo)
 {
     struct sigaction the_action;
-    the_action.sa_sigaction = sel_sig_capture::signal_handler;
+    the_action.sa_sigaction = sig_capture::signal_handler;
     the_action.sa_flags = SA_SIGINFO;
     sigfillset(&the_action.sa_mask);
 
@@ -116,7 +119,7 @@ inline void prepare_signal(int signo)
 
 inline sigjmp_buf &get_sigreceive_jmpbuf()
 {
-    return sel_sig_capture::rjmpbuf;
+    return sig_capture::rjmpbuf;
 }
 
 inline void unprep_signal(int signo)
@@ -126,8 +129,10 @@ inline void unprep_signal(int signo)
 
 inline siginfo_t * get_siginfo()
 {
-    return &sel_sig_capture::siginfo_cap;
+    return &sig_capture::siginfo_cap;
 }
+
+} } // namespace dasynq :: select_mech
 
 template <class Base> class select_events : public Base
 {
@@ -327,7 +332,7 @@ template <class Base> class select_events : public Base
     {
         sig_userdata[signo] = userdata;
         sigdelset(&active_sigmask, signo);
-        prepare_signal(signo);
+        dprivate::select_mech::prepare_signal(signo);
 
         // TODO signal any active poll thread
     }
@@ -343,7 +348,7 @@ template <class Base> class select_events : public Base
 
     void remove_signal_watch_nolock(int signo) noexcept
     {
-        unprep_signal(signo);
+        dprivate::select_mech::unprep_signal(signo);
         sigaddset(&active_sigmask, signo);
         sig_userdata[signo] = nullptr;
         // No need to signal other threads
@@ -369,6 +374,8 @@ template <class Base> class select_events : public Base
     //            pending.
     void pull_events(bool do_wait) noexcept
     {
+        using namespace dprivate::select_mech;
+
         struct timespec ts;
         ts.tv_sec = 0;
         ts.tv_nsec = 0;
