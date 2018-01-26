@@ -399,7 +399,7 @@ template <class Base> class select_events : public Base
         FD_ZERO(&err_set);
 
         sigset_t sigmask;
-        sigprocmask(SIG_UNBLOCK, nullptr, &sigmask); // TODO use traits-supplied function
+        this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);
         // This is horrible, but hopefully will be optimised well. POSIX gives no way to combine signal
         // sets other than this.
         for (int i = 1; i < NSIG; i++) {
