@@ -162,17 +162,21 @@ template <class Base> class select_events : public Base
 
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, read_set_p) || FD_ISSET(i, error_set_p)) {
-                // report read
-                Base::receive_fd_event(*this, fd_r(i), rd_udata[i], IN_EVENTS);
-                FD_CLR(i, &read_set);
+                if (FD_ISSET(i, &read_set)) {
+                    // report read
+                    Base::receive_fd_event(*this, fd_r(i), rd_udata[i], IN_EVENTS);
+                    FD_CLR(i, &read_set);
+                }
             }
         }
 
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, write_set_p) || FD_ISSET(i, error_set_p)) {
-                // report write
-                Base::receive_fd_event(*this, fd_r(i), wr_udata[i], OUT_EVENTS);
-                FD_CLR(i, &write_set);
+                if (FD_ISSET(i, &write_set)) {
+                    // report write
+                    Base::receive_fd_event(*this, fd_r(i), wr_udata[i], OUT_EVENTS);
+                    FD_CLR(i, &write_set);
+                }
             }
         }
     }
@@ -253,7 +257,7 @@ template <class Base> class select_events : public Base
 
     // flags specifies which watch to remove; ignored if the loop doesn't support
     // separate read/write watches.
-    void remove_fd_watch(int fd, int flags)
+    void remove_fd_watch_nolock(int fd, int flags)
     {
         if (flags & IN_EVENTS) {
             FD_CLR(fd, &read_set);
@@ -263,13 +267,12 @@ template <class Base> class select_events : public Base
         }
 
         // TODO potentially reduce size of userdata vectors
-
-        // TODO signal any other currently polling thread
     }
 
-    void remove_fd_watch_nolock(int fd, int flags)
+    void remove_fd_watch(int fd, int flags)
     {
-        remove_fd_watch(fd, flags);
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        remove_fd_watch_nolock(fd, flags);
     }
 
     void remove_bidi_fd_watch(int fd) noexcept
@@ -278,11 +281,9 @@ template <class Base> class select_events : public Base
         FD_CLR(fd, &write_set);
         
         // TODO potentially reduce size of userdata vectors
-
-        // TODO signal any other currently polling thread
     }
 
-    void enable_fd_watch(int fd, void *userdata, int flags)
+    void enable_fd_watch_nolock(int fd, void *userdata, int flags)
     {
         if (flags & IN_EVENTS) {
             FD_SET(fd, &read_set);
@@ -292,12 +293,13 @@ template <class Base> class select_events : public Base
         }
     }
 
-    void enable_fd_watch_nolock(int fd, void *userdata, int flags)
+    void enable_fd_watch(int fd, void *userdata, int flags)
     {
-        enable_fd_watch(fd, userdata, flags);
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        enable_fd_watch_nolock(fd, userdata, flags);
     }
 
-    void disable_fd_watch(int fd, int flags)
+    void disable_fd_watch_nolock(int fd, int flags)
     {
         if (flags & IN_EVENTS) {
             FD_CLR(fd, &read_set);
@@ -305,13 +307,12 @@ template <class Base> class select_events : public Base
         else {
             FD_CLR(fd, &write_set);
         }
-
-        // TODO signal other polling thread? maybe not - do it lazily
     }
 
-    void disable_fd_watch_nolock(int fd, int flags)
+    void disable_fd_watch(int fd, int flags)
     {
-        disable_fd_watch(fd, flags);
+        std::lock_guard<decltype(Base::lock)> guard(Base::lock);
+        disable_fd_watch_nolock(fd, flags);
     }
 
     // Note signal should be masked before call.
@@ -366,7 +367,7 @@ template <class Base> class select_events : public Base
     //
     //  do_wait - if false, returns immediately if no events are
     //            pending.
-    void pull_events(bool do_wait)
+    void pull_events(bool do_wait) noexcept
     {
         struct timespec ts;
         ts.tv_sec = 0;
@@ -376,6 +377,7 @@ template <class Base> class select_events : public Base
         fd_set write_set_c;
         fd_set err_set;
 
+        Base::lock.lock();
         FD_COPY(&read_set, &read_set_c);
         FD_COPY(&write_set, &write_set_c);
         FD_ZERO(&err_set);
@@ -389,6 +391,8 @@ template <class Base> class select_events : public Base
                 sigdelset(&sigmask, i);
             }
         }
+        int nfds = max_fd + 1;
+        Base::lock.unlock();
 
         volatile bool was_signalled = false;
 
@@ -398,11 +402,13 @@ template <class Base> class select_events : public Base
             auto * sinfo = get_siginfo();
             sigdata_t sigdata;
             sigdata.info = *sinfo;
+            Base::lock.lock();
             void *udata = sig_userdata[sinfo->si_signo];
             if (udata != nullptr && Base::receive_signal(*this, sigdata, udata)) {
                 sigaddset(&sigmask, sinfo->si_signo);
                 sigaddset(&active_sigmask, sinfo->si_signo);
             }
+            Base::lock.unlock();
             was_signalled = true;
         }
 
@@ -410,7 +416,7 @@ template <class Base> class select_events : public Base
             do_wait = false;
         }
 
-        int r = pselect(max_fd + 1, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts, &sigmask);
+        int r = pselect(nfds, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts, &sigmask);
         if (r == -1 || r == 0) {
             // signal or no events
             return;
