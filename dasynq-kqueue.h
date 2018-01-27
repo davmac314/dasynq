@@ -93,6 +93,7 @@ class kqueue_traits
     constexpr static bool has_bidi_fd_watch = false;
     constexpr static bool has_separate_rw_fd_watches = true;
     constexpr static bool interrupt_after_fd_add = false;
+    constexpr static bool interrupt_after_signal_add = false;
 };
 
 #if _POSIX_REALTIME_SIGNALS > 0

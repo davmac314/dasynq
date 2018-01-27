@@ -82,6 +82,7 @@ class select_traits
     constexpr static bool has_separate_rw_fd_watches = true;
     // requires interrupt after adding/enabling an fd:
     constexpr static bool interrupt_after_fd_add = true;
+    constexpr static bool interrupt_after_signal_add = true;
 };
 
 namespace dprivate {
@@ -333,8 +334,6 @@ template <class Base> class select_events : public Base
         sig_userdata[signo] = userdata;
         sigdelset(&active_sigmask, signo);
         dprivate::select_mech::prepare_signal(signo);
-
-        // TODO signal any active poll thread
     }
 
     // Note, called with lock held:
@@ -342,8 +341,6 @@ template <class Base> class select_events : public Base
     {
         sig_userdata[signo] = userdata;
         sigdelset(&active_sigmask, signo);
-
-        // TODO signal any active poll thread
     }
 
     void remove_signal_watch_nolock(int signo) noexcept

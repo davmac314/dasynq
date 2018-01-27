@@ -84,6 +84,7 @@ class epoll_traits
     constexpr static bool has_bidi_fd_watch = true;
     constexpr static bool has_separate_rw_fd_watches = false;
     constexpr static bool interrupt_after_fd_add = false;
+    constexpr static bool interrupt_after_signal_add = false;
 };
 
 

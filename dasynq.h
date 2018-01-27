@@ -585,6 +585,9 @@ class event_loop
         loop_mech.prepare_watcher(callBack);
         try {
             loop_mech.add_signal_watch_nolock(signo, callBack);
+            if (backend_traits_t::interrupt_after_signal_add) {
+                interrupt_if_necessary();
+            }
         }
         catch (...) {
             loop_mech.release_watcher(callBack);
@@ -983,6 +986,9 @@ class event_loop
         // Called with lock held
         if (rearm_type == rearm::REARM) {
             loop_mech.rearm_signal_watch_nolock(bsw->siginfo.get_signo(), bsw);
+            if (backend_traits_t::interrupt_after_signal_add) {
+                interrupt_if_necessary();
+            }
         }
         else if (rearm_type == rearm::REMOVE) {
             loop_mech.remove_signal_watch_nolock(bsw->siginfo.get_signo());
