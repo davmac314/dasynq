@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <sys/stat.h>
+#include <sys/select.h>
 
 #include <unistd.h>
 #include <signal.h>
@@ -382,8 +383,8 @@ template <class Base> class select_events : public Base
         fd_set err_set;
 
         Base::lock.lock();
-        FD_COPY(&read_set, &read_set_c);
-        FD_COPY(&write_set, &write_set_c);
+        read_set_c = read_set;
+        write_set_c = write_set;
         FD_ZERO(&err_set);
 
         sigset_t sigmask;
