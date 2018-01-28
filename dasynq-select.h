@@ -219,14 +219,14 @@ template <class Base> class select_events : public Base
     {
         if (flags & IN_EVENTS) {
             FD_SET(fd, &read_set);
-            if (fd >= rd_udata.size()) {
+            if (size_t(fd) >= rd_udata.size()) {
                 rd_udata.resize(fd + 1);
             }
             rd_udata[fd] = userdata;
         }
         else {
             FD_SET(fd, &write_set);
-            if (fd >= wr_udata.size()) {
+            if (size_t(fd) >= wr_udata.size()) {
                 wr_udata.resize(fd + 1);
             }
             wr_udata[fd] = userdata;
@@ -244,14 +244,14 @@ template <class Base> class select_events : public Base
     {
         if (flags & IN_EVENTS) {
             FD_SET(fd, &read_set);
-            if (fd >= rd_udata.size()) {
+            if (size_t(fd) >= rd_udata.size()) {
                 rd_udata.resize(fd + 1);
             }
             rd_udata[fd] = userdata;
         }
         if (flags & OUT_EVENTS) {
             FD_SET(fd, &write_set);
-            if (fd >= wr_udata.size()) {
+            if (size_t(fd) >= wr_udata.size()) {
                 wr_udata.resize(fd + 1);
             }
             wr_udata[fd] = userdata;
