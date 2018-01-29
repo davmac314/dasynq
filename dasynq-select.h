@@ -61,6 +61,9 @@ class select_traits
     // File descriptor optional storage. If the mechanism can return the file descriptor, this
     // class will be empty, otherwise it can hold a file descriptor.
     class fd_s {
+        public:
+        fd_s(int fd) noexcept { }
+
         DASYNQ_EMPTY_BODY
     };
 
@@ -84,6 +87,7 @@ class select_traits
     // requires interrupt after adding/enabling an fd:
     constexpr static bool interrupt_after_fd_add = true;
     constexpr static bool interrupt_after_signal_add = true;
+    constexpr static bool supports_non_oneshot_fd = false;
 };
 
 namespace dprivate {
@@ -163,26 +167,28 @@ template <class Base> class select_events : public Base
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
 
-        // Note: if error is set, report read and write.
-
-        // TODO need a way for non-oneshot fds
+        // Note: if error is set, report read-ready.
 
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, read_set_p) || FD_ISSET(i, error_set_p)) {
                 if (FD_ISSET(i, &read_set)) {
                     // report read
-                    Base::receive_fd_event(*this, fd_r(i), rd_udata[i], IN_EVENTS);
-                    FD_CLR(i, &read_set);
+                    auto r = Base::receive_fd_event(*this, fd_r(i), rd_udata[i], IN_EVENTS);
+                    if (std::get<0>(r) == 0) {
+                        FD_CLR(i, &read_set);
+                    }
                 }
             }
         }
 
         for (int i = 0; i <= max_fd; i++) {
-            if (FD_ISSET(i, write_set_p) || FD_ISSET(i, error_set_p)) {
+            if (FD_ISSET(i, write_set_p)) {
                 if (FD_ISSET(i, &write_set)) {
                     // report write
-                    Base::receive_fd_event(*this, fd_r(i), wr_udata[i], OUT_EVENTS);
-                    FD_CLR(i, &write_set);
+                    auto r = Base::receive_fd_event(*this, fd_r(i), wr_udata[i], OUT_EVENTS);
+                    if (std::get<0>(r) == 0) {
+                        FD_CLR(i, &write_set);
+                    }
                 }
             }
         }
@@ -385,7 +391,7 @@ template <class Base> class select_events : public Base
         Base::lock.lock();
         read_set_c = read_set;
         write_set_c = write_set;
-        FD_ZERO(&err_set);
+        err_set = read_set;
 
         sigset_t sigmask;
         this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);

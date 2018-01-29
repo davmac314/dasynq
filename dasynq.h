@@ -336,12 +336,17 @@ namespace dprivate {
             return true;
         }
         
+        // Receive fd event delivered from backend mechansim. Returns the desired watch mask, as per
+        // set_fd_enabled, which can be used to leave the watch disabled, re-enable it or re-enable
+        // one direction of a bi-directional watcher.
         template <typename T>
-        void receive_fd_event(T &loop_mech, typename Traits::fd_r fd_r, void * userdata, int flags) noexcept
+        std::tuple<int, typename Traits::fd_s> receive_fd_event(T &loop_mech, typename Traits::fd_r fd_r,
+                void * userdata, int flags) noexcept
         {
             base_fd_watcher * bfdw = static_cast<base_fd_watcher *>(userdata);
             
             bfdw->event_flags |= flags;
+            typename Traits::fd_s watch_fd_s {bfdw->watch_fd};
             
             base_watcher * bwatcher = bfdw;
             
@@ -361,19 +366,20 @@ namespace dprivate {
 
             queue_watcher(bwatcher);
             
-            if (! traits_t::has_separate_rw_fd_watches) {
+            if (is_multi_watch && ! traits_t::has_separate_rw_fd_watches) {
                 // If this is a bidirectional fd-watch, it has been disabled in *both* directions
                 // as the event was delivered. However, the other direction should not be disabled
                 // yet, so we need to re-enable:
                 int in_out_mask = IN_EVENTS | OUT_EVENTS;
-                if (is_multi_watch && (bfdw->watch_flags & in_out_mask) != 0) {
+                if ((bfdw->watch_flags & in_out_mask) != 0) {
                     // We need to re-enable the other channel now:
-                    loop_mech.enable_fd_watch_nolock(bfdw->watch_fd, userdata,
-                        (bfdw->watch_flags & in_out_mask) | ONE_SHOT);
+                    return std::make_tuple((bfdw->watch_flags & in_out_mask) | ONE_SHOT, watch_fd_s);
                     // We are the polling thread: don't need to interrupt polling, even if it would
                     // normally be required.
                 }
             }
+
+            return std::make_tuple(0, watch_fd_s);
         }
         
         // Child process terminated. Called with both the main lock and the reaper lock held.
@@ -406,7 +412,7 @@ namespace dprivate {
             return r;
         }
         
-        // Queue a watcher for reomval, or issue "removed" callback to it.
+        // Queue a watcher for removal, or issue "removed" callback to it.
         // Call with lock free.
         void issue_delete(base_watcher *watcher) noexcept
         {

@@ -119,6 +119,9 @@ class test_loop_traits
         // Epoll doesn't return the file descriptor (it can, but it can't return both file
         // descriptor and user data).
         int fd;
+
+        public:
+        fd_s(int fd) noexcept : fd(fd) { }
     };
 
     // File descriptor reference (passed to event callback). If the mechanism can return the
