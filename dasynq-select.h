@@ -1,7 +1,6 @@
 #include <system_error>
-#include <type_traits>
-#include <unordered_map>
 #include <vector>
+#include <atomic>
 
 #include <sys/time.h>
 #include <sys/types.h>
@@ -171,7 +170,7 @@ template <class Base> class select_events : public Base
 
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, read_set_p) || FD_ISSET(i, error_set_p)) {
-                if (FD_ISSET(i, &read_set)) {
+                if (FD_ISSET(i, &read_set) && rd_udata[i] != nullptr) {
                     // report read
                     auto r = Base::receive_fd_event(*this, fd_r(i), rd_udata[i], IN_EVENTS);
                     if (std::get<0>(r) == 0) {
@@ -183,7 +182,7 @@ template <class Base> class select_events : public Base
 
         for (int i = 0; i <= max_fd; i++) {
             if (FD_ISSET(i, write_set_p)) {
-                if (FD_ISSET(i, &write_set)) {
+                if (FD_ISSET(i, &write_set) && wr_udata[i] != nullptr) {
                     // report write
                     auto r = Base::receive_fd_event(*this, fd_r(i), wr_udata[i], OUT_EVENTS);
                     if (std::get<0>(r) == 0) {
@@ -282,12 +281,12 @@ template <class Base> class select_events : public Base
     {
         if (flags & IN_EVENTS) {
             FD_CLR(fd, &read_set);
+            rd_udata[fd] = nullptr;
         }
         if (flags & OUT_EVENTS) {
             FD_CLR(fd, &write_set);
+            wr_udata[fd] = nullptr;
         }
-
-        // TODO potentially reduce size of userdata vectors
     }
 
     void remove_fd_watch(int fd, int flags)
@@ -300,8 +299,6 @@ template <class Base> class select_events : public Base
     {
         FD_CLR(fd, &read_set);
         FD_CLR(fd, &write_set);
-        
-        // TODO potentially reduce size of userdata vectors
     }
 
     void enable_fd_watch_nolock(int fd, void *userdata, int flags)
@@ -418,6 +415,7 @@ template <class Base> class select_events : public Base
         // using sigjmp/longjmp is ugly, but there is no other way. If a signal that we're watching is
         // received during polling, it will longjmp back to here:
         if (sigsetjmp(get_sigreceive_jmpbuf(), 1) != 0) {
+            std::atomic_signal_fence(std::memory_order_acquire);
             auto * sinfo = get_siginfo();
             sigdata_t sigdata;
             sigdata.info = *sinfo;
@@ -434,6 +432,8 @@ template <class Base> class select_events : public Base
         if (was_signalled) {
             do_wait = false;
         }
+
+        std::atomic_signal_fence(std::memory_order_release);
 
         int r = pselect(nfds, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts, &sigmask);
         if (r == -1 || r == 0) {
