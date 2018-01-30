@@ -1034,6 +1034,85 @@ void ftest_multi_thread2()
     close(pipe1[1]);
 }
 
+void ftest_multi_thread3()
+{
+    using Loop_t = dasynq::event_loop<std::mutex>;
+    Loop_t my_loop;
+
+    int pipe1[2];
+    int pipe2[2];
+    int pipe3[2];
+    create_pipe(pipe1);
+    create_pipe(pipe2);
+    create_pipe(pipe3);
+
+    class mt3_watch : public Loop_t::fd_watcher_impl<mt3_watch>
+    {
+        public:
+        bool seen = false;
+        bool was_removed = false;
+
+        mt3_watch() { }
+
+        rearm fd_event(Loop_t &eloop, int fd, int flags) noexcept
+        {
+            // Process I/O here
+            seen = true;
+            return rearm::DISARM;  // disable watcher
+        }
+
+        void watch_removed() noexcept override
+        {
+            was_removed = true;
+        }
+    };
+
+    mt3_watch fwatch1;
+    mt3_watch fwatch2;
+    mt3_watch fwatch3;
+
+    fwatch1.add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS);
+    fwatch2.add_watch(my_loop, pipe2[0], dasynq::IN_EVENTS);
+    fwatch3.add_watch(my_loop, pipe3[0], dasynq::IN_EVENTS);
+
+    std::thread t([&my_loop]() -> void {
+        my_loop.run();
+    });
+
+    struct timespec t200ms;
+    t200ms.tv_sec = 0;
+    t200ms.tv_nsec = 200 * 1000 * 1000;
+    nanosleep(&t200ms, nullptr);
+
+    // Loop is running in thread: try to remove two watchers
+    fwatch1.deregister(my_loop);
+
+    nanosleep(&t200ms, nullptr);
+    assert(fwatch1.was_removed);
+
+    fwatch2.deregister(my_loop);
+
+    nanosleep(&t200ms, nullptr);
+    assert(fwatch2.was_removed);
+    assert(! fwatch3.seen);
+
+    // Wake up loop by triggering final watcher:
+    char wbuf[1] = {'a'};
+    write(pipe3[1], wbuf, 1);
+
+    t.join();
+
+    my_loop.poll();
+
+    assert(! fwatch1.seen);
+    assert(! fwatch2.seen);
+    assert(fwatch3.seen);
+
+    close(pipe1[0]); close(pipe1[1]);
+    close(pipe2[0]); close(pipe2[1]);
+    close(pipe3[0]); close(pipe3[1]);
+}
+
 void ftest_child_watch()
 {
     using loop_t = dasynq::event_loop<std::mutex>;
@@ -1140,6 +1219,10 @@ int main(int argc, char **argv)
 
     std::cout << "ftest_multi_thread2... ";
     ftest_multi_thread2();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftest_multi_thread3... ";
+    ftest_multi_thread3();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_child_watch... ";
