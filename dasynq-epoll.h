@@ -78,7 +78,7 @@ class epoll_traits
     // must be stored in an fd_s instance.
     class fd_r {
         public:
-        int getFd(fd_s ss)
+        int get_fd(fd_s ss)
         {
             return ss.fd;
         }
@@ -140,7 +140,7 @@ template <class Base> class epoll_loop : public Base
                 (events[i].events & EPOLLERR) && (flags |= IN_EVENTS | OUT_EVENTS | ERR_EVENTS);
                 auto r = Base::receive_fd_event(*this, fd_r(), ptr, flags);
                 if (std::get<0>(r) != 0) {
-                    enable_fd_watch_nolock(std::get<1>(r), ptr, std::get<0>(r));
+                    enable_fd_watch_nolock(fd_r().get_fd(std::get<1>(r)), ptr, std::get<0>(r));
                 }
             }            
         }
