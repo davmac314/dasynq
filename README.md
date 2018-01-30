@@ -1,6 +1,6 @@
 # Dasynq
 
-_Version 1.0.4_
+_Version 1.1.0_
 
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries, it is
 crossplatform / portable. Unlike most other such libraries, it is intended to be completely usable in
@@ -10,7 +10,9 @@ are needed in critical sections). However, it is also designed to be lightweight
 require the use of threads (and so does not require linking against a thread library).
 
 The existing backends include **epoll** and **kqueue**, meaning that it works on Linux and various
-BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called).
+BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called). There is also
+a less efficient backend based on **pselect**, meaning that it should also work on nearly all other
+POSIX-compliant systems.
 
 Dasynq is distributed under the terms of the Apache License, version 2.0, as found in the LICENSE file.
 

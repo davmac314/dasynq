@@ -527,9 +527,9 @@ Most of the following limitations carry through from the underlying backend, rat
 inherent in the design of Dasynq itself.
 
 You cannot generally add two watchers for the same identity (file descriptor, signal, child
-process). (Exception: when using kqueue backend, you can add one fd read watcher and one fd write
-watcher for the same file descriptor; however, it's better to use a `bidi_fd_watcher` to abstract
-away platform differences).
+process). (Exception: when using the kqueue or pselect backend, you can add one fd read watcher
+and one fd write watcher for the same file descriptor; however, it's better to use a
+`bidi_fd_watcher` to abstract away platform differences).
 
 You should fully remove the watcher(s) for a file descriptor *before* you close the file
 descriptor. In a multi-threaded program, failure to do this could cause a watcher to read from
