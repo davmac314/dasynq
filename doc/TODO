@@ -1,4 +1,5 @@
-For later versions:
+* select/kqueue: clean up helper functions in dasynq:: namespace. Move them into per-mechanism namespace
+  to avoid clashes. 
 
 * STOP rearm for timers. Instead of just disabling a timer, actually stop (but don't deallocate) it.
 
@@ -20,8 +21,6 @@ For later versions:
 
 * kqueue: use EVDISPATCH where available. On OS X, potentially use EVDISPATCH2 (which potentially
   also allows removing the wait lock, though this is obviously considerable work).
-
-* poll() (i.e. "pure POSIX") backend?
 
 * Current deregister implementation gets attention lock and issues delete. An alternative would be
   to test-acquire the attention lock and on failure, instead add the watcher to a queue and signal
