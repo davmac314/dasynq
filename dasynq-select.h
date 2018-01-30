@@ -223,6 +223,10 @@ template <class Base> class select_events : public Base
     // throws:  std::system_error or std::bad_alloc on failure
     bool add_fd_watch(int fd, void *userdata, int flags, bool enabled = true, bool soft_fail = false)
     {
+        if (fd >= FD_SETSIZE) {
+            throw std::system_error(EMFILE, std::system_category());
+        }
+
         if (flags & IN_EVENTS) {
             FD_SET(fd, &read_set);
             if (size_t(fd) >= rd_udata.size()) {
@@ -248,6 +252,10 @@ template <class Base> class select_events : public Base
     //          OUT_EVENTS if out watch requires emulation
     int add_bidi_fd_watch(int fd, void *userdata, int flags, bool emulate = false)
     {
+        if (fd >= FD_SETSIZE) {
+            throw std::system_error(EMFILE, std::system_category());
+        }
+
         if (flags & IN_EVENTS) {
             FD_SET(fd, &read_set);
             if (size_t(fd) >= rd_udata.size()) {
