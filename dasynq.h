@@ -8,21 +8,24 @@
 #include "dasynq-interrupt.h"
 #include "dasynq-util.h"
 
-// Dasynq uses a "mix-in" pattern to produce an event loop implementation incorporating selectable implementations of
-// various components (main backend, timers, child process watch mechanism etc). In C++ this can be achieved by
-// a template for some component which extends its own type parameter:
+// Dasynq uses a "mix-in" pattern to produce an event loop implementation incorporating selectable
+// implementations of various components (main backend, timers, child process watch mechanism etc). In C++
+// this can be achieved by a template for some component which extends its own type parameter:
 //
 //     template <typename Base> class X : public B { .... }
 //
-// We can chain several such components together (and so so below) to "mix in" the functionality of each into the final
-// class, eg:
+// (Note that in a sense this is actually the opposite of the so-called "Curiously Recurring Template"
+// pattern, which is used to achieve a similar goal). We can chain several such components together to "mix
+// in" the functionality of each into the final class, eg:
 //
-//     template <typename T> using Loop = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
+//     template <typename T> using loop_t =
+//         epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
 //
-// (which defines an alias template "Loop", whose implementation will use the epoll backend, a standard interrupt channel
-// implementation, a timerfd-based timer implementation, and the standard child process watch implementation).
-// We sometimes need the base class to be able to call derived-class members: to do this we pass a reference to
-// the derived instance into a templated method in the base, called "init":
+// (which defines an alias template "loop_t", whose implementation will use the epoll backend, a standard
+// interrupt channel implementation, a timerfd-based timer implementation, and the standard child process
+// watch implementation). We sometimes need the base class to be able to call derived-class members: to do
+// this we pass a reference to the derived instance into a template member function in the base, for example
+// the "init" function:
 //
 //     template <typename T> void init(T *derived)
 //     {
@@ -32,10 +35,50 @@
 //         Base::init(derived);
 //     }
 //
-// At the base all this is the event_dispatch class, defined below, which receives event notifications and inserts
-// them into a queue for processing. The event_loop class, also below, wraps this (via composition) in an interface
-// which can be used to register/de-regsiter/enable/disable event watchers, and which can process the queued events
-// by calling the watcher callbacks. The event_loop class also provides some synchronisation to ensure thread-safety.
+// The 'loop_t' defined above is a template for a usable backend mechanism for the event_loop template
+// class. At the base all this is the event_dispatch class, defined below, which receives event
+// notifications and inserts them into a queue for processing. The event_loop class, also below, wraps this
+// (via composition) in an interface which can be used to register/de-register/enable/disable event
+// watchers, and which can process the queued events by calling the watcher callbacks. The event_loop class
+// also provides some synchronisation to ensure thread-safety, and abstracts away some differences between
+// backends.
+//
+// The differences are exposed as traits, partly via a separate traits class (loop_traits_t as defined
+// below, which contains the "main" traits, particularly the sigdata_t, fd_r and fd_s types). Note that the
+// event_dispatch class exposes the loop traits as traits_t, and these are then potentially augmented at
+// each stage of the mechanism inheritance chain (i.e. the final traits are exposed as
+// `loop_t<event_dispatch>::traits_t'.
+//
+// The trait members are:
+//   sigdata_t  - a wrapper for the siginfo_t type or equivalent used to pass signal parameters
+//   fd_r       - a file descriptor wrapper, if the backend is able to retrieve the file descriptor when
+//                it receives an fd event. Not all backends can do this.
+//   fd_s       - a file descriptor storage wrapper. If the backend can retrieve file descriptors, this
+//                will be empty (and ideally zero-size), otherwise it stores a file descriptor.
+//                With an fd_r and fd_s instance you can always retrieve the file descriptor:
+//                `fdr.get_fd(fds)' will return it.
+//   has_bidi_fd_watch
+//              - boolean indicating whether a single watch can support watching for both input and output
+//                events simultaneously
+//   has_separate_rw_fd_watches
+//              - boolean indicating whether it is possible to add separate input and output watches for the
+//                same fd. Either this or has_bidi_fd_watch must be true.
+//   interrupt_after_fd_add
+//              - boolean indicating if a loop interrupt must be forced after adding/enabling an fd watch.
+//   interrupt_after_signal_add
+//              - boolean indicating if a loop interrupt must be forced after adding or enabling a signal
+//                watch.
+//   supports_non_oneshot_fd
+//              - boolean; if true, event_dispatch can arm an fd watch without ONESHOT and returning zero
+//                events from receive_fd_event (the event notification function) will leave the descriptor
+//                armed. If false, all fd watches are effectively ONESHOT (they can be re-armed immediately
+//                after delivery by returning an appropriate event flag mask).
+//   full_timer_support
+//              - boolean indicating that the monotonic and system clocks are actually different clocks and
+//                that timers against the system clock will work correctly if the system clock time is
+//                adjusted. If false, the monotic clock may not be present at all (monotonic clock will map
+//                to system clock), and timers against either clock are not guaranteed to work correctly if
+//                the system clock is adjusted.
 
 #if DASYNQ_HAVE_KQUEUE
 #include "dasynq-kqueue.h"
@@ -262,7 +305,7 @@ namespace dprivate {
         }
     }
 
-    // This class serves as the base class (mixin) for the AEN mechanism class.
+    // This class serves as the base class (mixin) for the backend mechanism.
     //
     // The event_dispatch class maintains the queued event data structures. It inserts watchers
     // into the queue when events are received (receiveXXX methods). It also owns a mutex used
