@@ -15,8 +15,8 @@
 //     template <typename Base> class X : public B { .... }
 //
 // (Note that in a sense this is actually the opposite of the so-called "Curiously Recurring Template"
-// pattern, which is used to achieve a similar goal). We can chain several such components together to "mix
-// in" the functionality of each into the final class, eg:
+// pattern, which can be used to achieve a similar goal). We can chain several such components together to
+// "mix in" the functionality of each into the final class, eg:
 //
 //     template <typename T> using loop_t =
 //         epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
@@ -482,7 +482,7 @@ namespace dprivate {
             }
         }
         
-        // Queue a watcher for reomval, or issue "removed" callback to it.
+        // Queue a watcher for removal, or issue "removed" callback to it.
         // Call with lock free.
         void issue_delete(base_bidi_fd_watcher *watcher) noexcept
         {
@@ -523,9 +523,18 @@ namespace dprivate {
     };
 }
 
-// This is the main event_loop implementation. It serves as an interface to the event loop
-// backend (of which it maintains an internal instance). It also serialises waits the backend
-// and provides safe deletion of watchers (see comments inline).
+// This is the main event_loop implementation. It serves as an interface to the event loop backend (of which
+// it maintains an internal instance). It also serialises polling the backend and provides safe deletion of
+// watchers (see comments inline).
+//
+// The T_Mutex type parameter specifies the mutex type. A null_mutex can be used for a single-threaded event
+// loop; std::mutex, or any mutex providing a compatible interface, can be used for a thread-safe event
+// loop.
+//
+// The Traits type parameter specifies any required traits for the event loop.  This specifies the back-end
+// to use (backend_t, a template) and the basic back-end traits (backend_traits_t).
+// The default is `default_traits<T_Mutex>'.
+//
 template <typename T_Mutex, typename Traits>
 class event_loop
 {
