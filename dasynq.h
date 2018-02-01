@@ -186,6 +186,7 @@ namespace dprivate {
         typedef std::condition_variable_any condvar;
     };
 
+    // For a single-threaded loop, the waitqueue is a no-op:
     template <> class waitqueue_node<null_mutex>
     {
         // Specialised waitqueue_node for null_mutex.
@@ -378,11 +379,9 @@ namespace dprivate {
         // queue data structure/pointer
         prio_queue event_queue;
         
-        using base_signal_watcher = dasynq::dprivate::base_signal_watcher<mutex_t, typename traits_t::sigdata_t>;
-        using base_fd_watcher = dasynq::dprivate::base_fd_watcher<mutex_t>;
-        using base_bidi_fd_watcher = dasynq::dprivate::base_bidi_fd_watcher<mutex_t>;
-        using base_child_watcher = dasynq::dprivate::base_child_watcher<mutex_t>;
-        using base_timer_watcher = dasynq::dprivate::base_timer_watcher<mutex_t>;
+        using base_signal_watcher = dprivate::base_signal_watcher<typename traits_t::sigdata_t>;
+        using base_child_watcher = dprivate::base_child_watcher;
+        using base_timer_watcher = dprivate::base_timer_watcher;
         
         // Add a watcher into the queueing system (but don't queue it). Call with lock held.
         //   may throw: std::bad_alloc
@@ -615,11 +614,11 @@ class event_loop
     template <typename T> using waitqueue = dprivate::waitqueue<T>;
     template <typename T> using waitqueue_node = dprivate::waitqueue_node<T>;
     using base_watcher = dprivate::base_watcher;
-    using base_signal_watcher = dprivate::base_signal_watcher<T_Mutex, typename loop_traits_t::sigdata_t>;
-    using base_fd_watcher = dprivate::base_fd_watcher<T_Mutex>;
-    using base_bidi_fd_watcher = dprivate::base_bidi_fd_watcher<T_Mutex>;
-    using base_child_watcher = dprivate::base_child_watcher<T_Mutex>;
-    using base_timer_watcher = dprivate::base_timer_watcher<T_Mutex>;
+    using base_signal_watcher = dprivate::base_signal_watcher<typename loop_traits_t::sigdata_t>;
+    using base_fd_watcher = dprivate::base_fd_watcher;
+    using base_bidi_fd_watcher = dprivate::base_bidi_fd_watcher;
+    using base_child_watcher = dprivate::base_child_watcher;
+    using base_timer_watcher = dprivate::base_timer_watcher;
     using watch_type_t = dprivate::watch_type_t;
 
     loop_mech_t loop_mech;
@@ -1427,7 +1426,7 @@ namespace dprivate {
 
 // Posix signal event watcher
 template <typename EventLoop>
-class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop::mutex_t, typename EventLoop::loop_traits_t::sigdata_t>
+class signal_watcher : private dprivate::base_signal_watcher<typename EventLoop::loop_traits_t::sigdata_t>
 {
     template <typename, typename> friend class signal_watcher_impl;
 
@@ -1517,7 +1516,7 @@ class signal_watcher_impl : public signal_watcher<EventLoop>
 
 // Posix file descriptor event watcher
 template <typename EventLoop>
-class fd_watcher : private dprivate::base_fd_watcher<typename EventLoop::mutex_t>
+class fd_watcher : private dprivate::base_fd_watcher
 {
     template <typename, typename> friend class fd_watcher_impl;
 
@@ -1673,7 +1672,7 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
 // This watcher type has two event notification methods which can both potentially be
 // active at the same time.
 template <typename EventLoop>
-class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher<typename EventLoop::mutex_t>
+class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher
 {
     template <typename, typename> friend class bidi_fd_watcher_impl;
 
@@ -1896,7 +1895,7 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
 
 // Child process event watcher
 template <typename EventLoop>
-class child_proc_watcher : private dprivate::base_child_watcher<typename EventLoop::mutex_t>
+class child_proc_watcher : private dprivate::base_child_watcher
 {
     template <typename, typename> friend class child_proc_watcher_impl;
 
@@ -2096,10 +2095,10 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
 };
 
 template <typename EventLoop>
-class timer : private base_timer_watcher<typename EventLoop::mutex_t>
+class timer : private base_timer_watcher
 {
     template <typename, typename> friend class timer_impl;
-    using base_t = base_timer_watcher<typename EventLoop::mutex_t>;
+    using base_t = base_timer_watcher;
     using mutex_t = typename EventLoop::mutex_t;
 
     public:
