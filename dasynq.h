@@ -291,17 +291,68 @@ namespace dprivate {
         }
     };
     
+    // friend of event_loop for giving access to various private members
+    class loop_access {
+        public:
+        template <typename Loop>
+        static typename Loop::mutex_t &get_base_lock(Loop &loop) noexcept
+        {
+            return loop.get_base_lock();
+        }
+
+        template <typename Loop>
+        static rearm process_fd_rearm(Loop &loop, typename Loop::base_fd_watcher *bfw,
+                rearm rearm_type, bool is_multi_watch) noexcept
+        {
+            return loop.process_fd_rearm(bfw, rearm_type, is_multi_watch);
+        }
+
+        template <typename Loop>
+        static rearm process_secondary_rearm(Loop &loop, typename Loop::base_bidi_fd_watcher * bdfw,
+                base_watcher * outw, rearm rearm_type) noexcept
+        {
+            return loop.process_secondary_rearm(bdfw, outw, rearm_type);
+        }
+
+        template <typename Loop>
+        static void process_signal_rearm(Loop &loop, typename Loop::base_signal_watcher * bsw,
+                rearm rearm_type) noexcept
+        {
+            loop.process_signal_rearm(bsw, rearm_type);
+        }
+
+        template <typename Loop>
+        static void process_child_watch_rearm(Loop &loop, typename Loop::base_child_watcher *bcw,
+                rearm rearm_type) noexcept
+        {
+            loop.process_child_watch_rearm(bcw, rearm_type);
+        }
+
+        template <typename Loop>
+        static void process_timer_rearm(Loop &loop, typename Loop::base_timer_watcher *btw,
+                rearm rearm_type) noexcept
+        {
+            loop.process_timer_rearm(btw, rearm_type);
+        }
+
+        template <typename Loop>
+        static void requeue_watcher(Loop &loop, base_watcher *watcher) noexcept
+        {
+            loop.requeue_watcher(watcher);
+        }
+    };
+
     // Do standard post-dispatch processing for a watcher. This handles the case of removing or
     // re-queing watchers depending on the rearm type.
     template <typename Loop> void post_dispatch(Loop &loop, base_watcher *watcher, rearm rearm_type)
     {
         if (rearm_type == rearm::REMOVE) {
-            loop.get_base_lock().unlock();
+            loop_access::get_base_lock(loop).unlock();
             watcher->watch_removed();
-            loop.get_base_lock().lock();
+            loop_access::get_base_lock(loop).lock();
         }
         else if (rearm_type == rearm::REQUEUE) {
-            loop.requeue_watcher(watcher);
+            loop_access::requeue_watcher(loop, watcher);
         }
     }
 
@@ -521,6 +572,7 @@ namespace dprivate {
         event_dispatch() {  }
         event_dispatch(const event_dispatch &) = delete;
     };
+
 }
 
 // This is the main event_loop implementation. It serves as an interface to the event loop backend (of which
@@ -539,20 +591,14 @@ template <typename T_Mutex, typename Traits>
 class event_loop
 {
     using my_event_loop_t = event_loop<T_Mutex, Traits>;
+
     friend class dprivate::fd_watcher<my_event_loop_t>;
     friend class dprivate::bidi_fd_watcher<my_event_loop_t>;
     friend class dprivate::signal_watcher<my_event_loop_t>;
     friend class dprivate::child_proc_watcher<my_event_loop_t>;
     friend class dprivate::timer<my_event_loop_t>;
     
-    friend void dprivate::post_dispatch<my_event_loop_t>(my_event_loop_t &loop,
-            dprivate::base_watcher *watcher, rearm rearm_type);
-
-    template <typename, typename> friend class dprivate::fd_watcher_impl;
-    template <typename, typename> friend class dprivate::bidi_fd_watcher_impl;
-    template <typename, typename> friend class dprivate::signal_watcher_impl;
-    template <typename, typename> friend class dprivate::child_proc_watcher_impl;
-    template <typename, typename> friend class dprivate::timer_impl;
+    friend class dprivate::loop_access;
 
     using backend_traits_t = typename Traits::backend_traits_t;
 
@@ -1448,11 +1494,11 @@ class signal_watcher_impl : public signal_watcher<EventLoop>
     void dispatch(void *loop_ptr) noexcept override
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.get_base_lock().unlock();
+        loop_access::get_base_lock(loop).unlock();
 
         auto rearm_type = static_cast<Derived *>(this)->received(loop, this->siginfo.get_signo(), this->siginfo);
 
-        loop.get_base_lock().lock();
+        loop_access::get_base_lock(loop).lock();
 
         if (rearm_type != rearm::REMOVED) {
 
@@ -1462,7 +1508,7 @@ class signal_watcher_impl : public signal_watcher<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            loop.process_signal_rearm(this, rearm_type);
+            loop_access::process_signal_rearm(loop, this, rearm_type);
 
             post_dispatch(loop, this, rearm_type);
         }
@@ -1601,11 +1647,11 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
         // In case emulating, clear enabled here; REARM or explicit set_enabled will re-enable.
         this->emulate_enabled = false;
 
-        loop.get_base_lock().unlock();
+        loop_access::get_base_lock(loop).unlock();
 
         auto rearm_type = static_cast<Derived *>(this)->fd_event(loop, this->watch_fd, this->event_flags);
 
-        loop.get_base_lock().lock();
+        loop_access::get_base_lock(loop).lock();
 
         if (rearm_type != rearm::REMOVED) {
             this->event_flags = 0;
@@ -1615,7 +1661,7 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            rearm_type = loop.process_fd_rearm(this, rearm_type, false);
+            rearm_type = loop_access::process_fd_rearm(loop, this, rearm_type, false);
 
             post_dispatch(loop, this, rearm_type);
         }
@@ -1797,11 +1843,11 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
         this->emulate_enabled = false;
-        loop.get_base_lock().unlock();
+        loop_access::get_base_lock(loop).unlock();
 
         auto rearm_type = static_cast<Derived *>(this)->read_ready(loop, this->watch_fd);
 
-        loop.get_base_lock().lock();
+        loop_access::get_base_lock(loop).lock();
 
         if (rearm_type != rearm::REMOVED) {
             this->event_flags &= ~IN_EVENTS;
@@ -1811,7 +1857,7 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            rearm_type = loop.process_fd_rearm(this, rearm_type, true);
+            rearm_type = loop_access::process_fd_rearm(loop, this, rearm_type, true);
 
             post_dispatch(loop, this, rearm_type);
         }
@@ -1822,11 +1868,11 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
         auto &outwatcher = bidi_fd_watcher<EventLoop>::out_watcher;
 
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.get_base_lock().unlock();
+        loop_access::get_base_lock(loop).unlock();
 
         auto rearm_type = static_cast<Derived *>(this)->write_ready(loop, this->watch_fd);
 
-        loop.get_base_lock().lock();
+        loop_access::get_base_lock(loop).lock();
 
         if (rearm_type != rearm::REMOVED) {
             this->event_flags &= ~OUT_EVENTS;
@@ -1836,7 +1882,7 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            rearm_type = loop.process_secondary_rearm(this, &outwatcher, rearm_type);
+            rearm_type = loop_access::process_secondary_rearm(loop, this, &outwatcher, rearm_type);
 
             if (rearm_type == rearm::REQUEUE) {
                 post_dispatch(loop, &outwatcher, rearm_type);
@@ -2027,11 +2073,11 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
     void dispatch(void *loop_ptr) noexcept override
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.get_base_lock().unlock();
+        loop_access::get_base_lock(loop).unlock();
 
         auto rearm_type = static_cast<Derived *>(this)->status_change(loop, this->watch_pid, this->child_status);
 
-        loop.get_base_lock().lock();
+        loop_access::get_base_lock(loop).lock();
 
         if (rearm_type != rearm::REMOVED) {
 
@@ -2041,7 +2087,7 @@ class child_proc_watcher_impl : public child_proc_watcher<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            loop.process_child_watch_rearm(this, rearm_type);
+            loop_access::process_child_watch_rearm(loop, this, rearm_type);
 
             // rearm_type = loop.process??;
             post_dispatch(loop, this, rearm_type);
@@ -2158,13 +2204,13 @@ class timer_impl : public timer<EventLoop>
     void dispatch(void *loop_ptr) noexcept override
     {
         EventLoop &loop = *static_cast<EventLoop *>(loop_ptr);
-        loop.get_base_lock().unlock();
+        loop_access::get_base_lock(loop).unlock();
 
         auto intervals_report = this->intervals;
         this->intervals = 0;
         auto rearm_type = static_cast<Derived *>(this)->timer_expiry(loop, intervals_report);
 
-        loop.get_base_lock().lock();
+        loop_access::get_base_lock(loop).lock();
 
         if (rearm_type != rearm::REMOVED) {
 
@@ -2174,7 +2220,7 @@ class timer_impl : public timer<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            loop.process_timer_rearm(this, rearm_type);
+            loop_access::process_timer_rearm(loop, this, rearm_type);
 
             post_dispatch(loop, this, rearm_type);
         }
