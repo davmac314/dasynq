@@ -739,6 +739,8 @@ class event_loop
         }
     }
     
+    // Register a bidi fd watcher. The watch_flags should already be set to the eventmask to watch
+    // (i.e. eventmask == callback->watch_flags is a pre-condition).
     void register_fd(base_bidi_fd_watcher *callback, int fd, int eventmask, bool emulate = false)
     {
         auto & ed = (event_dispatch<T_Mutex, backend_traits_t> &) loop_mech;
@@ -754,6 +756,7 @@ class event_loop
                     if (r & IN_EVENTS) {
                         callback->emulatefd = true;
                         if (eventmask & IN_EVENTS) {
+                            callback->watch_flags &= ~IN_EVENTS;
                             requeue_watcher(callback);
                         }
                     }
@@ -764,6 +767,7 @@ class event_loop
                     if (r & OUT_EVENTS) {
                         callback->out_watcher.emulatefd = true;
                         if (eventmask & OUT_EVENTS) {
+                            callback->watch_flags &= ~OUT_EVENTS;
                             requeue_watcher(&callback->out_watcher);
                         }
                     }
@@ -776,9 +780,11 @@ class event_loop
                         callback->emulatefd = true;
                         callback->out_watcher.emulatefd = true;
                         if (eventmask & IN_EVENTS) {
+                            callback->watch_flags &= ~IN_EVENTS;
                             requeue_watcher(callback);
                         }
                         if (eventmask & OUT_EVENTS) {
+                            callback->watch_flags &= ~OUT_EVENTS;
                             requeue_watcher(&callback->out_watcher);
                         }
                     }
@@ -1145,9 +1151,8 @@ class event_loop
                 }
             }
             else if (rearm_type == rearm::REARM) {
-                bdfw->watch_flags |= IN_EVENTS;
-                
                 if (! emulatedfd) {
+                    bdfw->watch_flags |= IN_EVENTS;
                     if (! backend_traits_t::has_separate_rw_fd_watches) {
                         int watch_flags = bdfw->watch_flags;
                         set_fd_enabled_nolock(bdfw, bdfw->watch_fd,
@@ -1158,12 +1163,14 @@ class event_loop
                     }
                 }
                 else {
+                    bdfw->watch_flags &= ~IN_EVENTS;
                     rearm_type = rearm::REQUEUE;
                 }
             }
             else if (rearm_type == rearm::NOOP) {
                 if (bdfw->emulatefd) {
                     if (bdfw->watch_flags & IN_EVENTS) {
+                        bdfw->watch_flags &= ~IN_EVENTS;
                         rearm_type = rearm::REQUEUE;
                     }
                 }
@@ -1215,11 +1222,12 @@ class event_loop
                 bdfw->watch_flags &= ~OUT_EVENTS;
             }
             else if (rearm_type == rearm::REARM) {
-                bdfw->watch_flags |= OUT_EVENTS;
+                bdfw->watch_flags &= ~OUT_EVENTS;
                 rearm_type = rearm::REQUEUE;
             }
             else if (rearm_type == rearm::NOOP) {
                 if (bdfw->watch_flags & OUT_EVENTS) {
+                    bdfw->watch_flags &= ~OUT_EVENTS;
                     rearm_type = rearm::REQUEUE;
                 }
             }
@@ -1679,6 +1687,7 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher
     void set_watch_enabled(EventLoop &eloop, bool in, bool b)
     {
         int events = in ? IN_EVENTS : OUT_EVENTS;
+        auto orig_flags = this->watch_flags;
         
         if (b) {
             this->watch_flags |= events;
@@ -1697,6 +1706,13 @@ class bidi_fd_watcher : private dprivate::base_bidi_fd_watcher
                 eloop.set_fd_enabled_nolock(this, this->watch_fd,
                         (this->watch_flags & IO_EVENTS) | ONE_SHOT,
                         (this->watch_flags & IO_EVENTS) != 0);
+            }
+        }
+        else {
+            // emulation: if enabling a previously disabled watcher, must queue now:
+            if (b && (orig_flags != this->watch_flags)) {
+                this->watch_flags = orig_flags;
+                loop_access::requeue_watcher(eloop, watcher);
             }
         }
 

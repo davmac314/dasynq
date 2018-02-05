@@ -276,13 +276,13 @@ void test_bidi_fd_emu()
         {
             // Process I/O here
             seen_read++;
-            return ((seen_read % 10) == 0) ? rearm::REARM : rearm::NOOP;
+            return ((seen_read % 10) != 0) ? rearm::REARM : rearm::NOOP;
         }
 
         rearm write_ready(Loop_t &eloop, int fd)
         {
             seen_write++;
-            return ((seen_write % 10) == 0) ? rearm::REARM : rearm::NOOP;
+            return ((seen_write % 10) != 0) ? rearm::REARM : rearm::NOOP;
         }
     };
 
@@ -301,7 +301,6 @@ void test_bidi_fd_emu()
     my_loop.run();
     assert(watcher1.seen_read == 10);
     assert(watcher1.seen_write == 20);
-
 
     watcher1.deregister(my_loop);
 }
