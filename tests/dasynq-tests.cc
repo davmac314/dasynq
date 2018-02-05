@@ -216,6 +216,96 @@ void test_fd_emu()
     watcher1.deregister(my_loop);
 }
 
+void test_fd_emu2()
+{
+    test_io_engine::clear_fd_data();
+    Loop_t my_loop;
+
+    int seen_count = 0;
+
+    class my_watcher : public Loop_t::fd_watcher_impl<my_watcher>
+    {
+        public:
+        int &seen_count;
+
+        my_watcher(int &seen) : seen_count(seen) { }
+
+        rearm fd_event(Loop_t &eloop, int fd, int flags)
+        {
+            // Process I/O here
+            seen_count++;
+            if (seen_count == 10) {
+                return rearm::NOOP; // don't re-enable
+            }
+            else {
+                return rearm::REARM;
+            }
+        }
+    };
+
+    my_watcher watcher1(seen_count);
+
+    test_io_engine::mark_fd_needs_emulation(0);
+
+    watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS, false);
+
+    my_loop.poll();
+    assert(seen_count == 0);
+
+    watcher1.set_enabled(my_loop, true);
+    my_loop.run();
+    assert(seen_count == 10);
+
+    watcher1.deregister(my_loop);
+}
+
+void test_bidi_fd_emu()
+{
+    test_io_engine::clear_fd_data();
+    Loop_t my_loop;
+
+    class my_watcher : public Loop_t::bidi_fd_watcher_impl<my_watcher>
+    {
+        public:
+        int seen_read = 0;
+        int seen_write = 0;
+
+        my_watcher() { }
+
+        rearm read_ready(Loop_t &eloop, int fd)
+        {
+            // Process I/O here
+            seen_read++;
+            return ((seen_read % 10) == 0) ? rearm::REARM : rearm::NOOP;
+        }
+
+        rearm write_ready(Loop_t &eloop, int fd)
+        {
+            seen_write++;
+            return ((seen_write % 10) == 0) ? rearm::REARM : rearm::NOOP;
+        }
+    };
+
+    my_watcher watcher1;
+
+    test_io_engine::mark_fd_needs_emulation(0);
+
+    watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
+
+    my_loop.run();
+    assert(watcher1.seen_read == 10);
+    assert(watcher1.seen_write == 10);
+
+    watcher1.set_out_watch_enabled(my_loop, true);
+
+    my_loop.run();
+    assert(watcher1.seen_read == 10);
+    assert(watcher1.seen_write == 20);
+
+
+    watcher1.deregister(my_loop);
+}
+
 void test_limited_run()
 {
     test_io_engine::clear_fd_data();
@@ -1159,6 +1249,14 @@ int main(int argc, char **argv)
 
     std::cout << "test_fd_emu... ";
     test_fd_emu();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_fd_emu2... ";
+    test_fd_emu2();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "test_bidi_fd_emu... ";
+    test_bidi_fd_emu();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "test_limited_run... ";

@@ -185,6 +185,12 @@ template <class Base> class test_loop : public timer_base<Base>, io_receiver
         return true;
     }
     
+    bool add_bidi_fd_watch(int fd, void *userdata, int flags, bool emulate)
+    {
+        // No implementation.
+        throw std::system_error(std::make_error_code(std::errc::not_supported));
+    }
+
     void enable_fd_watch_nolock(int fd_num, void *userdata, int events)
     {
         auto srch = fd_data_map.find(fd_num);
@@ -218,6 +224,12 @@ template <class Base> class test_loop : public timer_base<Base>, io_receiver
         fd_data_map.erase(fd);
     }
     
+    void remove_bidi_fd_watch(int fd) noexcept
+    {
+        // Shouldn't be called.
+        remove_fd_watch(fd, IN_EVENTS | OUT_EVENTS);
+    }
+
     void rearm_signal_watch_nolock(int signo, void *userdata)
     {
         // TODO
