@@ -344,7 +344,7 @@ namespace dprivate {
     };
 
     // Do standard post-dispatch processing for a watcher. This handles the case of removing or
-    // re-queing watchers depending on the rearm type.
+    // re-queueing watchers depending on the rearm type.
     template <typename Loop> void post_dispatch(Loop &loop, base_watcher *watcher, rearm rearm_type)
     {
         if (rearm_type == rearm::REMOVE) {
@@ -1008,25 +1008,18 @@ class event_loop
     void requeue_watcher(base_watcher *watcher) noexcept
     {
         loop_mech.queue_watcher(watcher);
-
-        // We need to signal any thread that is currently waiting on the loop mechanism, so that it wakes
-        // and processes the newly queued watcher:
-
-        wait_lock.lock();
-        bool attn_q_empty = attn_waitqueue.is_empty();
-        wait_lock.unlock();
-
-        if (! attn_q_empty) {
-            loop_mech.interrupt_wait();
-        }
+        interrupt_if_necessary();
     }
 
     // Interrupt the current poll-waiter, if necessary - that is, if the loop is multi-thread safe, and if
     // there is currently another thread polling the backend event mechanism.
     void interrupt_if_necessary()
     {
- 	    std::lock_guard<mutex_t> guard(wait_lock);
-        if (! attn_waitqueue.is_empty()) {  // (always false for single-threaded loops)
+        wait_lock.lock();
+        bool attn_q_empty = attn_waitqueue.is_empty(); // (always false for single-threaded loops)
+        wait_lock.unlock();
+
+        if (! attn_q_empty) {
             loop_mech.interrupt_wait();
         }
     }
@@ -1591,11 +1584,15 @@ class fd_watcher : private dprivate::base_fd_watcher
     {
         std::lock_guard<mutex_t> guard(eloop.get_base_lock());
         if (this->emulatefd) {
+            if (enable && ! this->emulate_enabled) {
+                loop_access::requeue_watcher(eloop, this);
+            }
             this->emulate_enabled = enable;
         }
         else {
             eloop.set_fd_enabled_nolock(this, this->watch_fd, this->watch_flags, enable);
         }
+
         if (! enable) {
             eloop.dequeue_watcher(this);
         }
