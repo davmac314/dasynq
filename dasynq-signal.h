@@ -17,7 +17,7 @@ class signal_traits
 
     class sigdata_t
     {
-        template <class Base> friend class signal_events;
+        template <typename, bool> friend class signal_events;
 
         siginfo_t info;
 
@@ -98,7 +98,14 @@ inline siginfo_t * get_siginfo()
 
 } } // namespace dasynq :: signal_mech
 
-template <class Base> class signal_events : public Base
+// signal_events template.
+//
+// Active (watched and enabled) signals are maintained as a signal mask, which either has active
+// signals in the mask or inactive signals in the mask, depending on the mask_enables parameter.
+// (if mask_enables is true, active signals are in the mask). Which is more convenient depends
+// exactly on how the mask will be used.
+//
+template <class Base, bool mask_enables = false> class signal_events : public Base
 {
     sigset_t active_sigmask; // mask out unwatched signals i.e. active=0
     void * sig_userdata[NSIG];
@@ -109,7 +116,12 @@ template <class Base> class signal_events : public Base
 
     signal_events()
     {
-        sigfillset(&active_sigmask);
+        if (mask_enables) {
+            sigemptyset(&active_sigmask);
+        }
+        else {
+            sigfillset(&active_sigmask);
+        }
     }
 
     const sigset_t &get_active_sigmask()
@@ -129,11 +141,18 @@ template <class Base> class signal_events : public Base
         auto * sinfo = get_siginfo();
         sigdata_t sigdata;
         sigdata.info = *sinfo;
+
         Base::lock.lock();
         void *udata = sig_userdata[sinfo->si_signo];
         if (udata != nullptr && Base::receive_signal(*this, sigdata, udata)) {
-            sigaddset(&sigmask, sinfo->si_signo);
-            sigaddset(&active_sigmask, sinfo->si_signo);
+            if (mask_enables) {
+                sigdelset(&sigmask, sinfo->si_signo);
+                sigdelset(&active_sigmask, sinfo->si_signo);
+            }
+            else {
+                sigaddset(&sigmask, sinfo->si_signo);
+                sigaddset(&active_sigmask, sinfo->si_signo);
+            }
         }
         Base::lock.unlock();
     }
@@ -151,7 +170,12 @@ template <class Base> class signal_events : public Base
     void add_signal_watch_nolock(int signo, void *userdata)
     {
         sig_userdata[signo] = userdata;
-        sigdelset(&active_sigmask, signo);
+        if (mask_enables) {
+            sigaddset(&active_sigmask, signo);
+        }
+        else {
+            sigdelset(&active_sigmask, signo);
+        }
         dprivate::signal_mech::prepare_signal(signo);
     }
 
@@ -159,13 +183,23 @@ template <class Base> class signal_events : public Base
     void rearm_signal_watch_nolock(int signo, void *userdata) noexcept
     {
         sig_userdata[signo] = userdata;
-        sigdelset(&active_sigmask, signo);
+        if (mask_enables) {
+            sigaddset(&active_sigmask, signo);
+        }
+        else {
+            sigdelset(&active_sigmask, signo);
+        }
     }
 
     void remove_signal_watch_nolock(int signo) noexcept
     {
         dprivate::signal_mech::unprep_signal(signo);
-        sigaddset(&active_sigmask, signo);
+        if (mask_enables) {
+            sigdelset(&active_sigmask, signo);
+        }
+        else {
+            sigaddset(&active_sigmask, signo);
+        }
         sig_userdata[signo] = nullptr;
         // No need to signal other threads
     }
