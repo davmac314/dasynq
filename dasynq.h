@@ -80,8 +80,7 @@
 //                to system clock), and timers against either clock are not guaranteed to work correctly if
 //                the system clock is adjusted.
 
-#if DASYNQ_HAVE_KQUEUE
-#include "dasynq-kqueue.h"
+#if DASYNQ_HAVE_EPOLL <= 0
 #if _POSIX_TIMERS > 0
 #include "dasynq-posixtimer.h"
 namespace dasynq {
@@ -93,11 +92,23 @@ namespace dasynq {
     template <typename T> using timer_events = itimer_events<T>;
 }
 #endif
+#endif
+
+#if DASYNQ_HAVE_KQUEUE
+#if DASYNQ_KQUEUE_MACOS_WORKAROUND
+#include "dasynq-kqueue-macos.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using loop_t = kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
-    using loop_traits_t = kqueue_traits;
+    template <typename T> using loop_t = macos_kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
+    using loop_traits_t = macos_kqueue_traits;
 }
+#else
+#include "dasynq-childproc.h"
+namespace dasynq {
+    template <typename T> using loop_t = macos_kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
+    using loop_traits_t = macos_kqueue_traits;
+}
+#endif
 #elif DASYNQ_HAVE_EPOLL
 #include "dasynq-epoll.h"
 #include "dasynq-timerfd.h"

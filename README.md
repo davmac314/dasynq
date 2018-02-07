@@ -39,10 +39,6 @@ for detecting:
 It also supports one-shot and periodic timers, against both a monotonic and adjustable system clock
 (on systems where this is possible).
 
-***Note:*** On macOS, a bug in the kqueue implementations means that signals, and by extension child
-process termination, are not reliably reported. See extra/macos-kqueue-bug for more information.
-The bug has been reported to Apple.
-
 Dasynq is fully thread-safe, allowing events to be polled and processed on any thread, unlike nearly
 every other event loop library (some of which are thread-safe, but require that events be polled
 from a single thread).
