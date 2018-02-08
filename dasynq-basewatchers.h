@@ -75,7 +75,7 @@ namespace dprivate {
         TIMER
     };
 
-    template <typename T_Mutex, typename Traits, typename LoopTraits> class event_dispatch;
+    template <typename Traits, typename LoopTraits> class event_dispatch;
 
     // For FD watchers:
     // Use this watch flag to indicate that in and out events should be reported separately,
@@ -142,7 +142,7 @@ namespace dprivate {
     template <typename T_Sigdata>
     class base_signal_watcher : public base_watcher
     {
-        template <typename, typename, typename> friend class event_dispatch;
+        template <typename, typename> friend class event_dispatch;
         template <typename, typename> friend class dasynq::event_loop;
 
         protected:
@@ -156,7 +156,7 @@ namespace dprivate {
 
     class base_fd_watcher : public base_watcher
     {
-        template <typename, typename, typename> friend class event_dispatch;
+        template <typename, typename> friend class event_dispatch;
         template <typename, typename> friend class dasynq::event_loop;
 
         protected:
@@ -176,7 +176,7 @@ namespace dprivate {
 
     class base_bidi_fd_watcher : public base_fd_watcher
     {
-        template <typename, typename, typename> friend class event_dispatch;
+        template <typename, typename> friend class event_dispatch;
         template <typename, typename> friend class dasynq::event_loop;
 
         base_bidi_fd_watcher(const base_bidi_fd_watcher &) = delete;
@@ -195,7 +195,7 @@ namespace dprivate {
 
     class base_child_watcher : public base_watcher
     {
-        template <typename, typename, typename> friend class event_dispatch;
+        template <typename, typename> friend class event_dispatch;
         template <typename, typename> friend class dasynq::event_loop;
 
         protected:
@@ -209,7 +209,7 @@ namespace dprivate {
 
     class base_timer_watcher : public base_watcher
     {
-        template <typename, typename, typename> friend class event_dispatch;
+        template <typename, typename> friend class event_dispatch;
         template <typename, typename> friend class dasynq::event_loop;
 
         protected:
