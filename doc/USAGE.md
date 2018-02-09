@@ -276,9 +276,6 @@ programs is by masking the signal at program startup, before creating any additi
 Note that signal masks are inherited by child processes; if you mask commonly used signals you
 should generally unmask them after forking a child process.
 
-MacOS, at least on version 10.12.6, appears to have a bug where signals generated using the
-`raise` system call are not seen by the kqueue mechanism and so are undetectable by Dasynq.
-
 
 ## 3.3 Child process watchers
 
