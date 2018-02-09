@@ -103,10 +103,11 @@ namespace dasynq {
     using loop_traits_t = macos_kqueue_traits;
 }
 #else
+#include "dasynq-kqueue.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using loop_t = macos_kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
-    using loop_traits_t = macos_kqueue_traits;
+    template <typename T> using loop_t = kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
+    using loop_traits_t = kqueue_traits;
 }
 #endif
 #elif DASYNQ_HAVE_EPOLL
