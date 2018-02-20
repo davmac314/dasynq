@@ -24,12 +24,12 @@ dasynq.pc:
 	@echo "Version: $(VERSION)" >> dasynq.pc
 	@echo "URL: http://github.com/davmac314/dasynq" >> dasynq.pc
 	@echo "Libs: $(CXXLINKOPT)" >> dasynq.pc
-	@echo "Cflags: $(CXXOPTS) -I$(HEADERDIR)" >> dasynq.pc
+	@echo "Cflags: $(CXXOPTS) -I\"$(HEADERDIR)\"" >> dasynq.pc
 
 install: dasynq.pc
-	install -d $(DESTDIR)$(HEADERDIR) $(DESTDIR)$(LIBDIR)/pkgconfig
-	install -m644 -t $(DESTDIR)$(HEADERDIR) dasynq.h dasynq-*.h
-	install -m644 -t $(DESTDIR)$(LIBDIR)/pkgconfig dasynq.pc
+	install -d "$(DESTDIR)$(HEADERDIR)" "$(DESTDIR)$(LIBDIR)/pkgconfig"
+	install -m644 -t "$(DESTDIR)$(HEADERDIR)" dasynq.h dasynq-*.h
+	install -m644 -t "$(DESTDIR)$(LIBDIR)/pkgconfig" dasynq.pc
 
 clean:
 	rm -f *.o
