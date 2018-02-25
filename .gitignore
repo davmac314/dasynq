@@ -4,3 +4,7 @@ dasynq-test
 /extra/iobench/libev/**
 /.project
 /.cproject
+/.settings
+/cmake/Dasynq.cmake
+/cmake/DasynqConfigVersion.cmake
+/Makefile

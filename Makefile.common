@@ -4,12 +4,19 @@ HEADERDIR=/usr/include/dasynq
 LIBDIR=/usr/lib
 
 VERSION=1.1.2
+VERSION_MAJOR=1
 
 export CXX CXXOPTS CXXLINKOPTS CXXTESTOPTS CXXTESTLINKOPTS THREADOPT SANITIZE
+export HEADERDIR LIBDIR DESTDIR VERSION VERSION_MAJOR
 
 all:
+	$(MAKE) -C cmake all
+	@echo "------------------------------"
 	@echo "Dasynq version $(VERSION)."
-	@echo "This is a header-only library. Use \"$(MAKE) check\" to build and run tests."
+	@echo "------------------------------"
+	@echo "This is a header-only library."
+	@echo "Use \"$(MAKE) check\" to build and run tests."
+	@echo "Use \"$(MAKE) install\" to install."
 
 check:
 	$(MAKE) -C tests check
@@ -30,7 +37,9 @@ install: dasynq.pc
 	install -d "$(DESTDIR)$(HEADERDIR)" "$(DESTDIR)$(LIBDIR)/pkgconfig"
 	install -m644 -t "$(DESTDIR)$(HEADERDIR)" dasynq.h dasynq-*.h
 	install -m644 -t "$(DESTDIR)$(LIBDIR)/pkgconfig" dasynq.pc
+	$(MAKE) -C cmake install
 
 clean:
 	rm -f *.o
 	$(MAKE) -C tests clean
+	$(MAKE) -C cmake clean
