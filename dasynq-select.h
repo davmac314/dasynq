@@ -60,7 +60,7 @@ class select_traits : public signal_traits
     constexpr static bool supports_non_oneshot_fd = false;
 };
 
-template <class Base> class select_events : public signal_events<Base>
+template <class Base> class select_events : public signal_events<Base, ! DASYNQ_HAVE_PSELECT>
 {
     fd_set read_set;
     fd_set write_set;
@@ -263,9 +263,15 @@ template <class Base> class select_events : public signal_events<Base>
     {
         //using namespace dprivate::select_mech;
 
+#if DASYNQ_HAVE_PSELECT
         struct timespec ts;
         ts.tv_sec = 0;
         ts.tv_nsec = 0;
+#else
+        struct timeval ts;
+        ts.tv_sec = 0;
+        ts.tv_usec = 0;
+#endif
 
         fd_set read_set_c;
         fd_set write_set_c;
@@ -305,7 +311,14 @@ template <class Base> class select_events : public signal_events<Base>
 
         std::atomic_signal_fence(std::memory_order_release);
 
+#if DASYNQ_HAVE_PSELECT
         int r = pselect(nfds, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts, &sigmask);
+#else
+        this->sigmaskf(SIG_UNBLOCK, &active_sigmask, nullptr);
+        int r = select(nfds, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts);
+        this->sigmaskf(SIG_BLOCK, &active_sigmask, nullptr);
+#endif
+
         if (r == -1 || r == 0) {
             // signal or no events
             return;
