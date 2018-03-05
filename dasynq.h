@@ -120,17 +120,6 @@ namespace dasynq {
 }
 #else
 #include "dasynq-select.h"
-#if _POSIX_TIMERS > 0
-#include "dasynq-posixtimer.h"
-namespace dasynq {
-    template <typename T> using timer_events = posix_timer_events<T>;
-}
-#else
-#include "dasynq-itimer.h"
-namespace dasynq {
-    template <typename T> using timer_events = itimer_events<T>;
-}
-#endif
 #include "dasynq-childproc.h"
 namespace dasynq {
     template <typename T> using loop_t = select_events<interrupt_channel<timer_events<child_proc_events<T>>>>;
