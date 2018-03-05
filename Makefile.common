@@ -30,7 +30,7 @@ dasynq.pc:
 	@echo "Description:  Event-loop library, C++" >> dasynq.pc
 	@echo "Version: $(VERSION)" >> dasynq.pc
 	@echo "URL: http://github.com/davmac314/dasynq" >> dasynq.pc
-	@echo "Libs: $(CXXLINKOPT)" >> dasynq.pc
+	@echo "Libs: $(CXXLINKOPTS)" >> dasynq.pc
 	@echo "Cflags: $(CXXOPTS) -I\"$(HEADERDIR)\"" >> dasynq.pc
 
 install: dasynq.pc
