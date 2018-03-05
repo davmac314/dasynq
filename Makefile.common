@@ -35,8 +35,8 @@ dasynq.pc:
 
 install: dasynq.pc
 	install -d "$(DESTDIR)$(HEADERDIR)" "$(DESTDIR)$(LIBDIR)/pkgconfig"
-	install -m644 -t "$(DESTDIR)$(HEADERDIR)" dasynq.h dasynq-*.h
-	install -m644 -t "$(DESTDIR)$(LIBDIR)/pkgconfig" dasynq.pc
+	install -m644 dasynq.h dasynq-*.h "$(DESTDIR)$(HEADERDIR)"
+	install -m644 dasynq.pc "$(DESTDIR)$(LIBDIR)/pkgconfig"
 	$(MAKE) -C cmake install
 
 clean:

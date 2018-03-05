@@ -2,7 +2,7 @@ all: Dasynq.cmake DasynqConfigVersion.cmake
 
 install: all
 	install -d "$(DESTDIR)$(LIBDIR)/cmake/Dasynq"
-	install -m644 -t "$(DESTDIR)$(LIBDIR)/cmake/Dasynq" *.cmake
+	install -m644 *.cmake "$(DESTDIR)$(LIBDIR)/cmake/Dasynq"
 
 clean:
 	rm -f Dasynq.cmake
