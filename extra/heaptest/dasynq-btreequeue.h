@@ -11,22 +11,22 @@ namespace dasynq {
 template <typename T, typename P, typename Compare = std::less<P>, int N = 8>
 class btree_queue
 {
-    struct HeapNode;
+    struct heap_node;
     
     public:
-    using handle_t = HeapNode;
-    using handle_t_r = HeapNode &;
+    using handle_t = heap_node;
+    using handle_t_r = heap_node &;
     
     private:
     
-    struct SeptNode
+    struct sept_node
     {
         P prio[N];
         handle_t * hn_p[N];  // pointer to handle (linked list)
-        SeptNode * children[N + 1];
-        SeptNode * parent;
+        sept_node * children[N + 1];
+        sept_node * parent;
         
-        SeptNode()
+        sept_node()
         {
             // Do nothing; constructor will be run later
         }
@@ -84,21 +84,35 @@ class btree_queue
         }
     };
     
-    struct HeapNode
+    // A marker type to disambiguate constructor calls:
+    class no_data_marker { };
+
+    struct heap_node
     {
-        T data;
+        // We wrap the data in union so that it can have a lifetime shorter than the containing
+        // heap_node:
+        union u_data_t {
+            T data;
+
+            // Construct without data:
+            u_data_t(no_data_marker) { }
+
+            // Construct with data:
+            template <typename ...U> u_data_t(U... u) : data(u...) { }
+        } u_data;
         
-        HeapNode * next_sibling;
-        HeapNode * prev_sibling;
+        // heap_nodes with the same priority are stored in a circular, doubly-linked list:
+        heap_node * next_sibling;
+        heap_node * prev_sibling;
         
-        SeptNode * parent; // only maintained for head of list
+        sept_node * parent; // only maintained for head of list
         
-        HeapNode()
+        heap_node() : u_data(no_data_marker {})
         {
-        
+        	// do not initialise udata.data
         }
         
-        template <typename ...U> HeapNode(U... u) : data(u...)
+        template <typename ...U> heap_node(U... u) : u_data(u...)
         {
             next_sibling = nullptr;
             prev_sibling = nullptr;
@@ -106,22 +120,26 @@ class btree_queue
         }
     };
 
-    SeptNode * root_sept = nullptr; // root of the B=Tree
-    SeptNode * left_sept = nullptr; // leftmost child (cache)
-    SeptNode * sn_reserve = nullptr;
+    sept_node * root_sept = nullptr; // root of the B-Tree
+    sept_node * left_sept = nullptr; // leftmost child (cache)
+    sept_node * sn_reserve = nullptr;
 
     int num_alloced = 0;
     int num_septs = 0;
     int num_septs_needed = 0;
-    int next_sept = 1;  // next num_allocd for which we need another SeptNode in reserve.
+    int next_sept = 1;  // next num_allocd for which we need another sept_node in reserve.
     
     // Note that sept nodes are always at least half full, except for the root sept node.
     // For up to N nodes, one sept node is needed;
     //        at N+1 nodes, three sept nodes are needed: a root and two leaves;
-    //     for every N/2 nodes thereafter, an additional sept node may be required.
-    // A simple approximation is, s = (n * 2 + N - 1) / N.
-    // (Actually we get away with much less, if nodes have the same priority, since they are
-    // then linked in list and effectively become a single node).
+    //     for every (N+1)/2 nodes thereafter, an additional sept node may be required.
+    // A simple approximation is, s(n) = (n - 1 + ((N+1)/2)) / ((N+1)/2).
+    // With this approximation, s(0) == 0, s(1) == 1, and s(N+1) = 3.  s((N+1)/2+1 <= n <= N) == 2, but we
+    // can live with that (conservative is ok). Remember that we use integer arithmetic.
+    //
+    // (We may actually we get away with much less, if nodes have the same priority, since they
+    // are then linked in list and effectively become a single node; but, we need to allocate
+    // sept nodes according to the formula in case priorities change).
     
     void alloc_slot()
     {
@@ -130,7 +148,7 @@ class btree_queue
         if (__builtin_expect(num_alloced == next_sept, 0)) {
             if (++num_septs_needed > num_septs) {
                 try {
-                    SeptNode *new_res = new SeptNode();
+                    sept_node *new_res = new sept_node();
                     new_res->parent = sn_reserve;
                     sn_reserve = new_res;
                     num_septs++;
@@ -141,19 +159,19 @@ class btree_queue
                     throw;
                 }
             }
-            next_sept += N/2;
+            next_sept += (N+1)/2;
         }
     }
     
-    SeptNode * alloc_sept()
+    sept_node * alloc_sept()
     {
-        SeptNode * r = sn_reserve;
+        sept_node * r = sn_reserve;
         sn_reserve = r->parent;
         r->init();
         return r;
     }
     
-    void release_sept(SeptNode *s)
+    void release_sept(sept_node *s)
     {
         s->parent = sn_reserve;
         sn_reserve = s;
@@ -163,7 +181,7 @@ class btree_queue
     
     T & node_data(handle_t & hn) noexcept
     {
-        return hn.data;
+        return hn.u_data.data;
     }
     
     static void init_handle(handle_t &hn) noexcept
@@ -175,24 +193,21 @@ class btree_queue
     template <typename ...U> void allocate(handle_t &hndl, U... u)
     {
         alloc_slot();
-        // TODO should not really new over an existing object.
-        //      T element in HeapNode should be obscured so we don't need a default-constructed
-        //      T in it.
-        new (& hndl) HeapNode(u...);
+        new (& hndl.u_data.data) T(u...);
     }
     
     void deallocate(handle_t & hn) noexcept
     {
-        hn.HeapNode::~HeapNode();
+        hn.u_data.data.T::~T();
         num_alloced--;
         
         // Potentially release reserved sept node
-        if (__builtin_expect(num_alloced < next_sept - N/2, 0)) {
-            next_sept -= N/2;
+        if (__builtin_expect(num_alloced < next_sept - (N+1)/2, 0)) {
             num_septs_needed--;
+            next_sept -= (N+1)/2;
             if (num_septs_needed < num_septs - 1) {
                 // Note the "-1" margin is to alleviate bouncing allocation/deallocation
-                SeptNode * r = sn_reserve;
+                sept_node * r = sn_reserve;
                 sn_reserve = r->parent;
                 delete r;
                 num_septs--;
@@ -215,10 +230,13 @@ class btree_queue
             left_sept = root_sept;
         }
         
-        SeptNode * srch_sept = root_sept;
+        sept_node * srch_sept = root_sept;
         
         bool leftmost = true;
 
+        // Start at the root, and go down the tree until we find a leaf sept_node, or until we find
+        // a node with the same priority value (in which case, we link the new node with it as
+        // a linked list, and are done):
         while (! srch_sept->is_leaf()) {
             int min = 0;
             int max = N - 1;
@@ -283,15 +301,17 @@ class btree_queue
         hndl.prev_sibling = &hndl;
         hndl.next_sibling = &hndl;
         
-        SeptNode * left_down = nullptr; // left node going down
-        SeptNode * right_down = nullptr; // right node going down
+        sept_node * left_down = nullptr; // left node going down
+        sept_node * right_down = nullptr; // right node going down
         leftmost = leftmost && pval < srch_sept->prio[0];
         
         handle_t * hndl_p = &hndl;
         
+        // If the sept_node is full, we must split it, and push one node into its parent, which may
+        // then also need to be split, and so on:
         while (children == N) {
             // split and push value towards root
-            SeptNode * new_sibling = alloc_sept();
+            sept_node * new_sibling = alloc_sept();
             new_sibling->parent = srch_sept->parent;
 
             // create new sibling to the right:
@@ -392,7 +412,7 @@ class btree_queue
     
     // Merge rsibling, and one value from the parent, into lsibling.
     // Index is the index of the parent value.
-    void merge(SeptNode *lsibling, SeptNode *rsibling, int index) noexcept
+    void merge(sept_node *lsibling, sept_node *rsibling, int index) noexcept
     {
         int lchildren = lsibling->num_vals();
         lsibling->hn_p[lchildren] = lsibling->parent->hn_p[index];
@@ -433,10 +453,10 @@ class btree_queue
     
     // borrow values from, or merge with, a sibling node so that the node
     // is suitably (~>=50%) populated.
-    void repop_node(SeptNode *sept, int children) noexcept
+    void repop_node(sept_node *sept, int children) noexcept
     {
         start:
-        SeptNode *parent = sept->parent;
+        sept_node *parent = sept->parent;
         if (parent == nullptr) {
             // It's the root node, so don't worry about it, unless empty
             if (sept->hn_p[0] == nullptr) {
@@ -450,7 +470,7 @@ class btree_queue
         // Find a suitable sibling to the left or right:
         if (parent->children[0] == sept) {
             // take right sibling
-            SeptNode *rsibling = parent->children[1];
+            sept_node *rsibling = parent->children[1];
             if (rsibling->num_vals() + children + 1 <= N) {
                 // We can merge
                 merge(sept, rsibling, 0);
@@ -487,7 +507,7 @@ class btree_queue
                 }
             }
             
-            SeptNode *lsibling = parent->children[i-1];
+            sept_node *lsibling = parent->children[i-1];
             int lchildren = lsibling->num_vals();
             if (lchildren + children + 1 <= N) {
                 // merge
@@ -521,7 +541,7 @@ class btree_queue
     
     void remove_from_root()
     {
-        SeptNode *sept = left_sept;
+        sept_node *sept = left_sept;
         int i;
         for (i = 0; i < (N-1); i++) {
             sept->hn_p[i] = sept->hn_p[i+1];
@@ -552,7 +572,7 @@ class btree_queue
             hndl.prev_sibling = nullptr; // mark as not in queue
             if (hndl.parent != nullptr) {
                 next->parent = hndl.parent;
-                SeptNode * sept = next->parent;
+                sept_node * sept = next->parent;
                 for (int i = 0; i < N; i++) {
                     if (sept->hn_p[i] == & hndl) {
                         sept->hn_p[i] = next;
@@ -566,14 +586,14 @@ class btree_queue
             // Pull nodes from a child, all the way down
             // the tree. Then re-balance back up the tree,
             // merging nodes if necessary.
-            SeptNode * sept = hndl.parent;
+            sept_node * sept = hndl.parent;
             
             int i;
             for (i = 0; i < N; i++) {
                 if (sept->hn_p[i] == &hndl) {
                     // Ok, go right, then as far as we can to the left:
-                    SeptNode * lsrch = sept->children[i+1];
-                    SeptNode * prev = sept;
+                    sept_node * lsrch = sept->children[i+1];
+                    sept_node * prev = sept;
                     while (lsrch != nullptr) {
                         prev = lsrch;
                         lsrch = lsrch->children[0];
@@ -665,7 +685,7 @@ class btree_queue
         check_consistency(root_sept);
     }
     
-    void check_consistency(SeptNode *node, P * min = nullptr, P * max = nullptr)
+    void check_consistency(sept_node *node, P * min = nullptr, P * max = nullptr)
     {
         if (node == nullptr) return;
         
@@ -686,27 +706,32 @@ class btree_queue
         
         if (node->parent != nullptr && ch_count < N/2) abort();
         
+        int i;
+        for (i = 0; i < N; i++) {
+            if (node->hn_p[i] == nullptr) break;
+
+            // Priority checks
+            if (i != 0 && node->prio[i] < node->prio[i-1]) {
+                abort();
+            }
+            if (min != nullptr && node->prio[i] < *min) {
+                abort();
+            }
+            if (max != nullptr && node->prio[i] > *max) {
+                abort();
+            }
+
+            if (node->hn_p[i]->parent != node) {
+                abort();
+            }
+        }
+
         if (node->children[0] != nullptr) {
             // if the first child isn't a null pointer, no children should be:
-            int i;
             for (i = 0; i < N; i++) {
                 if (node->hn_p[i] == nullptr) break;
-                
-                // Priority checks
-                if (i != 0 && node->prio[i] < node->prio[i-1]) {
-                    abort();
-                }
-                if (min != nullptr && node->prio[i] < *min) {
-                    abort();
-                }
-                if (min != nullptr && node->prio[i] < *min) {
-                    abort();
-                }
-                
+
                 // Link checks
-                if (node->hn_p[i]->parent != node) {
-                    abort();
-                }
                 if (node->children[i]->parent != node) {
                     abort();
                 }
@@ -719,16 +744,23 @@ class btree_queue
                 
                 P * rmin = (i > 0) ? (& node->prio[i-1]) : min;
                 P * rmax = & node->prio[i];
-                check_consistency(node->children[i], min, max);
+                check_consistency(node->children[i], rmin, rmax);
             }
             check_consistency(node->children[i], & node->prio[i-1], max);
         }
     }
     
-    void dumpnode(SeptNode * node, std::vector<SeptNode *> &q = {})
+    void dumpnode(sept_node * node)
+    {
+        std::vector<sept_node *> bt;
+        dumpnode(node, bt);
+    }
+
+    void dumpnode(sept_node * node, std::vector<sept_node *> &q)
     {
         using namespace std;
         cout << "Node @ " << (void *) node << endl;
+        if (node == nullptr) return;
         cout << "    parent = " << node->parent << endl;
 
         int i;
@@ -757,9 +789,9 @@ class btree_queue
     void dump()
     {
         using namespace std;
-        cout << "root = " << (void *) root_sept << " num_septs = " << num_septs << " sn_reserve.size() = " << sn_reserve.size() << endl;
+        cout << "root = " << (void *) root_sept << " num_septs = " << num_septs << endl;
         if (root_sept != nullptr) {
-            vector<SeptNode *> q;
+            vector<sept_node *> q;
             q.push_back(root_sept);
             while (! q.empty()) {
                 auto b = q.back();
