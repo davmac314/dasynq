@@ -1057,7 +1057,7 @@ void ftest_timers()
     };
 
     my_timer timer_1;
-    struct timespec timeout_1 = { .tv_sec = 0, .tv_nsec = 0 };
+    struct timespec timeout_1 = { .tv_sec = 0, .tv_nsec = 1 };
     timer_1.add_timer(my_loop, clock_type::MONOTONIC);
     timer_1.arm_timer(my_loop, timeout_1);
 

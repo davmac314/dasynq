@@ -82,7 +82,10 @@ is relative to the current time. While setting relative times to the <i class="c
 is supported, be aware that it rarely makes sense to do so; the timer is not guaranteed to expire after
 the specified interval (if the system clock is adjusted, the adjustment will also be applied to the
 timeout). Use a timer against the <i class="code-name">MONOTONIC</i> clock if you need a specific interval
-of time.</p> 
+of time.</p>
+
+<p>An absolute timeout of 0:0 is not supported (some timer backends use it internally to disable the
+associated system timer).</p>
 
 <h3>Subclassing timer</h3>
 
