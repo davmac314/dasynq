@@ -1038,6 +1038,39 @@ void ftest_sig_watch2()
     swatch->deregister(my_loop);
 }
 
+void ftest_timers()
+{
+    using loop_t = dasynq::event_loop<checking_mutex>;
+    using clock_type = dasynq::clock_type;
+    loop_t my_loop;
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        public:
+        rearm timer_expiry(loop_t &loop, int expiry_count)
+        {
+            expiries += expiry_count;
+            return rearm::REARM;
+        }
+
+        int expiries = 0;
+    };
+
+    my_timer timer_1;
+    struct timespec timeout_1 = { .tv_sec = 0, .tv_nsec = 0 };
+    timer_1.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_1.arm_timer(my_loop, timeout_1);
+
+    struct timespec t200ms;
+    t200ms.tv_sec = 0;
+    t200ms.tv_nsec = 200 * 1000 * 1000;
+    nanosleep(&t200ms, nullptr);
+
+    my_loop.poll();
+
+    assert(timer_1.expiries == 1);
+}
+
 void ftest_multi_thread1()
 {
     using Loop_t = dasynq::event_loop<std::mutex>;
@@ -1308,6 +1341,10 @@ int main(int argc, char **argv)
 
     std::cout << "ftest_sig_watch2... ";
     ftest_sig_watch2();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftest_timers... ";
+    ftest_timers();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_multi_thread1... ";
