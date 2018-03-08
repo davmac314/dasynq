@@ -89,7 +89,7 @@ namespace dasynq {
 #else
 #include "dasynq-itimer.h"
 namespace dasynq {
-    template <typename T> using timer_events = itimer_events<T>;
+    template <typename T, bool provide_mono_timer = true> using timer_events = itimer_events<T, provide_mono_timer>;
 }
 #endif
 #endif
@@ -99,14 +99,14 @@ namespace dasynq {
 #include "dasynq-kqueue-macos.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using loop_t = macos_kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
+    template <typename T> using loop_t = macos_kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = macos_kqueue_traits;
 }
 #else
 #include "dasynq-kqueue.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using loop_t = kqueue_loop<interrupt_channel<timer_events<child_proc_events<T>>>>;
+    template <typename T> using loop_t = kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>>>;
     using loop_traits_t = kqueue_traits;
 }
 #endif

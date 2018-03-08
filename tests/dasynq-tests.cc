@@ -1038,7 +1038,8 @@ void ftest_sig_watch2()
     swatch->deregister(my_loop);
 }
 
-void ftest_timers()
+// function test for immediate timer expiry
+void ftest_timers1()
 {
     using loop_t = dasynq::event_loop<checking_mutex>;
     using clock_type = dasynq::clock_type;
@@ -1061,12 +1062,52 @@ void ftest_timers()
     timer_1.add_timer(my_loop, clock_type::MONOTONIC);
     timer_1.arm_timer(my_loop, timeout_1);
 
-    struct timespec t200ms;
-    t200ms.tv_sec = 0;
-    t200ms.tv_nsec = 200 * 1000 * 1000;
-    nanosleep(&t200ms, nullptr);
+    // Allow a 100ms grace period:
+    struct timespec t100ms;
+    t100ms.tv_sec = 0;
+    t100ms.tv_nsec = 100 * 1000 * 1000;
+    nanosleep(&t100ms, nullptr);
 
     my_loop.poll();
+
+    assert(timer_1.expiries == 1);
+}
+
+// function test for future timer expiry
+void ftest_timers2()
+{
+    using loop_t = dasynq::event_loop<checking_mutex>;
+    using clock_type = dasynq::clock_type;
+    loop_t my_loop;
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        public:
+        rearm timer_expiry(loop_t &loop, int expiry_count)
+        {
+            expiries += expiry_count;
+            return rearm::REARM;
+        }
+
+        int expiries = 0;
+    };
+
+    my_timer timer_1;
+    struct timespec timeout_1 = { .tv_sec = 0, .tv_nsec = 200000000 /* 200ms*/ };
+    timer_1.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_1.arm_timer_rel(my_loop, timeout_1);
+
+    struct timespec t150ms;
+    t150ms.tv_sec = 0;
+    t150ms.tv_nsec = 150 * 1000 * 1000;
+    nanosleep(&t150ms, nullptr);
+
+    my_loop.poll();
+
+    // timer shouldn't have expired yet:
+    assert(timer_1.expiries == 0);
+
+    my_loop.run();
 
     assert(timer_1.expiries == 1);
 }
@@ -1343,8 +1384,12 @@ int main(int argc, char **argv)
     ftest_sig_watch2();
     std::cout << "PASSED" << std::endl;
 
-    std::cout << "ftest_timers... ";
-    ftest_timers();
+    std::cout << "ftest_timers1... ";
+    ftest_timers1();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftest_timers2... ";
+    ftest_timers2();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_multi_thread1... ";
