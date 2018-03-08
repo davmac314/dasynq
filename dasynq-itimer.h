@@ -132,7 +132,7 @@ template <class Base> class itimer_events : public timer_base<Base>
         this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);
         sigaddset(&sigmask, SIGALRM);
         this->sigmaskf(SIG_SETMASK, &sigmask, nullptr);
-        loop_mech->add_signal_watch(SIGALRM, nullptr);
+        loop_mech->add_signal_watch(SIGALRM, this);
         Base::init(loop_mech);
     }
     

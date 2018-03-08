@@ -94,7 +94,7 @@ template <class Base> class posix_timer_events : public timer_base<Base>
         this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);
         sigaddset(&sigmask, SIGALRM);
         this->sigmaskf(SIG_SETMASK, &sigmask, nullptr);
-        loop_mech->add_signal_watch(SIGALRM, nullptr);
+        loop_mech->add_signal_watch(SIGALRM, this);
 
         struct sigevent timer_sigevent;
         timer_sigevent.sigev_notify = SIGEV_SIGNAL;
