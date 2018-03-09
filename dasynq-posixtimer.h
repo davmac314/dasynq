@@ -148,10 +148,8 @@ class posix_timer_events : public timer_base<Base>
     void set_timer_rel(timer_handle_t &timer_id, const timespec &timeout, const timespec &interval,
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
-        // TODO consider caching current time somehow; need to decide then when to update cached value.
         struct timespec curtime;
-        int posix_clock_id = (clock == clock_type::MONOTONIC) ? CLOCK_MONOTONIC : CLOCK_REALTIME;
-        clock_gettime(posix_clock_id, &curtime);
+        get_time(curtime, clock, false);
         curtime.tv_sec += timeout.tv_sec;
         curtime.tv_nsec += timeout.tv_nsec;
         if (curtime.tv_nsec > 1000000000) {
