@@ -13,7 +13,8 @@ namespace dasynq {
 // Timer implementation based on POSIX create_timer et al.
 // May require linking with -lrt
 
-template <class Base> class posix_timer_events : public timer_base<Base>
+template <class Base, bool provide_mono_timer = true>
+class posix_timer_events : public timer_base<Base>
 {
     private:
     timer_t real_timer;
@@ -56,7 +57,7 @@ template <class Base> class posix_timer_events : public timer_base<Base>
                 set_timer_from_queue(real_timer, real_timer_queue);
             }
 
-            if (! mono_timer_queue.empty()) {
+            if (! mono_timer_queue.empty() && provide_mono_timer) {
                 this->get_time(curtime, clock_type::MONOTONIC, true);
                 this->process_timer_queue(mono_timer_queue, curtime);
                 set_timer_from_queue(mono_timer, mono_timer_queue);
@@ -103,7 +104,7 @@ template <class Base> class posix_timer_events : public timer_base<Base>
 
         // Create the timers; throw std::system_error if we can't.
         if (timer_create(CLOCK_REALTIME, &timer_sigevent, &real_timer) == 0) {
-            if (timer_create(CLOCK_MONOTONIC, &timer_sigevent, &mono_timer) != 0) {
+            if (provide_mono_timer && timer_create(CLOCK_MONOTONIC, &timer_sigevent, &mono_timer) != 0) {
                 timer_delete(real_timer);
                 throw std::system_error(errno, std::system_category());
             }
@@ -182,7 +183,9 @@ template <class Base> class posix_timer_events : public timer_base<Base>
 
     ~posix_timer_events()
     {
-        timer_delete(mono_timer);
+        if (provide_mono_timer) {
+            timer_delete(mono_timer);
+        }
         timer_delete(real_timer);
     }
 };

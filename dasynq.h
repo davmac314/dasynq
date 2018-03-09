@@ -106,7 +106,7 @@ namespace dasynq {
 #include "dasynq-kqueue.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
-    template <typename T> using loop_t = kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>>>;
+    template <typename T> using loop_t = kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = kqueue_traits;
 }
 #endif

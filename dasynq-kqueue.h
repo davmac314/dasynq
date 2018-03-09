@@ -557,14 +557,57 @@ template <class Base> class kqueue_loop : public Base
         struct kevent events[16];
         struct timespec ts;
 
-        ts.tv_sec = 0;
-        ts.tv_nsec = 0;
-        int r = kevent(kqfd, nullptr, 0, events, 16, do_wait ? nullptr : &ts);
+        // wait_ts remains null for an infinite wait; it is later set to either a 0 timeout
+        // if do_wait is false (or if we otherwise won't wait due to events being detected
+        // early) or is set to an appropriate timeout for the next timer's timeout.
+        struct timespec *wait_ts = nullptr;
+
+        Base::lock.lock();
+
+        // Check whether any timers are pending, and what the next timeout is.
+        timespec now;
+        auto &timer_q = this->queue_for_clock(clock_type::MONOTONIC);
+        this->get_time(now, clock_type::MONOTONIC, true);
+        if (! timer_q.empty()) {
+            const time_val &timeout = timer_q.get_root_priority();
+            if (timeout <= now) {
+                this->process_timer_queue(timer_q, now);
+                do_wait = false; // don't wait, we have events already
+            }
+            else if (do_wait) {
+                ts = (timeout - now);
+                wait_ts = &ts;
+            }
+        }
+
+        Base::lock.unlock();
+
+        if (! do_wait) {
+            ts.tv_sec = 0;
+            ts.tv_nsec = 0;
+            wait_ts = &ts;
+        }
+
+        int r = kevent(kqfd, nullptr, 0, events, 16, wait_ts);
         if (r == -1 || r == 0) {
             // signal or no events
+            if (r == 0 && do_wait) {
+                // timeout:
+                Base::lock.lock();
+
+                this->get_time(now, clock_type::MONOTONIC, true);
+                if (! timer_q.empty()) {
+                    this->process_timer_queue(timer_q, now);
+                }
+
+                Base::lock.unlock();
+            }
             return;
         }
         
+        ts.tv_sec = 0;
+        ts.tv_nsec = 0;
+
         do {
             process_events(events, r);
             r = kevent(kqfd, nullptr, 0, events, 16, &ts);
