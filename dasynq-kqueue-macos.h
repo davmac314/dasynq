@@ -70,7 +70,7 @@ class macos_kqueue_traits : public signal_traits
     constexpr static bool supports_non_oneshot_fd = false;
 };
 
-template <class Base> class macos_kqueue_loop : public signal_events<Base,true>
+template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
 {
     int kqfd; // kqueue fd
 
@@ -360,13 +360,13 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base,true>
             }
         }
 
-        sigset_t sigmask = this->get_active_sigmask();
+        sigset_t &active_sigmask = this->get_active_sigmask();
         Base::lock.unlock();
 
         // using sigjmp/longjmp is ugly, but there is no other way. If a signal that we're watching is
         // received during polling, it will longjmp back to here:
         if (sigsetjmp(this->get_sigreceive_jmpbuf(), 1) != 0) {
-            this->process_signal(sigmask);
+            this->process_signal();
             do_wait = false;
         }
 
@@ -379,9 +379,9 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base,true>
         std::atomic_signal_fence(std::memory_order_release);
 
         // Run kevent with signals unmasked:
-        this->sigmaskf(SIG_UNBLOCK, &sigmask, nullptr);
+        this->sigmaskf(SIG_UNBLOCK, &active_sigmask, nullptr);
         int r = kevent(kqfd, nullptr, 0, events, 16, wait_ts);
-        this->sigmaskf(SIG_BLOCK, &sigmask, nullptr);
+        this->sigmaskf(SIG_BLOCK, &active_sigmask, nullptr);
 
         if (r == -1 || r == 0) {
             // signal or no events

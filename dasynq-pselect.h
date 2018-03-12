@@ -1,8 +1,9 @@
 #include "dasynq-select.h"
+#include "dasynq-signal.h"
 
 namespace dasynq {
 
-template <class Base> class pselect_events : public signal_events<Base, true>
+template <class Base> class pselect_events : public signal_events<Base, false>
 {
     fd_set read_set;
     fd_set write_set;
@@ -204,14 +205,30 @@ template <class Base> class pselect_events : public signal_events<Base, true>
     void pull_events(bool do_wait) noexcept
     {
         struct timespec ts;
-        ts.tv_sec = 0;
-        ts.tv_nsec = 0;
+        struct timespec *wait_ts = nullptr;
+
+        Base::lock.lock();
+
+        // Check whether any timers are pending, and what the next timeout is.
+        timespec now;
+        auto &timer_q = this->queue_for_clock(clock_type::MONOTONIC);
+        this->get_time(now, clock_type::MONOTONIC, true);
+        if (! timer_q.empty()) {
+            const time_val &timeout = timer_q.get_root_priority();
+            if (timeout <= now) {
+                this->process_timer_queue(timer_q, now);
+                do_wait = false; // don't wait, we have events already
+            }
+            else if (do_wait) {
+                ts = (timeout - now);
+                wait_ts = &ts;
+            }
+        }
 
         fd_set read_set_c;
         fd_set write_set_c;
         fd_set err_set;
 
-        Base::lock.lock();
         read_set_c = read_set;
         write_set_c = write_set;
         err_set = read_set;
@@ -224,7 +241,7 @@ template <class Base> class pselect_events : public signal_events<Base, true>
         // This is horrible, but hopefully will be optimised well. POSIX gives no way to combine signal
         // sets other than this.
         for (int i = 1; i < NSIG; i++) {
-            if (sigismember(&active_sigmask, i)) {
+            if (! sigismember(&active_sigmask, i)) {
                 sigdelset(&sigmask, i);
             }
         }
@@ -238,18 +255,38 @@ template <class Base> class pselect_events : public signal_events<Base, true>
             do_wait = false;
         }
 
+        if (! do_wait) {
+            ts.tv_sec = 0;
+            ts.tv_nsec = 0;
+            wait_ts = &ts;
+        }
+
         std::atomic_signal_fence(std::memory_order_release);
 
-        int r = pselect(nfds, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts, &sigmask);
+        int r = pselect(nfds, &read_set_c, &write_set_c, &err_set, wait_ts, &sigmask);
 
         if (r == -1 || r == 0) {
             // signal or no events
-            if (r == 0 && ! do_wait) {
-                // At least on Mac OS, pselect doesn't seem to give us a pending signal
-                // if we have a zero timeout. Force detection using sigmask:
-                sigset_t origmask;
-                this->sigmaskf(SIG_SETMASK, &sigmask, &origmask);
-                this->sigmaskf(SIG_SETMASK, &origmask, nullptr);
+            if (r == 0) {
+                if (! do_wait) {
+                    // At least on Mac OS, pselect doesn't seem to give us a pending signal
+                    // if we have a zero timeout. Force detection using sigmask:
+                    sigset_t origmask;
+                    this->sigmaskf(SIG_SETMASK, &sigmask, &origmask);
+                    this->sigmaskf(SIG_SETMASK, &origmask, nullptr);
+                }
+
+                if (r == 0 && do_wait) {
+                    // timeout:
+                    Base::lock.lock();
+
+                    this->get_time(now, clock_type::MONOTONIC, true);
+                    if (! timer_q.empty()) {
+                        this->process_timer_queue(timer_q, now);
+                    }
+
+                    Base::lock.unlock();
+                }
             }
             return;
         }

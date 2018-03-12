@@ -123,13 +123,13 @@ namespace dasynq {
 #if DASYNQ_HAVE_PSELECT
 #include "dasynq-pselect.h"
 namespace dasynq {
-    template <typename T> using loop_t = pselect_events<timer_events<interrupt_channel<child_proc_events<T>>>>;
+    template <typename T> using loop_t = pselect_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
 }
 #else
 #include "dasynq-select.h"
 namespace dasynq {
-    template <typename T> using loop_t = select_events<timer_events<interrupt_channel<child_proc_events<T>>>>;
+    template <typename T> using loop_t = select_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
 }
 #endif

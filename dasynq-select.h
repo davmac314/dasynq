@@ -265,53 +265,74 @@ template <class Base> class select_events : public signal_events<Base, true>
     void pull_events(bool do_wait) noexcept
     {
         struct timeval ts;
-        ts.tv_sec = 0;
-        ts.tv_usec = 0;
+        struct timeval *wait_ts = nullptr;
+
+        Base::lock.lock();
+
+        // Check whether any timers are pending, and what the next timeout is.
+        timespec now;
+        auto &timer_q = this->queue_for_clock(clock_type::MONOTONIC);
+        this->get_time(now, clock_type::MONOTONIC, true);
+        if (! timer_q.empty()) {
+            const time_val &timeout = timer_q.get_root_priority();
+            if (timeout <= now) {
+                this->process_timer_queue(timer_q, now);
+                do_wait = false; // don't wait, we have events already
+            }
+            else if (do_wait) {
+                timespec time_to = (timeout - now);
+                ts.tv_sec = time_to.tv_sec;
+                ts.tv_usec = time_to.tv_nsec / 1000;
+                wait_ts = &ts;
+            }
+        }
 
         fd_set read_set_c;
         fd_set write_set_c;
         fd_set err_set;
 
-        Base::lock.lock();
         read_set_c = read_set;
         write_set_c = write_set;
         err_set = read_set;
 
         const sigset_t &active_sigmask = this->get_active_sigmask();
 
-        sigset_t sigmask;
-        this->sigmaskf(SIG_UNBLOCK, nullptr, &sigmask);
-        // This is horrible, but hopefully will be optimised well. POSIX gives no way to combine signal
-        // sets other than this.
-        for (int i = 1; i < NSIG; i++) {
-            if (! sigismember(&active_sigmask, i)) {
-                sigdelset(&sigmask, i);
-            }
-        }
         int nfds = max_fd + 1;
         Base::lock.unlock();
-
-        volatile bool was_signalled = false;
 
         // using sigjmp/longjmp is ugly, but there is no other way. If a signal that we're watching is
         // received during polling, it will longjmp back to here:
         if (sigsetjmp(this->get_sigreceive_jmpbuf(), 1) != 0) {
-            this->process_signal(sigmask);
-            was_signalled = true;
+            this->process_signal();
+            do_wait = false;
         }
 
-        if (was_signalled) {
-            do_wait = false;
+        if (! do_wait) {
+            ts.tv_sec = 0;
+            ts.tv_usec = 0;
+            wait_ts = &ts;
         }
 
         std::atomic_signal_fence(std::memory_order_release);
 
         this->sigmaskf(SIG_UNBLOCK, &active_sigmask, nullptr);
-        int r = select(nfds, &read_set_c, &write_set_c, &err_set, do_wait ? nullptr : &ts);
+        int r = select(nfds, &read_set_c, &write_set_c, &err_set, wait_ts);
         this->sigmaskf(SIG_BLOCK, &active_sigmask, nullptr);
 
         if (r == -1 || r == 0) {
             // signal or no events
+            if (r == 0 && do_wait) {
+                // timeout:
+                Base::lock.lock();
+
+                this->get_time(now, clock_type::MONOTONIC, true);
+                if (! timer_q.empty()) {
+                    this->process_timer_queue(timer_q, now);
+                }
+
+                Base::lock.unlock();
+            }
+
             return;
         }
 
