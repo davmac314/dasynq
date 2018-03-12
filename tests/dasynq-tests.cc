@@ -1112,6 +1112,72 @@ void ftest_timers2()
     assert(timer_1.expiries == 1);
 }
 
+// function test for future timer expiry, preceded by signal
+void ftest_timers3()
+{
+    using loop_t = dasynq::event_loop<checking_mutex>;
+    using clock_type = dasynq::clock_type;
+    loop_t my_loop;
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        public:
+        rearm timer_expiry(loop_t &loop, int expiry_count)
+        {
+            expiries += expiry_count;
+            return rearm::REARM;
+        }
+
+        int expiries = 0;
+    };
+
+    using siginfo_p = loop_t::signal_watcher::siginfo_p;
+
+    sigset_t sigmask;
+    sigemptyset(&sigmask);
+    sigaddset(&sigmask, SIGUSR1);
+    sigprocmask(SIG_BLOCK, &sigmask, nullptr);
+
+    bool seen1 = false;
+
+    loop_t::signal_watcher::add_watch(my_loop, SIGUSR1,
+            [&seen1](loop_t &eloop, int signo, siginfo_p info) -> rearm {
+        seen1 = true;
+        return rearm::REMOVE;
+    });
+
+    // We avoid using raise(...) since a bug in some versions of MacOS prevents signals generated
+    // using raise from being detected by kqueue (and therefore by Dasynq).
+
+    // raise(SIGUSR1);
+    kill(getpid(), SIGUSR1);
+
+    // The signal is now pending and should be received before the timeout of the timer which we
+    // now set up:
+
+    my_timer timer_1;
+    struct timespec timeout_1 = { .tv_sec = 0, .tv_nsec = 200000000 /* 250ms*/ };
+    timer_1.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_1.arm_timer_rel(my_loop, timeout_1);
+
+    struct timespec t100ms;
+    t100ms.tv_sec = 0;
+    t100ms.tv_nsec = 100 * 1000 * 1000;
+    nanosleep(&t100ms, nullptr);
+
+    my_loop.run();
+
+    // timer shouldn't have expired yet:
+    assert(timer_1.expiries == 0);
+
+    // signal should be seen:
+    assert(seen1);
+
+    my_loop.run();
+
+    assert(timer_1.expiries == 1);
+}
+
 void ftest_multi_thread1()
 {
     using Loop_t = dasynq::event_loop<std::mutex>;
@@ -1390,6 +1456,10 @@ int main(int argc, char **argv)
 
     std::cout << "ftest_timers2... ";
     ftest_timers2();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftest_timers3... ";
+    ftest_timers3();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_multi_thread1... ";
