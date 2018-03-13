@@ -270,22 +270,8 @@ template <class Base> class select_events : public signal_events<Base, true>
         Base::lock.lock();
 
         // Check whether any timers are pending, and what the next timeout is.
-        timespec now;
-        auto &timer_q = this->queue_for_clock(clock_type::MONOTONIC);
-        this->get_time(now, clock_type::MONOTONIC, true);
-        if (! timer_q.empty()) {
-            const time_val &timeout = timer_q.get_root_priority();
-            if (timeout <= now) {
-                this->process_timer_queue(timer_q, now);
-                do_wait = false; // don't wait, we have events already
-            }
-            else if (do_wait) {
-                timespec time_to = (timeout - now);
-                ts.tv_sec = time_to.tv_sec;
-                ts.tv_usec = time_to.tv_nsec / 1000;
-                wait_ts = &ts;
-            }
-        }
+        // Check whether any timers are pending, and what the next timeout is.
+        this->process_monotonic_timers(do_wait, ts, wait_ts);
 
         fd_set read_set_c;
         fd_set write_set_c;
@@ -324,12 +310,7 @@ template <class Base> class select_events : public signal_events<Base, true>
             if (r == 0 && do_wait) {
                 // timeout:
                 Base::lock.lock();
-
-                this->get_time(now, clock_type::MONOTONIC, true);
-                if (! timer_q.empty()) {
-                    this->process_timer_queue(timer_q, now);
-                }
-
+                this->process_monotonic_timers();
                 Base::lock.unlock();
             }
 

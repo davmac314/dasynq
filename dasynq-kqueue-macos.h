@@ -116,7 +116,8 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
             }
         }
 
-        // Now we disable all received events, to simulate EV_DISPATCH:
+        // Now we disable all received events, to simulate EV_DISPATCH. Note that EV_DISPATH is
+        // actually available on MacOS, but we can't use it due to the signal processing bug.
         kevent(kqfd, events, r, nullptr, 0, nullptr);
     }
 
@@ -345,22 +346,9 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
         Base::lock.lock();
 
         // Check whether any timers are pending, and what the next timeout is.
-        timespec now;
-        auto &timer_q = this->queue_for_clock(clock_type::MONOTONIC);
-        this->get_time(now, clock_type::MONOTONIC, true);
-        if (! timer_q.empty()) {
-            const time_val &timeout = timer_q.get_root_priority();
-            if (timeout <= now) {
-                this->process_timer_queue(timer_q, now);
-                do_wait = false; // don't wait, we have events already
-            }
-            else if (do_wait) {
-                ts = (timeout - now);
-                wait_ts = &ts;
-            }
-        }
+        this->process_monotonic_timers(do_wait, ts, wait_ts);
 
-        sigset_t &active_sigmask = this->get_active_sigmask();
+        const sigset_t &active_sigmask = this->get_active_sigmask();
         Base::lock.unlock();
 
         // using sigjmp/longjmp is ugly, but there is no other way. If a signal that we're watching is
@@ -388,19 +376,13 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
             if (r == 0 && do_wait) {
                 // timeout:
                 Base::lock.lock();
-
-                this->get_time(now, clock_type::MONOTONIC, true);
-                if (! timer_q.empty()) {
-                    this->process_timer_queue(timer_q, now);
-                }
-
+                this->process_monotonic_timers();
                 Base::lock.unlock();
             }
             return;
         }
 
-        ts.tv_sec = 0;
-        ts.tv_nsec = 0;
+        ts = time_val(0, 0);
 
         do {
             process_events(events, r);
