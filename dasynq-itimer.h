@@ -11,8 +11,10 @@ namespace dasynq {
 
 // Timer implementation based on the (basically obsolete) POSIX itimer interface.
 
-// With this timer implementation, we only use one clock, and allow no distinction between the
-// monotonic and system time.
+// With this timer implementation, we only have one real clock (the monotonic clock) that we can
+// run a timer against. However, if the system has both clocks, we still maintain two separate queues.
+// If provide_mono_timer is false we actually provide no system timer and rely on the event mechanism
+// which extends this class to measure time and run timeouts (via process_monotonic_timers functions).
 
 template <class Base, bool provide_mono_timer = true>
 class itimer_events : public timer_base<Base>
@@ -103,6 +105,66 @@ class itimer_events : public timer_base<Base>
         }
     }
 
+#ifdef CLOCK_MONOTONIC
+    // We need to override the monotonic timer processing functions from timer_base to check both
+    // timer queues, since we aren't actually providing a separate timer for the system clock:
+
+    inline void process_monotonic_timers(bool &do_wait, timeval &tv, timeval *&wait_tv)
+    {
+        // We need to process both timer queues and set tv/wait_tv according to which has the
+        // timer that will expire soonest:
+        timer_base<Base>::process_timers(clock_type::MONOTONIC, do_wait, tv, wait_tv);
+
+        if (! do_wait) {
+            timer_base<Base>::process_timers(clock_type::SYSTEM, do_wait, tv, wait_tv);
+        }
+        else {
+            timeval mono_tv = tv;
+            timer_base<Base>::process_timers(clock_type::SYSTEM, do_wait, tv, wait_tv);
+            if (mono_tv.tv_sec < tv.tv_sec ||
+                    (mono_tv.tv_sec == tv.tv_sec && mono_tv.tv_usec < tv.tv_usec)) {
+                tv = mono_tv;
+            }
+        }
+    }
+
+    inline void process_monotonic_timers(bool &do_wait, timespec &ts, timespec *&wait_ts)
+    {
+        // We need to process both timer queues and set tv/wait_tv according to which has the
+        // timer that will expire soonest:
+        timer_base<Base>::process_timers(clock_type::MONOTONIC, do_wait, ts, wait_ts);
+
+        if (! do_wait) {
+            timer_base<Base>::process_timers(clock_type::SYSTEM, do_wait, ts, wait_ts);
+        }
+        else {
+            timespec mono_ts = ts;
+            timer_base<Base>::process_timers(clock_type::SYSTEM, do_wait, ts, wait_ts);
+            ts = std::min(time_val(ts), time_val(mono_ts));
+        }
+    }
+
+    // Process monotonic timers based on the current clock time. However, we shadow the
+    // function and provide an implementation which also processes the system clock timer queue.
+    inline void process_monotonic_timers()
+    {
+        auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
+        if (! mono_timer_queue.empty()) {
+            struct timespec curtime_mono;
+            timer_base<Base>::get_time(curtime_mono, clock_type::MONOTONIC, true);
+            timer_base<Base>::process_timer_queue(mono_timer_queue, curtime_mono);
+        }
+
+        auto &sys_timer_queue = this->queue_for_clock(clock_type::SYSTEM);
+        if (! sys_timer_queue.empty()) {
+            struct timespec curtime_sys;
+            timer_base<Base>::get_time(curtime_sys, clock_type::SYSTEM, true);
+            timer_base<Base>::process_timer_queue(sys_timer_queue, curtime_sys);
+        }
+    }
+
+#endif
+
     void process_timers()
     {
         auto &timer_queue = this->queue_for_clock(clock_type::SYSTEM);
@@ -113,11 +175,13 @@ class itimer_events : public timer_base<Base>
         }
         
 #ifdef CLOCK_MONOTONIC
-        auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
-        if (! mono_timer_queue.empty()) {
-            struct timespec curtime_mono;
-            timer_base<Base>::get_time(curtime_mono, clock_type::MONOTONIC, true);
-            timer_base<Base>::process_timer_queue(mono_timer_queue, curtime_mono);
+        if (provide_mono_timer) {
+            auto &mono_timer_queue = this->queue_for_clock(clock_type::MONOTONIC);
+            if (! mono_timer_queue.empty()) {
+                struct timespec curtime_mono;
+                timer_base<Base>::get_time(curtime_mono, clock_type::MONOTONIC, true);
+                timer_base<Base>::process_timer_queue(mono_timer_queue, curtime_mono);
+            }
         }
 #endif
 
