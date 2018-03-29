@@ -21,6 +21,10 @@
 
 * kqueue: use EVDISPATCH where available. On OS X, potentially use EVDISPATCH2 (which potentially
   also allows removing the wait lock, though this is obviously considerable work).
+  
+  Re OS X: the bug documented in extra/macos-kqueue-bug requires a workaround
+  (dasynq-kqueue-macos.h) which precludes the use of EV_DISPATCH[2]. This bug would have to be
+  resolved before EV_DISPATCH2 could be used.
 
 * Current deregister implementation gets attention lock and issues delete. An alternative would be
   to test-acquire the attention lock and on failure, instead add the watcher to a queue and signal
