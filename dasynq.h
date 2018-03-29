@@ -84,7 +84,7 @@
 #if _POSIX_TIMERS > 0
 #include "dasynq-posixtimer.h"
 namespace dasynq {
-    template <typename T> using timer_events = posix_timer_events<T>;
+    template <typename T, bool provide_mono_timer = true> using timer_events = posix_timer_events<T, provide_mono_timer>;
 }
 #else
 #include "dasynq-itimer.h"

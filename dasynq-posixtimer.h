@@ -149,7 +149,7 @@ class posix_timer_events : public timer_base<Base>
             bool enable, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         struct timespec curtime;
-        get_time(curtime, clock, false);
+        this->get_time(curtime, clock, false);
         curtime.tv_sec += timeout.tv_sec;
         curtime.tv_nsec += timeout.tv_nsec;
         if (curtime.tv_nsec > 1000000000) {
