@@ -382,9 +382,9 @@ You can add and set a timer using a lambda expression:
 
 	struct timespec expiry = { .tv_sec = 5, .tv_nsec = 0};
 	struct timespec interval = { .tv_sec = 5, .tv_nsec = 0}; // {0, 0} for non-periodic	
-    auto timer = loop_t::timer::add_timer(my_loop, fd, clock_type::MONOTONIC, true /* relative */,
+    auto timer = loop_t::timer::add_timer(my_loop, clock_type::MONOTONIC, true /* relative */,
     		expiry, interval,
-            [](loop_t &eloop, int expiry count) -> rearm {
+            [](loop_t &eloop, int expiry_count) -> rearm {
         
         // Process timer expiry here
 
