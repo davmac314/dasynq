@@ -2168,7 +2168,7 @@ class timer : private base_timer_watcher
 
     template <typename T>
     static timer<EventLoop> *add_timer(EventLoop &eloop, clock_type clock, bool relative,
-            struct timespec &timeout, struct timespec &interval, T watch_hndlr)
+            const timespec &timeout, const timespec &interval, T watch_hndlr)
     {
         class lambda_timer : public timer_impl<event_loop_t, lambda_timer>
         {
