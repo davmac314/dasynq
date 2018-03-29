@@ -39,9 +39,15 @@ template provides a means for subclassing.</p>
 
 <h3>Functions</h3>
 <ul>
-<li><i class="code-name">void add_timer(event_loop_t &amp;eloop, <a href="dasynq-namespace.html#clock_type">clock_type</a> clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)</i>
+<li>(#1) <i class="code-name">void add_timer(event_loop_t &amp;eloop, <a href="dasynq-namespace.html#clock_type">clock_type</a> clock = clock_type::MONOTONIC, int prio = DEFAULT_PRIORITY)</i>
     <br>&mdash; register a timer using the specified clock with an event loop. May throw
     <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
+<li>(#2) <i class="code-name">template &lt;typename T&gt; static void add_timer(event_loop_t &amp;eloop,
+<a href="dasynq-namespace.html#clock_type">clock_type</a> clock, const timespec &amp;timeout, const timespec &amp;interval,
+T handler)</i>
+    <br>&mdash; add a dynamically-allocated timer using the specified clock, timeout and interval. The timer
+    is automatically deleted when removed. See details <a href="#add_timer_2">below</a>. May throw
+    <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>    
 <li>(#1) <i class="code-name">void arm_timer(event_loop_t &amp;eloop, const timespec &timeout) noexcept</i>
     <br>&mdash; arm a one-shot timer with the specified absolute timeout.</li>
 <li>(#2) <i class="code-name">void arm_timer(event_loop_t &amp;eloop, const timespec &timeout, const timespec &interval) noexcept</i>
@@ -133,5 +139,29 @@ with the following parameters:</p>
 
 <p>An <i class="code-name">timer_impl</i> instantiation has no public or protected members, other than
 those inherited from <i class="code-name">timer_watcher</i>, which it publicly derives from.</p>
+
+<h2 id="add_timer_2">add_timer (#2)</h2>
+
+<pre>
+// member of dasynq::event_loop&lt;T&gt;::timer
+template &lt;typename T&gt;
+static timer&lt;event_loop_t&gt; *add_timer(event_loop_t &eloop, <a href="dasynq-namespace.html#clock_type">clock_type</a> clock, const timespec &amp;timeout, const timespec &amp;interval, T handler)
+</pre>
+
+<p>This variant of the <i class="code-name">add_timer</i> function can be used to create and register a
+dynamically-allocated <i class="code-name">timer</i>. This both creates and arms the timer in a single step;
+the parameters are as for <i class="code-name">add_timer</i>(#1) and <i class="code-name">arm_timer</i>, while 
+the additional <i class="code-name">handler</i> parameter is a function
+or lambda of the form:</p>
+
+<pre>
+[](event_loop_t &eloop, int expiry_count) -> rearm { ... }
+</pre>
+
+<p>It acts as the callback function for the generated timer. The watcher will delete itself when it is
+removed from the event loop (including if the callback returns <i class="code-name">rearm::REMOVE</i>.</p>
+
+<p>This <i class="code-name">add_timer</i> function can throw <i class="code-name">std::system_error</i> or
+<i class="code-name">std::bad_alloc</i> on failure.</p>
 
 </div></body></html>
