@@ -134,12 +134,16 @@ class posix_timer_events : public timer_base<Base>
         if (timer_queue.is_queued(timer_id)) {
             // Already queued; alter timeout
             if (timer_queue.set_priority(timer_id, timeout)) {
-                set_timer_from_queue(timer, timer_queue);
+                if (clock != clock_type::MONOTONIC || provide_mono_timer) {
+                    set_timer_from_queue(timer, timer_queue);
+                }
             }
         }
         else {
             if (timer_queue.insert(timer_id, timeout)) {
-                set_timer_from_queue(timer, timer_queue);
+                if (clock != clock_type::MONOTONIC || provide_mono_timer) {
+                    set_timer_from_queue(timer, timer_queue);
+                }
             }
         }
     }
@@ -173,7 +177,7 @@ class posix_timer_events : public timer_base<Base>
         if (timer_queue.is_queued(timer_id)) {
             bool was_first = (&timer_queue.get_root()) == &timer_id;
             timer_queue.remove(timer_id);
-            if (was_first) {
+            if (was_first && (clock != clock_type::MONOTONIC || provide_mono_timer)) {
                 set_timer_from_queue(timer, timer_queue);
             }
         }
