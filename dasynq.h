@@ -1326,8 +1326,9 @@ class event_loop
             // (Above variables are initialised only to silence compiler warnings).
             
             if (pqueue->watchType == watch_type_t::SECONDARYFD) {
-                // construct a pointer to the main watcher (using char* arithmetic):
-                char * rp = (char *)pqueue;
+                // construct a pointer to the main watcher, using integer arithmetic to avoid undefined
+                // pointer arithmetic:
+                uintptr_t rp = (uintptr_t)pqueue;
 
                 // Here we take the offset of a member from a non-standard-layout class, which is
                 // specified to have undefined result by the C++ language standard, but which
