@@ -1,6 +1,3 @@
-* select/kqueue: clean up helper functions in dasynq:: namespace. Move them into per-mechanism namespace
-  to avoid clashes. 
-
 * STOP rearm for timers. Instead of just disabling a timer, actually stop (but don't deallocate) it.
 
 * Use C++ standard library functions to get time (system time and monotonic time). Works on OS X, apparently,
