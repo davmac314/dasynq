@@ -559,3 +559,14 @@ try to watch `SIGCHLD` independently, and should not try to add a watch for the 
 Similarly, the implementation may use `SIGALRM` to implement timers.
 
 Creating two event loop instances in a single application is not likely to work well, or at all.
+
+The Itanium C++ ABI, which is the basis for the ABI on many platforms (for instance it is the
+ABI which the Sys V ABI for x86-64 defers to), has one very unfortunate design flaw: throwing an
+exception requires making a heap allocation (and if the allocation fails, the process terminates).
+Implementations have an "emergency allocation pool" for exceptions which should mean that the
+allocation fails only in truly exceptional circumstances, but the possibility is there.
+Unfortunately Dasynq at this stage sometimes uses exceptions (in some cases handling them
+internally rather than exposing them to the user of the API) and in theory could trigger process
+termination on these platforms. I consider this a bug in the ABI and in the platforms implementing
+it, however a future version of Dasynq may endeavour to avoid use of exceptions entirely (or at
+least make it possible for the client to avoid unwittingly triggering exceptions).
