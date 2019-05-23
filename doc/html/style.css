@@ -28,6 +28,10 @@ pre {
     padding: 0.2em;
     border: 1px solid #a9b0b2;
     border-radius: 0.2em;
+    font-family: mono;
+    font-weight: bold;
+    font-size: 75%;
+    color: #228;
 }
 
 .small-indent {
@@ -48,10 +52,11 @@ pre {
     font-style: normal;
     font-weight: bold;
     color: #493a18;
-    background: #eccfd7;
+    background: #f0eaec;
     border-radius: 0.2em;
     padding-left: 0.1em;
     padding-right: 0.1em;
+    border: 1px solid #bbb;
 }
 
 a {

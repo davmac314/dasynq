@@ -129,21 +129,23 @@ multi-threaded applications; an event loop with any other mutex type will instea
 therefore not possible to use a single-threaded event loop in a multi-threaded program, even if it would be
 used only from a single thread.</p>
 
-<h3>Watcher state cycle</h3>
+<h3 id="watcher-constraints">Watcher constraints and state cycle</h3>
 
 <p>Watchers are initially in a <i>waiting</i> state once enabled.
 An enabled watcher for which a watched event is detected (during the execution of the <i class="code-name">run</i>
 or <i class="code-name">poll</i> functions) is disabled and becomes <i>queued</i> for notification until its callback
 is run; during execution of the callback, the watcher is in the <i>processing</i> state.</p>
 
-<p>If the event loop may be polled (via <i class="code-name">run</i> or <i class="code-name">poll</i> from another
-thread while a watcher is in the <i>queued</i> or <i>processing</i> states, then the watcher must not be re-enabled
-while in those states (except by returning a suitable <i class="code-name"><a href="dasynq-namespace.html#rearm">rearm</a></i>
-code from the callback).<br>
+<p>A watcher must not be re-enabled while in the <i>queued</i> or <i>processing</i> state, unless the
+event loop will not be polled (via <i class="code-name">run</i> or <i class="code-name">poll</i>) before the associated
+event is processed. For a client program which polls the event loop from multiple threads, this (roughly) means that
+watchers should not be enabled, once they have become disabled, except by returning a suitable
+<i class="code-name"><a href="dasynq-namespace.html#rearm">rearm</a></i> code from the callback.<br>
 <span class="note"><i>Note:</i> Technically, the requirement is that polling must not be performed if an event may be detected
 via an enabled watcher that is not in the <i>waiting</i> state.</span></p>
 
-<p>Watchers may not be registered with more than one event loop at any time.</p>
+<p>Watchers may not be registered with more than one event loop at the same time (nor with the same loop more than once at the
+same time).</p>
 
 <h3>Event batching</h3>
 

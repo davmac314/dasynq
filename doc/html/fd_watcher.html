@@ -64,8 +64,8 @@ ready for reading or writing (or both, if supported by the event loop back-end).
 <ul>
 <li><i class="code-name">void set_watch_flags(int newFlags)</i> &mdash; set watched event types (a combination
 of <i class="code-name">IN_EVENTS</i> and <i class="code-name">OUT_EVENTS</i>). Must only be called if
-the event loop supports multi-direction file descriptor watches (i.e. if the <i class="code-name">
-has_separate_rw_fd_watches</i> loop trait is false). For multi-threaded event loops, must only be called
+the event loop supports multi-direction file descriptor watches (i.e. if the
+<i class="code-name">has_separate_rw_fd_watches</i> loop trait is false). For multi-threaded event loops, must only be called
 from within the callback function. Takes effect when the watcher is next enabled (either by using the
 <i class="code-name">set_enabled</i> function or returning the <i class="code-name">REARM</i> code from
 the callback).</li>
@@ -73,6 +73,8 @@ the callback).</li>
 </div>
 
 <h2>Details and Usage</h2>
+
+<p><span class="note"><i>Note:</i> also see the <a href="event_loop.html#watcher-constraints">watcher constraints</a> section.</span></p>
 
 <p>A file descriptor often represents an input or output channel (or both) for which I/O <i>readiness</i> is a
 detectable event. For example, a connected network socket becomes ready for input when data is received over

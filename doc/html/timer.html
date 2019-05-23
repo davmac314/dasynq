@@ -77,6 +77,8 @@ watcher which receives callback notifications for timer expiry. Timers can be <i
 automatically after expiry) or <i>periodic</i> (on expiry, the timeout is incremented by a specified
 interval).</p>
 
+<p><span class="note"><i>Note:</i> also see the <a href="event_loop.html#watcher-constraints">watcher constraints</a> section.</span></p>
+
 <p>A timer can run on one of two clocks, specified by a <i class="code-name"><a href="dasynq-namespace.html#clock_type">clock_type</a></i>.
 The <i class="code-name">SYSTEM</i> clock is the current "wall clock" time according to the system; its time
 value should normally only increase at a constant rate, but may be altered by large amounts in either
