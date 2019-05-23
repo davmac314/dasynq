@@ -1178,6 +1178,52 @@ void ftest_timers3()
     assert(timer_1.expiries == 1);
 }
 
+// function test for future timer expiry, multiple timers
+void ftest_timers4()
+{
+    using loop_t = dasynq::event_loop<checking_mutex>;
+    using clock_type = dasynq::clock_type;
+    loop_t my_loop;
+
+    class my_timer : public loop_t::timer_impl<my_timer>
+    {
+        public:
+        rearm timer_expiry(loop_t &loop, int expiry_count)
+        {
+            expiries += expiry_count;
+            return rearm::REARM;
+        }
+
+        int expiries = 0;
+    };
+
+    my_timer timer_1;
+    struct timespec timeout_1 = { .tv_sec = 0, .tv_nsec = 200000000 /* 200ms*/ };
+    timer_1.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_1.arm_timer_rel(my_loop, timeout_1);
+
+    my_timer timer_2;
+    timer_2.add_timer(my_loop, clock_type::MONOTONIC);
+    timer_2.arm_timer_rel(my_loop, timeout_1);
+
+    struct timespec t150ms;
+    t150ms.tv_sec = 0;
+    t150ms.tv_nsec = 150 * 1000 * 1000;
+    nanosleep(&t150ms, nullptr);
+
+    // Cancel timer_2:
+    timer_2.deregister(my_loop);
+
+    my_loop.poll();
+
+    // timer shouldn't have expired yet:
+    assert(timer_1.expiries == 0);
+
+    my_loop.run();
+
+    assert(timer_1.expiries == 1);
+}
+
 void ftest_multi_thread1()
 {
     using Loop_t = dasynq::event_loop<std::mutex>;
@@ -1459,6 +1505,10 @@ int main(int argc, char **argv)
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_timers3... ";
+    ftest_timers3();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftest_timers4... ";
     ftest_timers3();
     std::cout << "PASSED" << std::endl;
 
