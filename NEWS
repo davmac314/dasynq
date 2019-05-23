@@ -1,0 +1,7 @@
+Dasynq Version 1.1.6:
+--------------------
+
+This version includes a critical bug-fix for the itimer-based timer
+implementation (affecting OpenBSD, but not most other systems).
+
+The documentation has also been slightly updated and re-styled.
