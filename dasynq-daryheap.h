@@ -91,7 +91,6 @@ class dary_heap
 
     bool bubble_down(hindex_t pos, handle_t * ohndl, const P &op) noexcept
     {
-        // int pos = v.size() - 1;
         Compare lt;
         while (pos > 0) {
             hindex_t parent = (pos - 1) / N;
@@ -177,8 +176,9 @@ class dary_heap
     {
         new (& hnd.hd_u.hd) T(u...);
         hnd.heap_index = -1;
-        constexpr hindex_t max_allowed = std::numeric_limits<hindex_t>::is_signed ?
-                std::numeric_limits<hindex_t>::max() : ((hindex_t) - 2);
+
+        // largest object size is PTRDIFF_MAX, so we expect the largest vector is that / sizeof node:
+        constexpr hindex_t max_allowed = (std::numeric_limits<ptrdiff_t>::max() - 1) / sizeof(heap_node);
 
         if (num_nodes == max_allowed) {
             throw std::bad_alloc();
@@ -224,7 +224,7 @@ class dary_heap
     bool insert(handle_t & hnd, const P &pval) noexcept
     {
         hnd.heap_index = hvec.size();
-        //hvec.emplace_back(&hnd, pval);
+        // emplace an empty node; data/prio will be stored via bubble_down.
         hvec.emplace_back();
         return bubble_down(hvec.size() - 1, &hnd, pval);
     }
