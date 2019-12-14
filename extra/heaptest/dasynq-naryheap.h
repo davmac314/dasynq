@@ -257,9 +257,9 @@ class nary_heap
 
     // Allocate a slot, but do not incorporate into the heap:
     //  u... : parameters for data constructor T::T(...)
-    template <typename ...U> void allocate(handle_t & hnd, U... u)
+    template <typename ...U> void allocate(handle_t & hnd, U&&... u)
     {
-        new (& hnd.hd_u.hd) T(u...);
+        new (& hnd.hd_u.hd) T(std::forward<U>(u)...);
         hnd.heap_index = -1;
         hindex_t max_allowed = hvec.max_size();
 

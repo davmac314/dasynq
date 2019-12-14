@@ -162,9 +162,9 @@ class BinaryHeap
     
     // Allocate a slot, but do not incorporate into the heap:
     //  u... : parameters for data constructor T::T(...)
-    template <typename ...U> void allocate(handle_t & hnd, U... u)
+    template <typename ...U> void allocate(handle_t & hnd, U&&... u)
     {
-        new (& hnd.hd) T(u...);
+        new (& hnd.hd) T(std::forward<U>(u)...);
         hnd.heap_index = -1;
         constexpr hindex_t max_allowed = std::numeric_limits<hindex_t>::is_signed ?
                 std::numeric_limits<hindex_t>::max() : ((hindex_t) - 2);

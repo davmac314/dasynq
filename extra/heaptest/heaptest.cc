@@ -4,6 +4,7 @@
 #include "dasynq-binaryheap.h"
 #include "dasynq-naryheap.h"
 #include "dasynq-daryheap.h"
+
 #include <functional>
 #include <random>
 #include <chrono>
@@ -23,10 +24,10 @@ int main(int argc, char **argv)
     // dasynq::PairingHeap<int, int> heap;
     // dasynq::btree_queue<int, int, std::less<int>, 16> heap;
     
-    // StableHeap<Dary, int, int> heap;
-    // StableHeap<dasynq::BinaryHeap, int, int> heap;
-    // StableHeap<Nary, int, int> heap;
-    StableHeap<dasynq::PairingHeap, int, int> heap;
+    // dasynq::stable_heap<Dary, int, int> heap;
+    // dasynq::stable_heap<dasynq::BinaryHeap, int, int> heap;
+    // dasynq::stable_heap<Nary, int, int> heap;
+    dasynq::stable_heap<dasynq::PairingHeap, int, int> heap;
     
     constexpr int NUM = 10000000;
     // constexpr int NUM = 5;

@@ -112,7 +112,7 @@ class btree_queue
         	// do not initialise udata.data
         }
         
-        template <typename ...U> heap_node(U... u) : u_data(u...)
+        template <typename ...U> heap_node(U&&... u) : u_data(std::forward<U>(u)...)
         {
             next_sibling = nullptr;
             prev_sibling = nullptr;
@@ -190,10 +190,10 @@ class btree_queue
     }
     
     // Allocate a slot, but do not incorporate into the heap:
-    template <typename ...U> void allocate(handle_t &hndl, U... u)
+    template <typename ...U> void allocate(handle_t &hndl, U&&... u)
     {
         alloc_slot();
-        new (& hndl.u_data.data) T(u...);
+        new (& hndl.u_data.data) T(std::forward<U>(u)...);
     }
     
     void deallocate(handle_t & hn) noexcept

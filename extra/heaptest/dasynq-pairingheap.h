@@ -182,9 +182,9 @@ class PairingHeap
     }
     
     // Allocate a slot, but do not incorporate into the heap:
-    template <typename ...U> void allocate(handle_t &hndl, U... u)
+    template <typename ...U> void allocate(handle_t &hndl, U&&... u)
     {
-        new (& hndl) HeapNode(u...);
+        new (& hndl) HeapNode(std::forward<U>(u)...);
     }
     
     void deallocate(handle_t & index)
