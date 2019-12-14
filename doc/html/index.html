@@ -54,17 +54,38 @@ during program execution. </p>
 
 <h3>Caveat</h3>
 
-<p>The <a href="http://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html#cxx-throw">Itanium C++ ABI</a>,
-which is the basis for the ABI on many platforms (for instance it is the
-ABI which the Sys V ABI for x86-64 defers to), has one very unfortunate design flaw: throwing an
-exception requires making a heap allocation (and if the allocation fails, the process terminates).
+<p>It should be possible for an application (whether using Dasynq or not) to be able to gracefully
+handle all error situations that it could be faced with. This is a necessary pre-requisite for a
+truly stable system&mdash;one where important programs do not terminate unexpectedly. Part of
+handling errors gracefully is being able to control when they can occur; it needs to be possible to
+allocate resources up-front, rather than just as they are needed. Dasynq is designed to allow, as much as
+possible, for exactly that, and to have well-defined error modes so that it is possible to
+produce robust and stable software. However, unfortunate external implementation and interface
+details can prevent this goal from being realised properly (regardless of whether Dasynq is used).</p>
+
+<p>One of these external details is related to an aspect of Dasynq that is, arguably, avoidable.
+The <a href="http://itanium-cxx-abi.github.io/cxx-abi/abi-eh.html#cxx-throw">Itanium C++ ABI</a>,
+which is the basis for the C++ ABI on many platforms (for instance it is the
+ABI which the Sys V ABI for x86-64 defers to), has one very unfortunate flaw: throwing an
+exception requires making a heap allocation, and if the allocation fails, the process terminates.
 Implementations have an "emergency allocation pool" for exceptions which should mean that the
 allocation fails only in truly exceptional circumstances, but the possibility is there.
-Unfortunately Dasynq at this stage sometimes uses exceptions (in some cases handling them
-internally rather than exposing them to the user of the API) and in theory could trigger process
+Unfortunately Dasynq at this stage sometimes uses exceptions (in some cases exposing them as part
+of its API, in others handling them internally) and in theory could trigger process
 termination on these platforms. I consider this a bug in the ABI and in the platforms implementing
 it, however a future version of Dasynq may endeavour to avoid use of exceptions entirely (or at
 least make it possible for the client to avoid unwittingly triggering exceptions).</p>
+
+<p>Another unfortunate externally-imposed limitation is that the event polling mechanisms used by
+Dasynq typically have no means for pre-sizing. Adding a file descriptor to an <i>epoll</i> set, or to
+a <i>kqueue</i>, is an operation that may fail due to lack of resources (kernel memory, etc): but it
+fails at the wrong time, when we have already accepted the network connection (or opened the device,
+etc). Dasynq can't pre-determine the number of descriptors that can be added to an event set, and so it
+must potentially return an error condition (or throw an exception) <i>when</i> the operation fails,
+and the application must deal with it then, without reasonable warning.</p>
+
+<p>I remain hopeful that such limitations can one day be lifted&mdash;but that requires changes outside
+of Dasynq itself. So, I suppose, we shall have to wait and see.</p>
 
 </div>
 </body>
