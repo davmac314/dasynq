@@ -350,6 +350,12 @@ namespace dprivate {
         {
             loop.requeue_watcher(watcher);
         }
+
+        template <typename Loop>
+        static void release_watcher(Loop &loop, base_watcher *watcher) noexcept
+        {
+            loop.release_watcher(watcher);
+        }
     };
 
     // Do standard post-dispatch processing for a watcher. This handles the case of removing or
@@ -358,6 +364,24 @@ namespace dprivate {
     {
         if (rearm_type == rearm::REMOVE) {
             loop_access::get_base_lock(loop).unlock();
+            loop_access::release_watcher(loop, watcher);
+            watcher->watch_removed();
+            loop_access::get_base_lock(loop).lock();
+        }
+        else if (rearm_type == rearm::REQUEUE) {
+            loop_access::requeue_watcher(loop, watcher);
+        }
+    }
+
+    // Post-dispatch handling for bidi fd watchers.
+    template <typename Loop> void post_dispatch(Loop &loop, bidi_fd_watcher<Loop> *bdfd_watcher,
+            base_watcher *out_watcher, rearm rearm_type)
+    {
+        base_watcher *watcher = (base_watcher *)bdfd_watcher;
+        if (rearm_type == rearm::REMOVE) {
+            loop_access::get_base_lock(loop).unlock();
+            loop_access::release_watcher(loop, watcher);
+            loop_access::release_watcher(loop, out_watcher);
             watcher->watch_removed();
             loop_access::get_base_lock(loop).lock();
         }
@@ -528,7 +552,6 @@ namespace dprivate {
                 // If the watcher is active, set deleteme true; the watcher will be removed
                 // at the end of current processing (i.e. when active is set false).
                 watcher->deleteme = true;
-                release_watcher(watcher);
                 lock.unlock();
             }
             else {
@@ -1015,6 +1038,11 @@ class event_loop
     {
         loop_mech.queue_watcher(watcher);
         interrupt_if_necessary();
+    }
+
+    void release_watcher(base_watcher *watcher) noexcept
+    {
+        loop_mech.release_watcher(watcher);
     }
 
     // Interrupt the current poll-waiter, if necessary - that is, if the loop is multi-thread safe, and if
@@ -1871,7 +1899,8 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
 
             rearm_type = loop_access::process_fd_rearm(loop, this, rearm_type, true);
 
-            post_dispatch(loop, this, rearm_type);
+            auto &outwatcher = bidi_fd_watcher<EventLoop>::out_watcher;
+            post_dispatch(loop, this, &outwatcher, rearm_type);
         }
     }
 
@@ -1900,7 +1929,7 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
                 post_dispatch(loop, &outwatcher, rearm_type);
             }
             else {
-                post_dispatch(loop, this, rearm_type);
+                post_dispatch(loop, this, &outwatcher, rearm_type);
             }
         }
     }
