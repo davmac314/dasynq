@@ -242,6 +242,11 @@ namespace dprivate {
             return nullptr;
         }
         
+        waitqueue_node<null_mutex> * get_second()
+        {
+            return nullptr;
+        }
+
         bool check_head(waitqueue_node<null_mutex> &node)
         {
             return true;
