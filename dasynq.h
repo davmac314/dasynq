@@ -359,7 +359,8 @@ namespace dprivate {
     };
 
     // Do standard post-dispatch processing for a watcher. This handles the case of removing or
-    // re-queueing watchers depending on the rearm type.
+    // re-queueing watchers depending on the rearm type. This is called from the individual
+    // watcher dispatch functions to handle REMOVE or REQUEUE re-arm values.
     template <typename Loop> void post_dispatch(Loop &loop, base_watcher *watcher, rearm rearm_type)
     {
         if (rearm_type == rearm::REMOVE) {
@@ -390,15 +391,16 @@ namespace dprivate {
         }
     }
 
-    // This class serves as the base class (mixin) for the backend mechanism.
+    // The event_dispatch class serves as the base class (mixin) for the backend mechanism. It
+    // mostly manages queing and dequeing of events and maintains/owns the relevant data
+    // structures, including a mutex lock.
     //
-    // The event_dispatch class maintains the queued event data structures. It inserts watchers
-    // into the queue when events are received (receiveXXX methods). It also owns a mutex used
-    // to protect those structures.
+    // The backend mechanism should call one of the receiveXXX functions to notify of an event
+    // received. The watcher will then be queued.
     //
-    // In general the methods should be called with lock held. In practice this means that the
-    // event loop backend implementations must obtain the lock; they are also free to use it to
-    // protect their own internal data structures.
+    // In general the functions should be called with lock held. In practice this means that the
+    // event loop backend implementations (that deposit received events here) must obtain the
+    // lock; they are also free to use it to protect their own internal data structures.
     template <typename Traits, typename LoopTraits> class event_dispatch
     {
         friend class dasynq::event_loop<typename LoopTraits::mutex_t, LoopTraits>;;
@@ -1099,9 +1101,12 @@ class event_loop
         std::unique_lock<T_Mutex> ulock(wait_lock);
         waitqueue_node<T_Mutex> * nhead = attn_waitqueue.unqueue();
         if (nhead != nullptr) {
+            // Someone else now owns the lock, signal them to wake them up
             nhead->signal();
         }
         else {
+            // Nobody is waiting in attn_waitqueue (the high-priority queue) so check in
+            // wait_waitqueue (the low-priority queue)
             if (! wait_waitqueue.is_empty()) {
                 auto nhead = wait_waitqueue.get_head();
                 wait_waitqueue.unqueue();
@@ -1126,7 +1131,8 @@ class event_loop
         // Note that signal watchers cannot (currently) be disarmed
     }
 
-    // Process rearm return for fd_watcher, including the primary watcher of a bidi_fd_watcher
+    // Process rearm return from an fd_watcher, including the primary watcher of a bidi_fd_watcher.
+    // Depending on the rearm value, we re-arm, remove, or disarm the watcher, etc.
     rearm process_fd_rearm(base_fd_watcher * bfw, rearm rearm_type, bool is_multi_watch) noexcept
     {
         bool emulatedfd = static_cast<base_watcher *>(bfw)->emulatefd;
