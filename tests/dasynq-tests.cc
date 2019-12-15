@@ -495,6 +495,9 @@ static void test_timers_1()
     my_loop.poll();
     assert(timer_1.expiries == 1);
     assert(timer_2.expiries == 3);
+
+    timer_1.deregister(my_loop);
+    timer_2.deregister(my_loop);
 }
 
 static void test_timers_2()
@@ -560,6 +563,8 @@ static void test_timers_2()
     timer_1.set_enabled(my_loop, clock_type::MONOTONIC, true);
     my_loop.poll();
     assert(timer_1.expiries == 9);
+
+    timer_1.deregister(my_loop);
 }
 
 static void test_timers_3()
@@ -621,6 +626,10 @@ static void test_timers_3()
         my_loop.poll();
         assert(timers[99 - i].expiries == 2);
     }
+
+    for (int i = 0; i < 100; i++) {
+        timers[i].deregister(my_loop);
+    }
 }
 
 static void test_timers_4()
@@ -675,6 +684,8 @@ static void test_timers_4()
     test_io_engine::cur_mono_time = time_val(3, 0);
     my_loop.poll();
     assert(timer.expiries == 2);
+
+    timer.deregister(my_loop);
 }
 
 static void create_pipe(int filedes[2])
@@ -868,6 +879,8 @@ void ftest_bidi_fd_watch2()
 
     close(pipe1[0]);
     close(pipe1[1]);
+
+    watch.deregister(my_loop);
 }
 
 void ftest_bidi_fd_watch3()
@@ -942,6 +955,8 @@ void ftest_bidi_fd_watch3()
 
     close(pipe1[0]);
     close(pipe1[1]);
+
+    watch.deregister(my_loop);
 }
 
 void ftest_sig_watch1()
@@ -1071,6 +1086,8 @@ void ftest_timers1()
     my_loop.poll();
 
     assert(timer_1.expiries == 1);
+
+    timer_1.deregister(my_loop);
 }
 
 // function test for future timer expiry
@@ -1110,6 +1127,8 @@ void ftest_timers2()
     my_loop.run();
 
     assert(timer_1.expiries == 1);
+
+    timer_1.deregister(my_loop);
 }
 
 // function test for future timer expiry, preceded by signal
@@ -1176,6 +1195,8 @@ void ftest_timers3()
     my_loop.run();
 
     assert(timer_1.expiries == 1);
+
+    timer_1.deregister(my_loop);
 }
 
 // function test for future timer expiry, multiple timers
@@ -1222,6 +1243,9 @@ void ftest_timers4()
     my_loop.run();
 
     assert(timer_1.expiries == 1);
+
+    timer_1.deregister(my_loop);
+    timer_2.deregister(my_loop);
 }
 
 void ftest_multi_thread1()
@@ -1386,6 +1410,8 @@ void ftest_multi_thread3()
     close(pipe1[0]); close(pipe1[1]);
     close(pipe2[0]); close(pipe2[1]);
     close(pipe3[0]); close(pipe3[1]);
+
+    fwatch3.deregister(my_loop);
 }
 
 void ftest_child_watch()
