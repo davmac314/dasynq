@@ -1,23 +1,42 @@
-#ifndef DASYNC_DARYHEAP_H_INCLUDED
-#define DASYNC_DARYHEAP_H_INCLUDED
+#ifndef DASYNQ_DARYHEAP_H_INCLUDED
+#define DASYNQ_DARYHEAP_H_INCLUDED
 
-#include "dasynq-svec.h"
 #include <type_traits>
 #include <functional>
 #include <utility>
 #include <limits>
 
+#include "dasynq-svec.h"
+
+
 namespace dasynq {
 
 /**
- * Priority queue implementation based on a binary heap.
+ * Priority queue implementation based on a heap with parameterised fan-out. All nodes are stored
+ * in a vector, with the root at position 0, and each node has N child nodes, at positions
+ * (p * N + 1) through (p * N + N) where p is the (parent) node position.
  *
- * Heap entry "handles" maintain an index into the heap. When the position of a node in the heap
- * changes, its handle must be updated.
+ * With N=2, this is a binary heap. Higher values of N may give better performance due to better
+ * cache locality, but also increase fan-out which will (if too high) also reduce performance.
+ *
+ * Implementation details:
+ *
+ * Adding a node returns a "handle", which maintains an index into the heap. When the position of
+ * a node in the heap changes, its handle must be updated (the advantage is that changing priority
+ * of or removing a node does not require a linear search for the node).
+ *
+ * Node data is actually stored as part of the handle, not in the queue.
+ *
+ * To add a node to the queue, it is inserted at the end and then "bubbled down" to its correct
+ * location according to priority. To removing a node, the node is replaced with the last node in
+ * the vector and then that is "bubbled up" to the correct position.
+ *
+ * Parameters:
  *
  * T : node data type
  * P : priority type (eg int)
  * Compare : functional object type to compare priorities
+ * N : fan out factor (number of child nodes per node)
  */
 template <typename T, typename P, typename Compare = std::less<P>, int N = 4>
 class dary_heap
@@ -28,6 +47,8 @@ class dary_heap
 
     private:
 
+    static_assert(std::is_nothrow_move_assignable<P>::value, "P must be no-except move assignable");
+
     // Actual heap node
     class heap_node
     {
@@ -35,7 +56,8 @@ class dary_heap
         P data;
         handle_t * hnd_p;
 
-        heap_node(handle_t * hnd, const P &odata) : data(odata), hnd_p(hnd)
+        heap_node(handle_t * hnd, const P &odata) noexcept(noexcept(P(std::declval<P>())))
+            : data(odata), hnd_p(hnd)
         {
             // nothing to do
         }
@@ -82,7 +104,7 @@ class dary_heap
 
     private:
 
-    // Bubble a newly added timer down to the correct position
+    // Bubble a newly added node down to the correct position
     bool bubble_down(hindex_t pos) noexcept
     {
         handle_t * ohndl = hvec[pos].hnd_p;
@@ -99,13 +121,13 @@ class dary_heap
                 break;
             }
 
-            hvec[pos] = hvec[parent];
+            hvec[pos] = std::move(hvec[parent]);
             hvec[pos].hnd_p->heap_index = pos;
             pos = parent;
         }
 
         hvec[pos].hnd_p = ohndl;
-        hvec[pos].data = op;
+        hvec[pos].data = std::move(op);
         ohndl->heap_index = pos;
 
         return pos == 0;
@@ -129,6 +151,7 @@ class dary_heap
         hindex_t max = (rmax - 1) / N;
 
         while (pos <= max) {
+            // Find (select) the smallest child node
             hindex_t lchild = pos * N + 1;
             hindex_t selchild = lchild;
             hindex_t rchild = std::min(lchild + N, rmax);
@@ -142,13 +165,13 @@ class dary_heap
                 break;
             }
 
-            hvec[pos] = hvec[selchild];
+            hvec[pos] = std::move(hvec[selchild]);
             hvec[pos].hnd_p->heap_index = pos;
             pos = selchild;
         }
 
         hvec[pos].hnd_p = &h;
-        hvec[pos].data = p;
+        hvec[pos].data = std::move(p);
         h.heap_index = pos;
     }
 
@@ -231,38 +254,38 @@ class dary_heap
     }
 
     // Get the root node handle. (Returns a handle_t or reference to handle_t).
-    handle_t & get_root()
+    handle_t & get_root() noexcept
     {
         return * hvec[0].hnd_p;
     }
 
-    P &get_root_priority()
+    P &get_root_priority() noexcept
     {
         return hvec[0].data;
     }
 
-    void pull_root()
+    void pull_root() noexcept
     {
         remove_h(0);
     }
 
-    void remove(handle_t & hnd)
+    void remove(handle_t & hnd) noexcept
     {
         remove_h(hnd.heap_index);
     }
 
-    bool empty()
+    bool empty() noexcept
     {
         return hvec.empty();
     }
 
-    bool is_queued(handle_t & hnd)
+    bool is_queued(handle_t & hnd) noexcept
     {
         return hnd.heap_index != (hindex_t) -1;
     }
 
     // Set a node priority. Returns true iff the node becomes the root node (and wasn't before).
-    bool set_priority(handle_t & hnd, const P& p)
+    bool set_priority(handle_t & hnd, const P& p) noexcept
     {
         int heap_index = hnd.heap_index;
 
