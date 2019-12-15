@@ -6,17 +6,17 @@
 namespace dasynq {
 
 template <typename T, typename P, typename Compare = std::less<P>>
-class PairingHeap
+class pairing_heap
 {
-    struct HeapNode
+    struct heap_node
     {
         T data;
         P prio;
-        HeapNode * next_sibling;
-        HeapNode * prev_sibling; // (or parent)
-        HeapNode * first_child;
+        heap_node * next_sibling;
+        heap_node * prev_sibling; // (or parent)
+        heap_node * first_child;
         
-        template <typename ...U> HeapNode(U... u) : data(u...)
+        template <typename ...U> heap_node(U... u) : data(u...)
         {
             next_sibling = nullptr;
             prev_sibling = nullptr;
@@ -26,21 +26,11 @@ class PairingHeap
 
     public:
 
-    using handle_t = HeapNode;
-    using handle_t_r = HeapNode &;
+    using handle_t = heap_node;
+    using handle_t_r = heap_node &;
 
     private:
 
-    // A slot in the backing vector can be free, or occupied. We use a union to cover
-    // these cases; if the slot is free, it just contains a link to the next free slot.
-    union HeapNodeU
-    {
-        HeapNode hn;
-        int next_free;
-        
-        HeapNodeU() { }
-    };
-    
     handle_t * root_node = nullptr;
     
     bool merge(handle_t &node)
@@ -184,7 +174,7 @@ class PairingHeap
     // Allocate a slot, but do not incorporate into the heap:
     template <typename ...U> void allocate(handle_t &hndl, U&&... u)
     {
-        new (& hndl) HeapNode(std::forward<U>(u)...);
+        new (& hndl) heap_node(std::forward<U>(u)...);
     }
     
     void deallocate(handle_t & index)

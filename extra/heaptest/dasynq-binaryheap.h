@@ -19,7 +19,7 @@ namespace dasynq {
  * Compare : functional object type to compare priorities
  */
 template <typename T, typename P, typename Compare = std::less<P>>
-class BinaryHeap
+class binary_heap
 {
     public:
     struct handle_t;
@@ -28,21 +28,21 @@ class BinaryHeap
     private:
     
     // Actual heap node
-    class HeapNode
+    class heap_node
     {
         public:
         P data;
         handle_t * hnd_p;
         
-        HeapNode(handle_t * hnd, const P &odata) : data(odata), hnd_p(hnd)
+        heap_node(handle_t * hnd, const P &odata) : data(odata), hnd_p(hnd)
         {
             // nothing to do
         }
 
-        HeapNode() { }
+        heap_node() { }
     };
     
-    svector<HeapNode> hvec;
+    svector<heap_node> hvec;
     
     using hindex_t = typename decltype(hvec)::size_type;
 

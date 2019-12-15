@@ -27,7 +27,7 @@ int main(int argc, char **argv)
     // dasynq::stable_heap<Dary, int, int> heap;
     // dasynq::stable_heap<dasynq::BinaryHeap, int, int> heap;
     // dasynq::stable_heap<Nary, int, int> heap;
-    dasynq::stable_heap<dasynq::PairingHeap, int, int> heap;
+    dasynq::stable_heap<dasynq::pairing_heap, int, int> heap;
     
     constexpr int NUM = 10000000;
     // constexpr int NUM = 5;
