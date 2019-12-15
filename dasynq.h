@@ -278,6 +278,11 @@ namespace dprivate {
             return head;
         }
         
+        waitqueue_node<T_Mutex> * get_second()
+        {
+            return head->next;
+        }
+
         bool check_head(waitqueue_node<T_Mutex> &node)
         {
             return head == &node;
@@ -693,15 +698,27 @@ class event_loop
     // So, we use two wait queues protected by a single mutex. The "attn_waitqueue"
     // (attention queue) is the high-priority queue, used for threads wanting to
     // unwatch event sources. The "wait_waitquueue" is the queue used by threads
-    // that wish to actually poll for events.
+    // that wish to actually poll for events, while they are waiting for the main
+    // queue to become quiet.
     // - The head of the "attn_waitqueue" is always the holder of the lock
     // - Therefore, a poll-waiter must be moved from the wait_waitqueue to the
     //   attn_waitqueue to actually gain the lock. This is only done if the
     //   attn_waitqueue is otherwise empty.
     // - The mutex only protects manipulation of the wait queues, and so should not
     //   be highly contended.
+    //
+    // To claim the lock for a poll-wait, the procedure is:
+    //    - check if the attn_waitqueue is empty;
+    //    - if it is, insert node at the head, thus claiming the lock, and return
+    //    - otherwise, insert node in the wait_waitqueue, and wait
+    // To claim the lock for an unwatch, the procedure is:
+    //    - insert node in the attn_waitqueue
+    //    - if the node is at the head of the queue, lock is claimed; return
+    //    - otherwise, if a poll is in progress, interrupt it
+    //    - wait until our node is at the head of the attn_waitqueue
     
     mutex_t wait_lock;  // protects the wait/attention queues
+    bool long_poll_running = false;  // whether any thread is polling the backend (with non-zero timeout)
     waitqueue<mutex_t> attn_waitqueue;
     waitqueue<mutex_t> wait_waitqueue;
     
@@ -1062,19 +1079,48 @@ class event_loop
 
     // Acquire the attention lock (when held, ensures that no thread is polling the AEN
     // mechanism). This can be used to safely remove watches, since it is certain that
-    // notification callbacks won't be run while the attention lock is held.
+    // notification callbacks won't be run while the attention lock is held. Any in-progress
+    // poll will be interrupted so that the lock should be acquired quickly.
     void get_attn_lock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
         attn_waitqueue.queue(&qnode);        
         if (! attn_waitqueue.check_head(qnode)) {
-            loop_mech.interrupt_wait();
+            if (long_poll_running) {
+                // We want to interrupt any in-progress poll so that the attn queue will progress
+                // but we don't want to do that unnecessarily. If we are 2nd in the queue then the
+                // head must be doing the poll; interrupt it. Otherwise, we assume the 2nd has
+                // already interrupted it.
+                if (attn_waitqueue.get_second() == &qnode) {
+                    loop_mech.interrupt_wait();
+                }
+            }
             while (! attn_waitqueue.check_head(qnode)) {
                 qnode.wait(ulock);
             }
         }
     }
     
+    // Acquire the attention lock, but without interrupting any poll that's in progress
+    // (prefer to fail in that case).
+    bool poll_attn_lock(waitqueue_node<T_Mutex> &qnode) noexcept
+    {
+        std::unique_lock<T_Mutex> ulock(wait_lock);
+        if (long_poll_running) {
+            // There are poll-waiters, bail out
+            return false;
+        }
+
+        // Nobody's doing a long poll, wait until we're at the head of the attn queue and return
+        // success:
+        attn_waitqueue.queue(&qnode);
+        while (! attn_waitqueue.check_head(qnode)) {
+            qnode.wait(ulock);
+        }
+
+        return true;
+    }
+
     // Acquire the poll-wait lock (to be held when polling the AEN mechanism; lower priority than
     // the attention lock). The poll-wait lock is used to prevent more than a single thread from
     // polling the event loop mechanism at a time; if this is not done, it is basically
@@ -1092,13 +1138,16 @@ class event_loop
         
         while (! attn_waitqueue.check_head(qnode)) {
             qnode.wait(ulock);
-        }    
+        }
+
+        long_poll_running = true;
     }
     
     // Release the poll-wait/attention lock.
     void release_lock(waitqueue_node<T_Mutex> &qnode) noexcept
     {
         std::unique_lock<T_Mutex> ulock(wait_lock);
+        long_poll_running = false;
         waitqueue_node<T_Mutex> * nhead = attn_waitqueue.unqueue();
         if (nhead != nullptr) {
             // Someone else now owns the lock, signal them to wake them up
@@ -1111,6 +1160,7 @@ class event_loop
                 auto nhead = wait_waitqueue.get_head();
                 wait_waitqueue.unqueue();
                 attn_waitqueue.queue(nhead);
+                long_poll_running = true;
                 nhead->signal();
             }
         }                
@@ -1427,9 +1477,10 @@ class event_loop
     void poll(int limit = -1) noexcept
     {
         waitqueue_node<T_Mutex> qnode;
-        get_pollwait_lock(qnode);
-        loop_mech.pull_events(false);
-        release_lock(qnode);
+        if (poll_attn_lock(qnode)) {
+            loop_mech.pull_events(false);
+            release_lock(qnode);
+        }
 
         process_events(limit);
     }

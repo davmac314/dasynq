@@ -1414,6 +1414,62 @@ void ftest_multi_thread3()
     fwatch3.deregister(my_loop);
 }
 
+void ftest_multi_thread4()
+{
+    using Loop_t = dasynq::event_loop<std::mutex>;
+    Loop_t my_loop;
+
+    int pipe1[2];
+    create_pipe(pipe1);
+
+    class mt3_watch : public Loop_t::fd_watcher_impl<mt3_watch>
+    {
+        public:
+        bool seen = false;
+        bool was_removed = false;
+
+        mt3_watch() { }
+
+        rearm fd_event(Loop_t &eloop, int fd, int flags) noexcept
+        {
+            // Process I/O here
+            seen = true;
+            return rearm::DISARM;  // disable watcher
+        }
+
+        void watch_removed() noexcept override
+        {
+            was_removed = true;
+        }
+    };
+
+    mt3_watch fwatch1;
+
+    fwatch1.add_watch(my_loop, pipe1[0], dasynq::IN_EVENTS);
+
+    std::thread t([&my_loop]() -> void {
+        my_loop.run();
+    });
+
+    struct timespec t200ms;
+    t200ms.tv_sec = 0;
+    t200ms.tv_nsec = 200 * 1000 * 1000;
+    nanosleep(&t200ms, nullptr);
+
+    // Loop is running, try to poll (shouldn't block)
+    my_loop.poll();
+
+    // Fire an event to terminate the thread
+    char wbuf[1] = {'a'};
+    write(pipe1[1], wbuf, 1);
+
+    t.join();
+
+    close(pipe1[0]); close(pipe1[1]);
+
+    fwatch1.deregister(my_loop);
+}
+
 void ftest_child_watch()
 {
     using loop_t = dasynq::event_loop<std::mutex>;
@@ -1548,6 +1604,10 @@ int main(int argc, char **argv)
 
     std::cout << "ftest_multi_thread3... ";
     ftest_multi_thread3();
+    std::cout << "PASSED" << std::endl;
+
+    std::cout << "ftest_multi_thread4... ";
+    ftest_multi_thread4();
     std::cout << "PASSED" << std::endl;
 
     std::cout << "ftest_child_watch... ";
