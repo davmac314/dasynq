@@ -12,9 +12,13 @@
 
 // Extremely simple chat server example for Dasynq
 //
-// This is an example of a chat server, using Dasynq to manage the event loop. When compiled and
-// run, it will listen on port 8367 for incoming client connections. You can use "telnet", if you
-// have it installed, to connect:
+// This is an example of a chat server, using Dasynq to manage the event loop. To compile, you
+// will need to specify the include path for Dasynq; something like:
+//
+//    cc -I../.. chatserver.cc -o chatserver
+//
+// When run, it will listen on port 8367 for incoming client connections. You can use "telnet", if
+// you have it installed, to connect:
 //
 //    telnet localhost 8367
 //
