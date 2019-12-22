@@ -120,7 +120,7 @@ event loop.</p>
 <hr>
 <h2 id="bidi_fd_watcher_impl">bidi_fd_watcher_impl</h2>
 
-<p><b>Brief</b>: The <i class="code-name">bidi_fd_watcher_impl</i> provides a basis for implementing
+<p><b>Brief</b>: The <i class="code-name">bidi_fd_watcher_impl</i> class provides a basis for implementing
 <i class="code-name">bidi_fd_watcher</i>, using the "curiously recurring template pattern". Instead of
 subclassing <i class="code-name">bidi_fd_watcher</i> directly, subclass an instantiation of
 <i class="code-name">bidi_fd_watcher_impl</i> with the template parameter specified as the subclass itself.
@@ -143,7 +143,7 @@ rearm read_ready(event_loop_t & loop, int fd);
 rearm write_ready(event_loop_t & loop, int fd);
 </pre>
 
-<p>The callback functions must be public, but need not be virtual. It will be called with the following
+<p>The callback functions must be public, but need not be virtual. They will be called with the following
 parameters:</p>
 
 <ul>
@@ -152,7 +152,15 @@ parameters:</p>
 </ul>
 
 <p>The return value specifies the <a href="dasynq-namespace.html"><i class="code-name">rearm</i></a> action.
-The action is performed independently for the input and output halves of the watcher.</p>
+The action is performed independently for the input and output halves of the watcher. If the <i class="code-name">rearm::REMOVE</i>
+action is returned by either callback function, the relevant callback is disabled and the watch (as a whole) will
+be de-registered once the other callback function also returns <i class="code-name">rearm::REMOVE</i> (or the
+watcher is explicitly deregistered).</p>
+
+<p>To deregister the watcher (disarming both callbacks) from inside either callback, the <i class="code-name">deregister</i>
+function can be used; the callback function should then return <i class="code-name">rearm::REMOVED</i>.</p>
+
+<p>Note that, if the event queue is polled from multiple threads, both callbacks may be active simultaneously.</p>
 
 <p>A <i class="code-name">bidi_fd_watcher_impl</i> instantiation has no public or protected members, other
 than those inherited from <i class="code-name">bidi_fd_watcher</i>, which it publicly derives from.</p>
