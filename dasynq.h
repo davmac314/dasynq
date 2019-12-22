@@ -322,9 +322,16 @@ namespace dprivate {
 
         template <typename Loop>
         static rearm process_fd_rearm(Loop &loop, typename Loop::base_fd_watcher *bfw,
-                rearm rearm_type, bool is_multi_watch) noexcept
+                rearm rearm_type) noexcept
         {
-            return loop.process_fd_rearm(bfw, rearm_type, is_multi_watch);
+            return loop.process_fd_rearm(bfw, rearm_type);
+        }
+
+        template <typename Loop>
+        static rearm process_primary_rearm(Loop &loop, typename Loop::base_bidi_fd_watcher *bdfw,
+                rearm rearm_type) noexcept
+        {
+            return loop.process_primary_rearm(bdfw, rearm_type);
         }
 
         template <typename Loop>
@@ -1188,111 +1195,112 @@ class event_loop
 
     // Process rearm return from an fd_watcher, including the primary watcher of a bidi_fd_watcher.
     // Depending on the rearm value, we re-arm, remove, or disarm the watcher, etc.
-    rearm process_fd_rearm(base_fd_watcher * bfw, rearm rearm_type, bool is_multi_watch) noexcept
+    rearm process_fd_rearm(base_fd_watcher * bfw, rearm rearm_type) noexcept
     {
         bool emulatedfd = static_cast<base_watcher *>(bfw)->emulatefd;
 
-        // Called with lock held
-        if (is_multi_watch) {
-            base_bidi_fd_watcher * bdfw = static_cast<base_bidi_fd_watcher *>(bfw);
-
-            if (rearm_type == rearm::REMOVE) {
-                bdfw->read_removed = 1;
-                
-                if (backend_traits_t::has_separate_rw_fd_watches) {
-                    bdfw->watch_flags &= ~IN_EVENTS;
-                    if (! emulatedfd) {
-                        loop_mech.remove_fd_watch_nolock(bdfw->watch_fd, IN_EVENTS);
-                    }
-                    return bdfw->write_removed ? rearm::REMOVE : rearm::NOOP;
-                }
-                else {
-                    if (! bdfw->write_removed) {
-                        if (bdfw->watch_flags & IN_EVENTS) {
-                            bdfw->watch_flags &= ~IN_EVENTS;
-                            if (! emulatedfd) {
-                                set_fd_enabled_nolock(bdfw, bdfw->watch_fd, bdfw->watch_flags,
-                                        bdfw->watch_flags != 0);
-                            }
-                        }
-                        return rearm::NOOP;
-                    }
-                    else {
-                        // both removed: actually remove
-                        if (! emulatedfd) {
-                            loop_mech.remove_fd_watch_nolock(bdfw->watch_fd, 0 /* not used */);
-                        }
-                        return rearm::REMOVE;
-                    }
-                }
+        if (emulatedfd) {
+            if (rearm_type == rearm::REARM) {
+                bfw->emulate_enabled = true;
+                rearm_type = rearm::REQUEUE;
             }
             else if (rearm_type == rearm::DISARM) {
-                bdfw->watch_flags &= ~IN_EVENTS;
-
-                if (! emulatedfd) {
-                    if (! backend_traits_t::has_separate_rw_fd_watches) {
-                        int watch_flags = bdfw->watch_flags  & (IN_EVENTS | OUT_EVENTS);
-                        set_fd_enabled_nolock(bdfw, bdfw->watch_fd, watch_flags, watch_flags != 0);
-                    }
-                    else {
-                        loop_mech.disable_fd_watch_nolock(bdfw->watch_fd, IN_EVENTS);
-                    }
-                }
-            }
-            else if (rearm_type == rearm::REARM) {
-                if (! emulatedfd) {
-                    bdfw->watch_flags |= IN_EVENTS;
-                    if (! backend_traits_t::has_separate_rw_fd_watches) {
-                        int watch_flags = bdfw->watch_flags;
-                        set_fd_enabled_nolock(bdfw, bdfw->watch_fd,
-                                watch_flags & (IN_EVENTS | OUT_EVENTS), true);
-                    }
-                    else {
-                        set_fd_enabled_nolock(bdfw, bdfw->watch_fd, IN_EVENTS, true);
-                    }
-                }
-                else {
-                    bdfw->watch_flags &= ~IN_EVENTS;
-                    rearm_type = rearm::REQUEUE;
-                }
+                bfw->emulate_enabled = false;
             }
             else if (rearm_type == rearm::NOOP) {
-                if (bdfw->emulatefd) {
-                    if (bdfw->watch_flags & IN_EVENTS) {
-                        bdfw->watch_flags &= ~IN_EVENTS;
-                        rearm_type = rearm::REQUEUE;
-                    }
-                }
-            }
-            return rearm_type;
-        }
-        else { // Not multi-watch:
-            if (emulatedfd) {
-                if (rearm_type == rearm::REARM) {
-                    bfw->emulate_enabled = true;
+                if (bfw->emulate_enabled) {
                     rearm_type = rearm::REQUEUE;
                 }
-                else if (rearm_type == rearm::DISARM) {
-                    bfw->emulate_enabled = false;
-                }
-                else if (rearm_type == rearm::NOOP) {
-                    if (bfw->emulate_enabled) {
-                        rearm_type = rearm::REQUEUE;
-                    }
-                }
             }
-            else  if (rearm_type == rearm::REARM) {
-                set_fd_enabled_nolock(bfw, bfw->watch_fd,
-                        bfw->watch_flags & (IN_EVENTS | OUT_EVENTS), true);
-            }
-            else if (rearm_type == rearm::DISARM) {
-                loop_mech.disable_fd_watch_nolock(bfw->watch_fd, bfw->watch_flags);
-            }
-            else if (rearm_type == rearm::REMOVE) {
-                loop_mech.remove_fd_watch_nolock(bfw->watch_fd, bfw->watch_flags);
-            }
-            return rearm_type;
         }
+        else  if (rearm_type == rearm::REARM) {
+            set_fd_enabled_nolock(bfw, bfw->watch_fd,
+                    bfw->watch_flags & (IN_EVENTS | OUT_EVENTS), true);
+        }
+        else if (rearm_type == rearm::DISARM) {
+            loop_mech.disable_fd_watch_nolock(bfw->watch_fd, bfw->watch_flags);
+        }
+        else if (rearm_type == rearm::REMOVE) {
+            loop_mech.remove_fd_watch_nolock(bfw->watch_fd, bfw->watch_flags);
+        }
+        return rearm_type;
+    }
+
+    // Process rearm option from the primary watcher in bidi_fd_watcher
+    rearm process_primary_rearm(base_bidi_fd_watcher * bdfw, rearm rearm_type) noexcept
+    {
+        bool emulatedfd = static_cast<base_watcher *>(bdfw)->emulatefd;
+
+        // Called with lock held
+        if (rearm_type == rearm::REMOVE) {
+            bdfw->read_removed = 1;
+
+            if (backend_traits_t::has_separate_rw_fd_watches) {
+                bdfw->watch_flags &= ~IN_EVENTS;
+                if (! emulatedfd) {
+                    loop_mech.remove_fd_watch_nolock(bdfw->watch_fd, IN_EVENTS);
+                }
+                return bdfw->write_removed ? rearm::REMOVE : rearm::NOOP;
+            }
+            else {
+                if (! bdfw->write_removed) {
+                    if (bdfw->watch_flags & IN_EVENTS) {
+                        bdfw->watch_flags &= ~IN_EVENTS;
+                        if (! emulatedfd) {
+                            set_fd_enabled_nolock(bdfw, bdfw->watch_fd, bdfw->watch_flags,
+                                    bdfw->watch_flags != 0);
+                        }
+                    }
+                    return rearm::NOOP;
+                }
+                else {
+                    // both removed: actually remove
+                    if (! emulatedfd) {
+                        loop_mech.remove_fd_watch_nolock(bdfw->watch_fd, 0 /* not used */);
+                    }
+                    return rearm::REMOVE;
+                }
+            }
+        }
+        else if (rearm_type == rearm::DISARM) {
+            bdfw->watch_flags &= ~IN_EVENTS;
+
+            if (! emulatedfd) {
+                if (! backend_traits_t::has_separate_rw_fd_watches) {
+                    int watch_flags = bdfw->watch_flags  & (IN_EVENTS | OUT_EVENTS);
+                    set_fd_enabled_nolock(bdfw, bdfw->watch_fd, watch_flags, watch_flags != 0);
+                }
+                else {
+                    loop_mech.disable_fd_watch_nolock(bdfw->watch_fd, IN_EVENTS);
+                }
+            }
+        }
+        else if (rearm_type == rearm::REARM) {
+            if (! emulatedfd) {
+                bdfw->watch_flags |= IN_EVENTS;
+                if (! backend_traits_t::has_separate_rw_fd_watches) {
+                    int watch_flags = bdfw->watch_flags;
+                    set_fd_enabled_nolock(bdfw, bdfw->watch_fd,
+                            watch_flags & (IN_EVENTS | OUT_EVENTS), true);
+                }
+                else {
+                    set_fd_enabled_nolock(bdfw, bdfw->watch_fd, IN_EVENTS, true);
+                }
+            }
+            else {
+                bdfw->watch_flags &= ~IN_EVENTS;
+                rearm_type = rearm::REQUEUE;
+            }
+        }
+        else if (rearm_type == rearm::NOOP) {
+            if (bdfw->emulatefd) {
+                if (bdfw->watch_flags & IN_EVENTS) {
+                    bdfw->watch_flags &= ~IN_EVENTS;
+                    rearm_type = rearm::REQUEUE;
+                }
+            }
+        }
+        return rearm_type;
     }
 
     // Process re-arm for the secondary (output) watcher in a Bi-direction Fd watcher.
@@ -1755,7 +1763,7 @@ class fd_watcher_impl : public fd_watcher<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            rearm_type = loop_access::process_fd_rearm(loop, this, rearm_type, false);
+            rearm_type = loop_access::process_fd_rearm(loop, this, rearm_type);
 
             post_dispatch(loop, this, rearm_type);
         }
@@ -1959,7 +1967,7 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
                 rearm_type = rearm::REMOVE;
             }
 
-            rearm_type = loop_access::process_fd_rearm(loop, this, rearm_type, true);
+            rearm_type = loop_access::process_primary_rearm(loop, this, rearm_type);
 
             auto &outwatcher = bidi_fd_watcher<EventLoop>::out_watcher;
             post_dispatch(loop, this, &outwatcher, rearm_type);
