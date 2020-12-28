@@ -1,6 +1,6 @@
 # Installation:
 #DESTDIR=  (acts as prefix to other paths for installation)
-HEADERDIR=/usr/include/dasynq
+HEADERDIR=/usr/include
 LIBDIR=/usr/lib
 
 VERSION=1.1.7
@@ -34,8 +34,9 @@ dasynq.pc:
 	@echo "Cflags: $(CXXOPTS) -I\"$(HEADERDIR)\"" >> dasynq.pc
 
 install: dasynq.pc
-	install -d "$(DESTDIR)$(HEADERDIR)" "$(DESTDIR)$(LIBDIR)/pkgconfig"
-	install -m644 dasynq.h dasynq-*.h "$(DESTDIR)$(HEADERDIR)"
+	install -d "$(DESTDIR)$(HEADERDIR)/dasynq" "$(DESTDIR)$(LIBDIR)/pkgconfig"
+	install -m644 include/dasynq/* "$(DESTDIR)$(HEADERDIR)/dasynq"
+	install -m644 include/dasynq.hpp "$(DESTDIR)$(HEADERDIR)"
 	install -m644 dasynq.pc "$(DESTDIR)$(LIBDIR)/pkgconfig"
 	$(MAKE) -C cmake install
 
