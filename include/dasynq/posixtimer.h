@@ -197,6 +197,6 @@ class posix_timer_events : public timer_base<Base>
     }
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_POSIXTIMER_H_ */

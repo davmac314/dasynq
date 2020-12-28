@@ -312,6 +312,6 @@ class dary_heap
     dary_heap(const dary_heap &) = delete;
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_DARYHEAP_H_ */

@@ -394,6 +394,6 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
     }
 };
 
-} // end namespace
+} // namespace dasynq
 
 #endif /* DASYNQ_KQUEUE_MACOS_H_ */

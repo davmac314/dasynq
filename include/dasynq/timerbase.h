@@ -511,6 +511,6 @@ template <typename Base> class timer_base : public Base
     }
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_TIMERBASE_H_ */

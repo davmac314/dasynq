@@ -188,7 +188,6 @@ class svector
     }
 };
 
-
-} // namespace
+} // namespace dasynq
 
 #endif /* DASYNQ_SVEC_H_ */

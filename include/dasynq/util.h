@@ -35,7 +35,6 @@ using ::pipe2;
 
 #endif
 
-
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_UTIL_H_ */

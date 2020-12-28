@@ -17,6 +17,6 @@ class null_mutex
     DASYNQ_EMPTY_BODY;
 };
 
-} // end of namespace
+} // namespace dasynq
 
 #endif /* DASYNQ_MUTEX_H_ */

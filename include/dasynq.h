@@ -85,12 +85,12 @@
 #include "dasynq-posixtimer.h"
 namespace dasynq {
     template <typename T, bool provide_mono_timer = true> using timer_events = posix_timer_events<T, provide_mono_timer>;
-}
+} // namespace dasynq
 #else
 #include "dasynq-itimer.h"
 namespace dasynq {
     template <typename T, bool provide_mono_timer = true> using timer_events = itimer_events<T, provide_mono_timer>;
-}
+} // namespace dasynq
 #endif
 #endif
 
@@ -101,14 +101,14 @@ namespace dasynq {
 namespace dasynq {
     template <typename T> using loop_t = macos_kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = macos_kqueue_traits;
-}
+} // namespace dasynq
 #else
 #include "dasynq-kqueue.h"
 #include "dasynq-childproc.h"
 namespace dasynq {
     template <typename T> using loop_t = kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = kqueue_traits;
-}
+} // namespace dasynq
 #endif
 #elif DASYNQ_HAVE_EPOLL
 #include "dasynq-epoll.h"
@@ -117,7 +117,7 @@ namespace dasynq {
 namespace dasynq {
     template <typename T> using loop_t = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
     using loop_traits_t = epoll_traits;
-}
+} // namespace dasynq
 #else
 #include "dasynq-childproc.h"
 #if DASYNQ_HAVE_PSELECT
@@ -125,13 +125,13 @@ namespace dasynq {
 namespace dasynq {
     template <typename T> using loop_t = pselect_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
-}
+} // namespace dasynq
 #else
 #include "dasynq-select.h"
 namespace dasynq {
     template <typename T> using loop_t = select_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
-}
+} // namespace dasynq
 #endif
 #endif
 
@@ -623,7 +623,7 @@ namespace dprivate {
         event_dispatch(const event_dispatch &) = delete;
     };
 
-}
+} // namespace dasynq
 
 // This is the main event_loop implementation. It serves as an interface to the event loop backend (of which
 // it maintains an internal instance). It also serialises polling the backend and provides safe deletion of
@@ -2338,7 +2338,8 @@ class timer_impl : public timer<EventLoop>
     }
 };
 
-}  // namespace dasynq::dprivate
-}  // namespace dasynq
+} // namespace dprivate
+
+} // namespace dasynq
 
 #endif /* DASYNQ_H_ */

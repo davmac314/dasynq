@@ -20,6 +20,6 @@ enum class clock_type
     MONOTONIC
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_FLAGS_H_ */

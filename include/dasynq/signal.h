@@ -100,7 +100,8 @@ inline siginfo_t * get_siginfo()
     return &sig_capture::siginfo_cap;
 }
 
-} } // namespace dprivate :: signal_mech
+} // namespace signal_mech
+} // namespace dprivate
 
 // signal_events template.
 //
@@ -243,6 +244,6 @@ template <class Base, bool mask_enables = false> class signal_events : public Ba
 
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_SIGNAL_H_ */

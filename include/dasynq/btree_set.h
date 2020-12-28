@@ -588,6 +588,6 @@ class btree_set
     }
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_BTREE_SET_H_ */

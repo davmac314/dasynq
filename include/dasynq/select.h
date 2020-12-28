@@ -321,6 +321,6 @@ template <class Base> class select_events : public signal_events<Base, true>
     }
 };
 
-} // end namespace
+} // namespace dasynq
 
 #endif /* DASYNQ_SELECT_H_ */

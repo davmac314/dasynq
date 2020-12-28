@@ -285,6 +285,6 @@ class itimer_events : public timer_base<Base>
     }
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_ITIMER_H_ */

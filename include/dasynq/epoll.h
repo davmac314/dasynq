@@ -362,6 +362,6 @@ template <class Base> class epoll_loop : public Base
     }
 };
 
-} // end namespace
+} // namespace dasynq
 
 #endif /* DASYNQ_EPOLL_H_ */

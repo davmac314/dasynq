@@ -161,7 +161,8 @@ inline bool get_siginfo(int signo, siginfo_t *siginfo)
 }
 
 #endif
-} }  // namespace dprivate :: dkqueue
+} // namespace dkqueue
+} // namespace dprivate
 
 template <class Base> class kqueue_loop : public Base
 {
@@ -593,6 +594,6 @@ template <class Base> class kqueue_loop : public Base
     }
 };
 
-} // end namespace
+} // namespace dasynq
 
 #endif /* DASYNQ_KQUEUE_H_ */

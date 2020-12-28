@@ -279,6 +279,6 @@ template <class Base> class pselect_events : public signal_events<Base, false>
     }
 };
 
-} // end namespace
+} // namespace dasynq
 
 #endif /* DASYNQ_PSELECT_H_ */

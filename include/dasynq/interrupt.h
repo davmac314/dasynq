@@ -89,6 +89,6 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
     }
 };
 
-}
+} // namespace dasynq
 
 #endif /* DASYNQ_INTERRUPT_H_ */
