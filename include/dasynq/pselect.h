@@ -1,8 +1,8 @@
 #ifndef DASYNQ_PSELECT_H_
 #define DASYNQ_PSELECT_H_
 
-#include "dasynq-select.h"
-#include "dasynq-signal.h"
+#include "select.h"
+#include "signal.h"
 
 namespace dasynq {
 

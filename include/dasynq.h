@@ -1,12 +1,12 @@
 #ifndef DASYNQ_H_
 #define DASYNQ_H_
 
-#include "dasynq-config.h"
+#include "dasynq/config.h"
 
-#include "dasynq-flags.h"
-#include "dasynq-stableheap.h"
-#include "dasynq-interrupt.h"
-#include "dasynq-util.h"
+#include "dasynq/flags.h"
+#include "dasynq/stableheap.h"
+#include "dasynq/interrupt.h"
+#include "dasynq/util.h"
 
 // Dasynq uses a "mix-in" pattern to produce an event loop implementation incorporating selectable
 // implementations of various components (main backend, timers, child process watch mechanism etc). In C++
@@ -82,12 +82,12 @@
 
 #if DASYNQ_HAVE_EPOLL <= 0
 #if _POSIX_TIMERS > 0
-#include "dasynq-posixtimer.h"
+#include "dasynq/posixtimer.h"
 namespace dasynq {
     template <typename T, bool provide_mono_timer = true> using timer_events = posix_timer_events<T, provide_mono_timer>;
 } // namespace dasynq
 #else
-#include "dasynq-itimer.h"
+#include "dasynq/itimer.h"
 namespace dasynq {
     template <typename T, bool provide_mono_timer = true> using timer_events = itimer_events<T, provide_mono_timer>;
 } // namespace dasynq
@@ -96,38 +96,38 @@ namespace dasynq {
 
 #if DASYNQ_HAVE_KQUEUE
 #if DASYNQ_KQUEUE_MACOS_WORKAROUND
-#include "dasynq-kqueue-macos.h"
-#include "dasynq-childproc.h"
+#include "dasynq/kqueue-macos.h"
+#include "dasynq/childproc.h"
 namespace dasynq {
     template <typename T> using loop_t = macos_kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = macos_kqueue_traits;
 } // namespace dasynq
 #else
-#include "dasynq-kqueue.h"
-#include "dasynq-childproc.h"
+#include "dasynq/kqueue.h"
+#include "dasynq/childproc.h"
 namespace dasynq {
     template <typename T> using loop_t = kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = kqueue_traits;
 } // namespace dasynq
 #endif
 #elif DASYNQ_HAVE_EPOLL
-#include "dasynq-epoll.h"
-#include "dasynq-timerfd.h"
-#include "dasynq-childproc.h"
+#include "dasynq/epoll.h"
+#include "dasynq/timerfd.h"
+#include "dasynq/childproc.h"
 namespace dasynq {
     template <typename T> using loop_t = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
     using loop_traits_t = epoll_traits;
 } // namespace dasynq
 #else
-#include "dasynq-childproc.h"
+#include "dasynq/childproc.h"
 #if DASYNQ_HAVE_PSELECT
-#include "dasynq-pselect.h"
+#include "dasynq/pselect.h"
 namespace dasynq {
     template <typename T> using loop_t = pselect_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
 } // namespace dasynq
 #else
-#include "dasynq-select.h"
+#include "dasynq/select.h"
 namespace dasynq {
     template <typename T> using loop_t = select_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
@@ -144,9 +144,9 @@ namespace dasynq {
 #include <unistd.h>
 #include <fcntl.h>
 
-#include "dasynq-mutex.h"
+#include "dasynq/mutex.h"
 
-#include "dasynq-basewatchers.h"
+#include "dasynq/basewatchers.h"
 
 namespace dasynq {
 

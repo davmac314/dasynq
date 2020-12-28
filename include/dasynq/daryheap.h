@@ -6,8 +6,7 @@
 #include <utility>
 #include <limits>
 
-#include "dasynq-svec.h"
-
+#include "svec.h"
 
 namespace dasynq {
 

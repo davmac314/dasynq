@@ -7,7 +7,7 @@
 #include <sys/timerfd.h>
 #include <ctime>
 
-#include "dasynq-timerbase.h"
+#include "timerbase.h"
 
 namespace dasynq {
 

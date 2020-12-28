@@ -6,7 +6,7 @@
 
 #include <ctime>
 
-#include "dasynq-daryheap.h"
+#include "daryheap.h"
 
 namespace dasynq {
 

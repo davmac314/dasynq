@@ -6,7 +6,7 @@
 
 #include <csignal>
 
-#include "dasynq-btree_set.h"
+#include "btree_set.h"
 
 namespace dasynq {
 

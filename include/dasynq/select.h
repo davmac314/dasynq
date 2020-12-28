@@ -15,8 +15,8 @@
 #include <csignal>
 #include <csetjmp>
 
-#include "dasynq-config.h"
-#include "dasynq-signal.h"
+#include "config.h"
+#include "signal.h"
 
 // "pselect"-based event loop mechanism.
 //

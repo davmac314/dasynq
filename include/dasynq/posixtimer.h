@@ -9,8 +9,8 @@
 #include <ctime>
 #include <csignal>
 
-#include "dasynq-config.h"
-#include "dasynq-timerbase.h"
+#include "config.h"
+#include "timerbase.h"
 
 namespace dasynq {
 

@@ -16,7 +16,7 @@
 #include <unistd.h>
 #include <csignal>
 
-#include "dasynq-config.h"
+#include "config.h"
 
 // "kqueue"-based event loop mechanism.
 //
