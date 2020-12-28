@@ -1,3 +1,6 @@
+#ifndef DASYNQ_KQUEUE_H_
+#define DASYNQ_KQUEUE_H_
+
 #include <system_error>
 #include <type_traits>
 #include <unordered_map>
@@ -591,3 +594,5 @@ template <class Base> class kqueue_loop : public Base
 };
 
 } // end namespace
+
+#endif /* DASYNQ_KQUEUE_H_ */

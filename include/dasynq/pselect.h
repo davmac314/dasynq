@@ -1,3 +1,6 @@
+#ifndef DASYNQ_PSELECT_H_
+#define DASYNQ_PSELECT_H_
+
 #include "dasynq-select.h"
 #include "dasynq-signal.h"
 
@@ -277,3 +280,5 @@ template <class Base> class pselect_events : public signal_events<Base, false>
 };
 
 } // end namespace
+
+#endif /* DASYNQ_PSELECT_H_ */

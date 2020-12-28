@@ -1,5 +1,5 @@
-#ifndef DASYNQ_MUTEX_H_INCLUDED
-#define DASYNQ_MUTEX_H_INCLUDED
+#ifndef DASYNQ_MUTEX_H_
+#define DASYNQ_MUTEX_H_
 
 #include <mutex>
 
@@ -19,4 +19,4 @@ class null_mutex
 
 } // end of namespace
 
-#endif
+#endif /* DASYNQ_MUTEX_H_ */

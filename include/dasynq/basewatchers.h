@@ -1,3 +1,6 @@
+#ifndef DASYNQ_BASEWATCHERS_H_
+#define DASYNQ_BASEWATCHERS_H_
+
 // Dasynq: early declarations and base watchers.
 //
 // Here we define watcher functionality that is not dependent on the event loop type. In particular,
@@ -276,3 +279,5 @@ namespace dprivate {
     };
 } // dprivate
 } // dasynq
+
+#endif /* DASYNQ_BASEWATCHERS_H_ */

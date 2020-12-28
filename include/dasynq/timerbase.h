@@ -1,5 +1,5 @@
-#ifndef DASYNQ_TIMERBASE_H_INCLUDED
-#define DASYNQ_TIMERBASE_H_INCLUDED
+#ifndef DASYNQ_TIMERBASE_H_
+#define DASYNQ_TIMERBASE_H_
 
 #include <utility>
 #include <mutex>
@@ -513,4 +513,4 @@ template <typename Base> class timer_base : public Base
 
 }
 
-#endif /* DASYNQ_TIMERBASE_H_INCLUDED */
+#endif /* DASYNQ_TIMERBASE_H_ */

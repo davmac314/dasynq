@@ -1,5 +1,5 @@
-#ifndef DASYNQ_SIGNAL_INCLUDED
-#define DASYNQ_SIGNAL_INCLUDED 1
+#ifndef DASYNQ_SIGNAL_H_
+#define DASYNQ_SIGNAL_H_
 
 #include <atomic>
 
@@ -245,4 +245,4 @@ template <class Base, bool mask_enables = false> class signal_events : public Ba
 
 }
 
-#endif
+#endif /* DASYNQ_SIGNAL_H_ */

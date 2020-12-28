@@ -1,3 +1,6 @@
+#ifndef DASYNQ_EPOLL_H_
+#define DASYNQ_EPOLL_H_
+
 #include <system_error>
 #include <mutex>
 #include <type_traits>
@@ -360,3 +363,5 @@ template <class Base> class epoll_loop : public Base
 };
 
 } // end namespace
+
+#endif /* DASYNQ_EPOLL_H_ */

@@ -1,3 +1,6 @@
+#ifndef DASYNQ_ITIMER_H_
+#define DASYNQ_ITIMER_H_
+
 #include <vector>
 #include <utility>
 
@@ -283,3 +286,5 @@ class itimer_events : public timer_base<Base>
 };
 
 }
+
+#endif /* DASYNQ_ITIMER_H_ */

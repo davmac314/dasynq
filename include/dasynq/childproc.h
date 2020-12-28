@@ -1,3 +1,6 @@
+#ifndef DASYNQ_CHILDPROC_H_
+#define DASYNQ_CHILDPROC_H_
+
 #include <sys/types.h>
 #include <sys/wait.h>
 
@@ -208,3 +211,5 @@ template <class Base> class child_proc_events : public Base
 
 
 } // end namespace
+
+#endif /* DASYNQ_CHILDPROC_H_ */

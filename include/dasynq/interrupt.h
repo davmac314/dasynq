@@ -1,5 +1,5 @@
-#ifndef DASYNQ_INTERRUPT_H_INCLUDED
-#define DASYNQ_INTERRUPT_H_INCLUDED
+#ifndef DASYNQ_INTERRUPT_H_
+#define DASYNQ_INTERRUPT_H_
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -91,4 +91,4 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
 
 }
 
-#endif /* DASYNQ_INTERRUPT_H_INCLUDED */
+#endif /* DASYNQ_INTERRUPT_H_ */

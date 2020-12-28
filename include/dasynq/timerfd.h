@@ -1,3 +1,6 @@
+#ifndef DASYNQ_TIMERFD_H_
+#define DASYNQ_TIMERFD_H_
+
 #include <vector>
 #include <utility>
 
@@ -198,3 +201,5 @@ template <class Base> class timer_fd_events : public timer_base<Base>
 };
 
 }
+
+#endif /* DASYNQ_TIMERFD_H_ */

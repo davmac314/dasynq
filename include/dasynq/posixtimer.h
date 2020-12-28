@@ -1,3 +1,6 @@
+#ifndef DASYNQ_POSIXTIMER_H_
+#define DASYNQ_POSIXTIMER_H_
+
 #include <vector>
 #include <utility>
 #include <cstdlib>
@@ -195,3 +198,5 @@ class posix_timer_events : public timer_base<Base>
 };
 
 }
+
+#endif /* DASYNQ_POSIXTIMER_H_ */

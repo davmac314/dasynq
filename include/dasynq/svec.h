@@ -1,5 +1,5 @@
-#ifndef DASYNQ_SVEC_H_INCLUDED
-#define DASYNQ_SVEC_H_INCLUDED
+#ifndef DASYNQ_SVEC_H_
+#define DASYNQ_SVEC_H_
 
 #include <limits>
 #include <utility>
@@ -191,4 +191,4 @@ class svector
 
 } // namespace
 
-#endif
+#endif /* DASYNQ_SVEC_H_ */

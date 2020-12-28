@@ -1,5 +1,5 @@
-#ifndef DASYNQ_UTIL_H_INCLUDED
-#define DASYNQ_UTIL_H_INCLUDED 1
+#ifndef DASYNQ_UTIL_H_
+#define DASYNQ_UTIL_H_
 
 #include <dasynq-config.h>
 #include <unistd.h>
@@ -38,4 +38,4 @@ using ::pipe2;
 
 }
 
-#endif
+#endif /* DASYNQ_UTIL_H_ */

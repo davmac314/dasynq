@@ -1,3 +1,6 @@
+#ifndef DASYNQ_KQUEUE_MACOS_H_
+#define DASYNQ_KQUEUE_MACOS_H_
+
 #include <system_error>
 #include <type_traits>
 #include <unordered_map>
@@ -392,3 +395,5 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
 };
 
 } // end namespace
+
+#endif /* DASYNQ_KQUEUE_MACOS_H_ */

@@ -1,5 +1,5 @@
-#ifndef DASYNQ_FLAGS_H_INCLUDED
-#define DASYNQ_FLAGS_H_INCLUDED
+#ifndef DASYNQ_FLAGS_H_
+#define DASYNQ_FLAGS_H_
 
 namespace dasynq {
 
@@ -22,4 +22,4 @@ enum class clock_type
 
 }
 
-#endif
+#endif /* DASYNQ_FLAGS_H_ */

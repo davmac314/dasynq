@@ -1,5 +1,5 @@
-#ifndef DASYNQ_H_INCLUDED
-#define DASYNQ_H_INCLUDED
+#ifndef DASYNQ_H_
+#define DASYNQ_H_
 
 #include "dasynq-config.h"
 
@@ -2341,4 +2341,4 @@ class timer_impl : public timer<EventLoop>
 }  // namespace dasynq::dprivate
 }  // namespace dasynq
 
-#endif
+#endif /* DASYNQ_H_ */

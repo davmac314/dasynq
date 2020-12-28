@@ -1,5 +1,5 @@
-#ifndef DASYNQ_DARYHEAP_H_INCLUDED
-#define DASYNQ_DARYHEAP_H_INCLUDED
+#ifndef DASYNQ_DARYHEAP_H_
+#define DASYNQ_DARYHEAP_H_
 
 #include <type_traits>
 #include <functional>
@@ -314,4 +314,4 @@ class dary_heap
 
 }
 
-#endif
+#endif /* DASYNQ_DARYHEAP_H_ */

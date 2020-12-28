@@ -1,5 +1,5 @@
-#ifndef DAYSNQ_SELECT_INCLUDED
-#define DASYNQ_SELECT_INDCLUDED 1
+#ifndef DASYNQ_SELECT_H_
+#define DASYNQ_SELECT_H_
 
 #include <system_error>
 #include <vector>
@@ -323,4 +323,4 @@ template <class Base> class select_events : public signal_events<Base, true>
 
 } // end namespace
 
-#endif
+#endif /* DASYNQ_SELECT_H_ */
