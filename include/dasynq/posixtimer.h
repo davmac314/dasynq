@@ -6,8 +6,8 @@
 #include <cstdlib>
 
 #include <sys/time.h>
-#include <time.h>
-#include <signal.h>
+#include <ctime>
+#include <csignal>
 
 #include "dasynq-config.h"
 #include "dasynq-timerbase.h"

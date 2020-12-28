@@ -4,7 +4,7 @@
 #include <utility>
 #include <mutex>
 
-#include <time.h>
+#include <ctime>
 
 #include "dasynq-daryheap.h"
 

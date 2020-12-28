@@ -12,8 +12,8 @@
 #include <sys/select.h>
 
 #include <unistd.h>
-#include <signal.h>
-#include <setjmp.h>
+#include <csignal>
+#include <csetjmp>
 
 #include "dasynq-config.h"
 #include "dasynq-signal.h"

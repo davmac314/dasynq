@@ -14,7 +14,7 @@
 #include <sys/stat.h>
 
 #include <unistd.h>
-#include <signal.h>
+#include <csignal>
 
 #include "dasynq-config.h"
 

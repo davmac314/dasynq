@@ -5,7 +5,7 @@
 #include <utility>
 
 #include <sys/timerfd.h>
-#include <time.h>
+#include <ctime>
 
 #include "dasynq-timerbase.h"
 

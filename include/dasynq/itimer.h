@@ -4,9 +4,9 @@
 #include <vector>
 #include <utility>
 
-#include <signal.h>
+#include <csignal>
 #include <sys/time.h>
-#include <time.h>
+#include <ctime>
 
 #include "dasynq-timerbase.h"
 

@@ -3,8 +3,8 @@
 
 #include <atomic>
 
-#include <signal.h>
-#include <setjmp.h>
+#include <csignal>
+#include <csetjmp>
 #include <sys/types.h>
 
 // Support for the standard POSIX signal mechanisms. This can be used by backends that don't
