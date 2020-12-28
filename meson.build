@@ -11,7 +11,13 @@ project('dasynq', 'cpp',
   version: '1.1.7-development',
 )
 
+dasynq_deps = []
+if target_machine.system() == 'freebsd'
+  dasynq_deps += meson.get_compiler('cpp').find_library('rt')
+endif
+
 dasynq_dep = declare_dependency(
+  dependencies: dasynq_deps,
   include_directories: include_directories('include'),
 )
 
@@ -27,7 +33,9 @@ install_subdir('include',
 pc = import('pkgconfig')
 pc.generate(
   description: 'Thread-safe cross-platform event loop library in C++',
+  libraries: dasynq_deps,
   name: meson.project_name(),
+  url: 'http://github.com/davmac314/dasynq',
 )
 
 executable('chatserver', 'examples/chatserver/chatserver.cc',
