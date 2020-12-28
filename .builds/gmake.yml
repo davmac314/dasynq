@@ -1,0 +1,12 @@
+image: alpine/3.12
+packages:
+  - make
+sources:
+  - 'https://github.com/davmac314/dasynq.git'
+environment:
+  CC: cc
+  CXX: c++
+tasks:
+  - build: |
+      cd dasynq
+      make -e -f makefiles/Makefile.linux check

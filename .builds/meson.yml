@@ -1,0 +1,16 @@
+image: alpine/3.12
+packages:
+  - python3
+  - samurai
+sources:
+  - 'https://github.com/davmac314/dasynq.git'
+tasks:
+  - setup: |
+      python3 -m ensurepip --altinstall
+      python3 -m pip -q install meson
+  - build: |
+      mkdir build
+      cd build
+      ~/.local/bin/meson setup . ../dasynq
+      samu -v
+      samu test
