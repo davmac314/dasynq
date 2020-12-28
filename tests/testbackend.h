@@ -2,10 +2,10 @@
 #include <memory>
 #include <unordered_map>
 
-#include "dasynq-config.h"
-#include "dasynq-flags.h"
-#include "dasynq-timerbase.h"
-#include "dasynq-mutex.h"
+#include "dasynq/config.h"
+#include "dasynq/flags.h"
+#include "dasynq/mutex.h"
+#include "dasynq/timerbase.h"
 
 namespace dasynq {
 
