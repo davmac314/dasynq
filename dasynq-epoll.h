@@ -199,7 +199,7 @@ template <class Base> class epoll_loop : public Base
             if (soft_fail && errno == EPERM) {
                 return false;
             }
-            throw new std::system_error(errno, std::system_category());        
+            throw std::system_error(errno, std::system_category());
         }
         return true;
     }
@@ -249,7 +249,7 @@ template <class Base> class epoll_loop : public Base
         
         if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &epevent) == -1) {
             // Shouldn't be able to fail
-            // throw new std::system_error(errno, std::system_category());
+            // throw std::system_error(errno, std::system_category());
         }
     }
     
@@ -270,7 +270,7 @@ template <class Base> class epoll_loop : public Base
         // EPOLLIN is set.
         if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &epevent) == -1) {
             // Let's assume that this can't fail.
-            // throw new std::system_error(errno, std::system_category());
+            // throw std::system_error(errno, std::system_category());
         }
     }
     
@@ -296,7 +296,7 @@ template <class Base> class epoll_loop : public Base
         sigaddset(&sigmask, signo);
         sigfd = signalfd(sigfd, &sigmask, SFD_NONBLOCK | SFD_CLOEXEC);
         if (sigfd == -1) {
-            throw new std::system_error(errno, std::system_category());
+            throw std::system_error(errno, std::system_category());
         }
         
         if (was_no_sigfd) {
@@ -309,7 +309,7 @@ template <class Base> class epoll_loop : public Base
             if (epoll_ctl(epfd, EPOLL_CTL_ADD, sigfd, &epevent) == -1) {
                 close(sigfd);
                 sigfd = -1;
-                throw new std::system_error(errno, std::system_category());        
+                throw std::system_error(errno, std::system_category());
             }
         }
     }
