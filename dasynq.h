@@ -76,7 +76,7 @@
 //   full_timer_support
 //              - boolean indicating that the monotonic and system clocks are actually different clocks and
 //                that timers against the system clock will work correctly if the system clock time is
-//                adjusted. If false, the monotic clock may not be present at all (monotonic clock will map
+//                adjusted. If false, the monotonic clock may not be present at all (monotonic clock will map
 //                to system clock), and timers against either clock are not guaranteed to work correctly if
 //                the system clock is adjusted.
 
@@ -545,7 +545,7 @@ namespace dprivate {
         
         // Pull a single event from the queue; returns nullptr if the queue is empty.
         // Call with lock held.
-        base_watcher * pull_event() noexcept
+        base_watcher * pull_queued_event() noexcept
         {
             if (event_queue.empty()) {
                 return nullptr;
@@ -1410,7 +1410,7 @@ class event_loop
             return false;
         }
         
-        base_watcher * pqueue = loop_mech.pull_event();
+        base_watcher * pqueue = loop_mech.pull_queued_event();
         bool active = false;
         
         while (pqueue != nullptr) {
@@ -1438,7 +1438,7 @@ class event_loop
 
                 // issue a secondary dispatch:
                 bbfw->dispatch_second(this);
-                pqueue = loop_mech.pull_event();
+                pqueue = loop_mech.pull_queued_event();
                 continue;
             }
 
@@ -1447,7 +1447,7 @@ class event_loop
                 limit--;
                 if (limit == 0) break;
             }
-            pqueue = loop_mech.pull_event();
+            pqueue = loop_mech.pull_queued_event();
         }
         
         loop_mech.lock.unlock();
