@@ -11,6 +11,8 @@
 #include <functional>
 #include <utility>
 
+#include <cstdint>
+
 namespace dasynq {
 
 template <typename P>
