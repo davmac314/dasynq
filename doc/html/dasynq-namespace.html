@@ -19,6 +19,9 @@ namespace dasynq {
     typedef event_loop&lt;null_mutex&gt; event_loop_n;
     typedef event_loop&lt;std::mutex&gt; event_loop_th;
     
+    // event loop delay initialisation tag
+    class delayed_init;
+    
     // rearm codes
     enum class <a href="#rearm">rearm</a>
     {

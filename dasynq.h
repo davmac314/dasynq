@@ -169,6 +169,11 @@ enum class rearm
     REQUEUE
 };
 
+// Tag type to specify that initialisation should be delayed
+class delayed_init {
+    DASYNQ_EMPTY_BODY
+};
+
 namespace dprivate {
 
     // Classes for implementing a fair(ish) wait queue.
@@ -205,7 +210,7 @@ namespace dprivate {
         void wait(std::unique_lock<null_mutex> &ul) { }
         void signal() { }
         
-        DASYNQ_EMPTY_BODY;
+        DASYNQ_EMPTY_BODY
     };
 
     template <typename T_Mutex> class waitqueue_node
@@ -425,6 +430,7 @@ namespace dprivate {
         public:
         using mutex_t = typename LoopTraits::mutex_t;
         using traits_t = Traits;
+        using delayed_init = dasynq::delayed_init;
 
         private:
 
@@ -1528,7 +1534,14 @@ class event_loop
     }
 
     event_loop() { }
+    event_loop(delayed_init d) noexcept : loop_mech(d) { }
     event_loop(const event_loop &other) = delete;
+
+    // Perform delayed initialisation, if constructed with delayed_init
+    void init()
+    {
+        loop_mech.init();
+    }
 };
 
 typedef event_loop<null_mutex> event_loop_n;

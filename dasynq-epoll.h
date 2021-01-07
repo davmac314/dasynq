@@ -94,8 +94,8 @@ class epoll_traits
 
 template <class Base> class epoll_loop : public Base
 {
-    int epfd; // epoll fd
-    int sigfd; // signalfd fd; -1 if not initialised
+    int epfd = -1; // epoll fd
+    int sigfd = -1; // signalfd fd; -1 if not initialised
     sigset_t sigmask;
 
     std::unordered_map<int, void *> sigdataMap;
@@ -153,17 +153,33 @@ template <class Base> class epoll_loop : public Base
      *
      * Throws std::system_error or std::bad_alloc if the event loop cannot be initialised.
      */
-    epoll_loop() : sigfd(-1)
+    epoll_loop()
+    {
+        init();
+    }
+
+    epoll_loop(typename Base::delayed_init d) noexcept
+    {
+        // delayed initialisation
+    }
+
+    void init()
     {
         epfd = epoll_create1(EPOLL_CLOEXEC);
         if (epfd == -1) {
             throw std::system_error(errno, std::system_category());
         }
         sigemptyset(&sigmask);
-        Base::init(this);
+        try {
+            Base::init(this);
+        }
+        catch (...) {
+            close(epfd);
+            throw;
+        }
     }
     
-    ~epoll_loop()
+    ~epoll_loop() noexcept
     {
         close(epfd);
         if (sigfd != -1) {
@@ -253,7 +269,7 @@ template <class Base> class epoll_loop : public Base
         }
     }
     
-    void enable_fd_watch_nolock(int fd, void *userdata, int flags)
+    void enable_fd_watch_nolock(int fd, void *userdata, int flags) noexcept
     {
         enable_fd_watch(fd, userdata, flags);
     }

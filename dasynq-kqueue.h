@@ -279,14 +279,30 @@ template <class Base> class kqueue_loop : public Base
      */
     kqueue_loop()
     {
+        init();
+    }
+
+    kqueue_loop(typename Base::delayed_init d) noexcept
+    {
+        // delayed initialisation
+    }
+
+    void init()
+    {
         kqfd = kqueue();
         if (kqfd == -1) {
             throw std::system_error(errno, std::system_category());
         }
-        Base::init(this);
+        try {
+            Base::init(this);
+        }
+        catch (...) {
+            close(kqfd);
+            throw;
+        }
     }
     
-    ~kqueue_loop()
+    ~kqueue_loop() noexcept
     {
         close(kqfd);
     }

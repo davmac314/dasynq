@@ -72,7 +72,7 @@ class macos_kqueue_traits : public signal_traits
 
 template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
 {
-    int kqfd; // kqueue fd
+    int kqfd = -1; // kqueue fd
 
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
@@ -130,19 +130,35 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
      */
     macos_kqueue_loop()
     {
+        init();
+    }
+
+    macos_kqueue_loop(typename Base::delayed_init d) noexcept
+    {
+        // delayed initialisation
+    }
+
+    void init()
+    {
         kqfd = kqueue();
         if (kqfd == -1) {
             throw std::system_error(errno, std::system_category());
         }
-        Base::init(this);
+        try {
+            Base::init(this);
+        }
+        catch (...) {
+            close(kqfd);
+            throw;
+        }
     }
 
-    ~macos_kqueue_loop()
+    ~macos_kqueue_loop() noexcept
     {
         close(kqfd);
     }
 
-    void set_filter_enabled(short filterType, uintptr_t ident, void *udata, bool enable)
+    void set_filter_enabled(short filterType, uintptr_t ident, void *udata, bool enable) noexcept
     {
         // Note, on OpenBSD enabling or disabling filter will not alter the filter parameters (udata etc);
         // on OS X however, it will. Therefore we set udata here (to the same value as it was originally
@@ -153,7 +169,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
         kevent(kqfd, &kev, 1, nullptr, 0, nullptr);
     }
 
-    void remove_filter(short filterType, uintptr_t ident)
+    void remove_filter(short filterType, uintptr_t ident) noexcept
     {
         struct kevent kev;
         EV_SET(&kev, ident, filterType, EV_DELETE, 0, 0, 0);
