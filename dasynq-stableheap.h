@@ -118,6 +118,11 @@ class stable_heap : private H<T,stable_prio<P>,compare_stable_prio<P,C>>
     {
         return Base::empty();
     }
+
+    unsigned size()
+    {
+        return Base::size();
+    }
 };
 
 } // namespace dasynq

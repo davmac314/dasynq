@@ -557,6 +557,11 @@ namespace dprivate {
             return r;
         }
         
+        size_t num_queued_events() noexcept
+        {
+            return event_queue.size();
+        }
+
         // Queue a watcher for removal, or issue "removed" callback to it.
         // Call with lock free.
         void issue_delete(base_watcher *watcher) noexcept
@@ -1410,6 +1415,14 @@ class event_loop
             return false;
         }
         
+        // limit processing to the number of events currently queued, to avoid prolonged processing
+        // of watchers which requeueu themselves immediately (including file watchers which are using
+        // emulation for watching regular files)
+        //
+        // If limit is -1 (no limit) we rely on this being always larger than/equal to the number of
+        // queued events when cast to size_t (which is unsigned).
+        limit = std::min(size_t(limit), loop_mech.num_queued_events());
+
         base_watcher * pqueue = loop_mech.pull_queued_event();
         bool active = false;
         
@@ -1438,11 +1451,11 @@ class event_loop
 
                 // issue a secondary dispatch:
                 bbfw->dispatch_second(this);
-                pqueue = loop_mech.pull_queued_event();
-                continue;
+            }
+            else {
+                pqueue->dispatch(this);
             }
 
-            pqueue->dispatch(this);
             if (limit > 0) {
                 limit--;
                 if (limit == 0) break;

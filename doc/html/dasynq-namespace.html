@@ -178,4 +178,7 @@ to disable it again (this has no effect if the watcher is already disabled).<p>
 must be returned if the watcher has been scheduled for removal from the loop (de-registered) via the
 watcher's <i class="code-name">deregister</i> function.
 
+<p>Note that a watcher that continuously requeues itself by returning <i class="code-name">REQUEUE</i>
+potentially starves other, lower-priority, watchers from processing.</p>
+
 </div></body></html>

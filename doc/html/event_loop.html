@@ -158,8 +158,11 @@ accurate priority ordering, at a cost to throughput.</p>
 
 <p>Note that watchers which re-queue immediately after processing (by returning <i class="code-name">rearm::REQUEUE</i>
 from the callback function, or due to emulation mode of an <i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i>
-watching readiness state of a regular file) can potentially cause an unlimited processing cycle if no
-specific batch limit is specified.</p>
+watching readiness state of a regular file) would cause an unlimited processing cycle if no specific batch limit was
+specified; to mitigate this, the limit is reduced to the number of currently queued events, which should generally
+prevent a watcher from being processed more than once. However, high-priority watchers which requeue themselves may still
+be processed more than once since they will continue to jump to the start of the queue, and this may cause starvation
+for lower priority watchers.</p>
 
 <h3>Removal of watchers</h3>
 
