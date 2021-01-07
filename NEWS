@@ -1,3 +1,16 @@
+Dasynq version 1.2.0:
+--------------------
+
+This version includes important bugfixes, including cases where the wrong
+exception type was thrown for certain errors with some event loop backends.
+Additionally, it fixes compilation issues with newer compilers.
+
+New feature: delayed event loop initialisation.
+
+  An event loop can be constructed via a noexcept constructor and initialised
+later via an init() function. See the documentation for details.
+
+
 Dasynq version 1.1.7:
 --------------------
 
