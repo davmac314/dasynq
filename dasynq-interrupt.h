@@ -60,6 +60,13 @@ template <typename Base, typename Mutex> class interrupt_channel : public Base
         Base::init(loop_mech);
     }
 
+    void cleanup() noexcept
+    {
+        close(pipe_r_fd);
+        close(pipe_w_fd);
+        Base::cleanup();
+    }
+
     template <typename T>
     std::tuple<int, typename Base::traits_t::fd_s>
     receive_fd_event(T &loop_mech, typename Base::traits_t::fd_r fd_r_a, void * userdata, int flags)
