@@ -18,7 +18,7 @@ Dasynq is distributed under the terms of the Apache License, version 2.0, as fou
 
 Dasynq is written in C++11, using POSIX functions and some OS-specific system calls.
 
-See the [web site](http://davmac.org/projects/dasynq/) for more information.
+See the [web site](https://davmac.org/projects/dasynq/) for more information.
 
 
 ## Event loops
@@ -56,7 +56,7 @@ during program execution.
 
 See [doc/USAGE.md](doc/USAGE.md) for a quick guide on how to use the Dasynq API. A full reference manual
 can be found in the [doc/html](doc/html) folder of the repository / source bundle, or
-[online](http://davmac.org/projects/dasynq/doc/).
+[online](https://davmac.org/projects/dasynq/doc/).
 
 GNU make is required to run the test suite / automated install.
 
