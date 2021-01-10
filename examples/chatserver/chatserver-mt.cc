@@ -16,13 +16,13 @@
 // See chatserver.cc for introduction / compilation instructions. You may need to add the system
 // threads library:
 //
-//   cc -I../../ -lpthread chatserver-mt.cc -o chatserver-mt
+//   c++ -I../../ -lpthread chatserver-mt.cc -o chatserver-mt
 //
 // The differences between this and the single-threaded version are:
 // - the event loop is declared (via the type alias event_loop_t) to be of type event_loop_th
 //   instead of event_loop_n;
 // - the 'clients' vector is protected by a mutex, 'client_mutex'. The mutex is locked before
-//   acessing the vector, to prevent multiple threads from accessing it once;
+//   accessing the vector, to prevent multiple threads from accessing it once;
 // - we start multiple threads to poll the event loop.
 
 
@@ -167,7 +167,7 @@ int main(int argc, char **argv)
         return dasynq::rearm::REARM;
     });
 
-    // TODO Periodically output time to other clients
+    // TODO Periodically output time to all clients
 
     std::vector<std::thread> threads;
     for (int i = 0; i < 4; i++) {

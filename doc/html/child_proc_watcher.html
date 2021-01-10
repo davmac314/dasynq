@@ -134,7 +134,7 @@ subclassing <i class="code-name">child_proc_watcher</i> directly, subclass an in
 For example:</p>
 
 <pre>
-class my_watcher : public child_proc_watcher_impl&lt;my_watcher&gt;
+class my_watcher : public event_loop_t::child_proc_watcher_impl&lt;my_watcher&gt;
 {
     // ...
 }

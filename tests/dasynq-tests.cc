@@ -202,7 +202,9 @@ void test_fd_emu()
     watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS);
 
     // test_io_engine::trigger_fd_event(0, dasynq::IN_EVENTS);
-    my_loop.run();
+    while (seen_count < 10) {
+        my_loop.poll();
+    }
 
     assert(seen_count == 10);
 
@@ -247,13 +249,16 @@ void test_fd_emu2()
 
     test_io_engine::mark_fd_needs_emulation(0);
 
-    watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS, false);
+    watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS, false); // initially disabled
 
     my_loop.poll();
     assert(seen_count == 0);
 
+    // enable watcher and run the loop
     watcher1.set_enabled(my_loop, true);
-    my_loop.run();
+    while (seen_count < 10) {
+        my_loop.poll();
+    }
     assert(seen_count == 10);
 
     watcher1.deregister(my_loop);
@@ -292,13 +297,17 @@ void test_bidi_fd_emu()
 
     watcher1.add_watch(my_loop, 0, dasynq::IN_EVENTS | dasynq::OUT_EVENTS);
 
-    my_loop.run();
+    while (watcher1.seen_read < 10 && watcher1.seen_write < 10) {
+        my_loop.poll();
+    }
     assert(watcher1.seen_read == 10);
     assert(watcher1.seen_write == 10);
 
     watcher1.set_out_watch_enabled(my_loop, true);
 
-    my_loop.run();
+    while (watcher1.seen_write < 20) {
+        my_loop.poll();
+    }
     assert(watcher1.seen_read == 10);
     assert(watcher1.seen_write == 20);
 

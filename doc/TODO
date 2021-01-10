@@ -34,8 +34,6 @@
 
 * Cache current clock times. The API allows for this but it hasn't been implemented.
 
-* Use eventfd (when available) as interrupt mechanism instead of a pipe.
-
 * Event loop construction with eg child_proc and itimer masks two signals separately. This could
   be combined into a single operation.
 

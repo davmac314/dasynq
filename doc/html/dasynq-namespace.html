@@ -19,6 +19,9 @@ namespace dasynq {
     typedef event_loop&lt;null_mutex&gt; event_loop_n;
     typedef event_loop&lt;std::mutex&gt; event_loop_th;
     
+    // event loop delay initialisation tag
+    class delayed_init;
+    
     // rearm codes
     enum class <a href="#rearm">rearm</a>
     {
@@ -177,5 +180,8 @@ to disable it again (this has no effect if the watcher is already disabled).<p>
 <p>Other return codes are largely self-explanatory. Note that <i class="code-name">rearm::REMOVED</i> code
 must be returned if the watcher has been scheduled for removal from the loop (de-registered) via the
 watcher's <i class="code-name">deregister</i> function.
+
+<p>Note that a watcher that continuously requeues itself by returning <i class="code-name">REQUEUE</i>
+potentially starves other, lower-priority, watchers from processing.</p>
 
 </div></body></html>

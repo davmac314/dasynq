@@ -68,7 +68,7 @@ template <class Base> class select_events : public signal_events<Base, true>
     fd_set read_set;
     fd_set write_set;
     //fd_set error_set;  // logical OR of both the above
-    int max_fd = 0; // highest fd in any of the sets
+    int max_fd = -1; // highest fd in any of the sets, -1 if not initialised
 
     // userdata pointers in read and write respectively, for each fd:
     std::vector<void *> rd_udata;
@@ -122,13 +122,27 @@ template <class Base> class select_events : public signal_events<Base, true>
      */
     select_events()
     {
+        init();
+    }
+
+    select_events(typename Base::delayed_init d) noexcept
+    {
+        // delayed initialisation
+    }
+
+    void init()
+    {
+        max_fd = 0;
         FD_ZERO(&read_set);
         FD_ZERO(&write_set);
         Base::init(this);
     }
 
-    ~select_events()
+    ~select_events() noexcept
     {
+        if (max_fd != -1) {
+            Base::cleanup();
+        }
     }
 
     //        fd:  file descriptor to watch

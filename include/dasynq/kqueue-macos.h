@@ -75,7 +75,7 @@ class macos_kqueue_traits : public signal_traits
 
 template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
 {
-    int kqfd; // kqueue fd
+    int kqfd = -1; // kqueue fd
 
     // Base contains:
     //   lock - a lock that can be used to protect internal structure.
@@ -133,19 +133,38 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
      */
     macos_kqueue_loop()
     {
+        init();
+    }
+
+    macos_kqueue_loop(typename Base::delayed_init d) noexcept
+    {
+        // delayed initialisation
+    }
+
+    void init()
+    {
         kqfd = kqueue();
         if (kqfd == -1) {
             throw std::system_error(errno, std::system_category());
         }
-        Base::init(this);
+        try {
+            Base::init(this);
+        }
+        catch (...) {
+            close(kqfd);
+            throw;
+        }
     }
 
-    ~macos_kqueue_loop()
+    ~macos_kqueue_loop() noexcept
     {
-        close(kqfd);
+        if (kqfd != -1) {
+            Base::cleanup();
+            close(kqfd);
+        }
     }
 
-    void set_filter_enabled(short filterType, uintptr_t ident, void *udata, bool enable)
+    void set_filter_enabled(short filterType, uintptr_t ident, void *udata, bool enable) noexcept
     {
         // Note, on OpenBSD enabling or disabling filter will not alter the filter parameters (udata etc);
         // on OS X however, it will. Therefore we set udata here (to the same value as it was originally
@@ -156,7 +175,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
         kevent(kqfd, &kev, 1, nullptr, 0, nullptr);
     }
 
-    void remove_filter(short filterType, uintptr_t ident)
+    void remove_filter(short filterType, uintptr_t ident) noexcept
     {
         struct kevent kev;
         EV_SET(&kev, ident, filterType, EV_DELETE, 0, 0, 0);
@@ -179,7 +198,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
             // We can't request poll semantics, so check for regular file:
             struct stat statbuf;
             if (fstat(fd, &statbuf) == -1) {
-                throw new std::system_error(errno, std::system_category());
+                throw std::system_error(errno, std::system_category());
             }
             if ((statbuf.st_mode & S_IFMT) == S_IFREG) {
                 // Regular file: emulation required
@@ -196,7 +215,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
             if (filter == EVFILT_WRITE && errno == EINVAL && emulate) {
                 return false; // emulate
             }
-            throw new std::system_error(errno, std::system_category());
+            throw std::system_error(errno, std::system_category());
         }
         return true;
     }
@@ -217,7 +236,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
         int r = kevent(kqfd, kev, 2, kev_r, 2, nullptr);
 
         if (r == -1) {
-            throw new std::system_error(errno, std::system_category());
+            throw std::system_error(errno, std::system_category());
         }
 
         // Some possibilities:
@@ -228,7 +247,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
 
         if (kev_r[0].data != 0) {
             // read failed
-            throw new std::system_error(kev_r[0].data, std::system_category());
+            throw std::system_error(kev_r[0].data, std::system_category());
         }
 
         if (kev_r[1].data != 0) {
@@ -248,7 +267,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
             EV_SET(&kev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, userdata);
             kevent(kqfd, kev, 1, nullptr, 0, nullptr);
             // throw exception
-            throw new std::system_error(kev_r[1].data, std::system_category());
+            throw std::system_error(kev_r[1].data, std::system_category());
         }
 
         return 0;
@@ -263,7 +282,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
         int r = kevent(kqfd, kev, 1, nullptr, 0, nullptr);
 
         if (r == -1) {
-            throw new std::system_error(errno, std::system_category());
+            throw std::system_error(errno, std::system_category());
         }
 
         EV_SET(&kev[0], fd, EVFILT_WRITE, wflags, 0, 0, userdata);
@@ -278,7 +297,7 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
             EV_SET(&kev[0], fd, EVFILT_READ, EV_DELETE, 0, 0, userdata);
             kevent(kqfd, kev, 1, nullptr, 0, nullptr);
             // throw exception
-            throw new std::system_error(errno, std::system_category());
+            throw std::system_error(errno, std::system_category());
         }
 
         return 0;

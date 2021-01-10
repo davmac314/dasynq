@@ -50,6 +50,9 @@ Additional template parameters are implementation internal.
 <ul>
 <li><i class="code-name">event_loop()</i> - default constructor; may throw <i class="code-name">std::bad_alloc</i>
     or <i class="code-name">std::system_error</i>. See details section.</li>
+<li><i class="code-name">event_loop(delayed_init) noexcept</i> - constructor for delayed initialisation. The event
+    loop instance must be initialised by calling the <i class="code-name">init</i> function before other functions
+    are called or watchers are registered.</li> 
 </ul>
 
 <h3>Types</h3>
@@ -74,6 +77,10 @@ Additional template parameters are implementation internal.
 
 <h3>Functions</h3>
 <ul>
+<li><i class="code-name">void init()</i> - initialise an event loop that has not yet been initialised (i.e.
+    which was constructed with the <i class="code-name">delayed_init</i> tag and for which <i class="code-name">init</i>
+    has not yet been called. Must not be called on an initialised event loop instance. May throw
+    <i class="code-name">std::bad_alloc</i> or <i class="code-name">std::system_error</i>.</li>
 <li><i class="code-name">void run(int limit = -1) noexcept</i> - wait while there are no events pending;
     queue and process pending events, up to the number specified by <i class="code-name">limit</i> (no
     limit if the default value of -1 is specified).</li>
@@ -98,10 +105,12 @@ Additional template parameters are implementation internal.
 
 <h2>Details and usage</h2>
 
-<p>Instances can be constructed using the default constructor. Only one instance can be active at a time in a
-process; libraries that require event loop functionality are encouraged to allow an
-<i class="code-name">event_loop reference</i> to be passed as a parameter from the application. Construction of
-a second event loop while a first is still active has undefined behaviour.<br>
+<p>Instances can be constructed using the default constructor (which performs initialisation) or the delayed
+initialisation constructor. If the delayed initialisation constructor is used, the instance remains uninitialised
+until the <i class="code-name">init</i> function is called. Only one instance can be active (initialised) at a time
+in a process; libraries that require event loop functionality are encouraged to allow an
+<i class="code-name">event_loop reference</i> to be passed as a parameter from the application. Construction of a
+second event loop while a first is still active has undefined behaviour.<br>
 <span class="note"><i>Note:</i> This limitation is a consequence of limitations in the backends (signals require handlers to
 be setup on some systems, and child process status requires watching for a signal).</span></p>
 
@@ -158,8 +167,11 @@ accurate priority ordering, at a cost to throughput.</p>
 
 <p>Note that watchers which re-queue immediately after processing (by returning <i class="code-name">rearm::REQUEUE</i>
 from the callback function, or due to emulation mode of an <i class="code-name"><a href="fd_watcher.html">fd_watcher</a></i>
-watching readiness state of a regular file) can potentially cause an unlimited processing cycle if no
-specific batch limit is specified.</p>
+watching readiness state of a regular file) would cause an unlimited processing cycle if no specific batch limit was
+specified; to mitigate this, the limit is reduced to the number of currently queued events, which should generally
+prevent a watcher from being processed more than once. However, high-priority watchers which requeue themselves may still
+be processed more than once since they will continue to jump to the start of the queue, and this may cause starvation
+for lower priority watchers.</p>
 
 <h3>Removal of watchers</h3>
 

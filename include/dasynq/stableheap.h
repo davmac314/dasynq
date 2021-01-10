@@ -11,6 +11,8 @@
 #include <functional>
 #include <utility>
 
+#include <cstdint>
+
 namespace dasynq {
 
 template <typename P>
@@ -115,6 +117,11 @@ class stable_heap : private H<T,stable_prio<P>,compare_stable_prio<P,C>>
     bool empty()
     {
         return Base::empty();
+    }
+
+    unsigned size()
+    {
+        return Base::size();
     }
 };
 

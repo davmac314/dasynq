@@ -15,12 +15,14 @@
 // This is an example of a chat server, using Dasynq to manage the event loop. To compile, you
 // will need to specify the include path for Dasynq; something like:
 //
-//    cc -I../.. chatserver.cc -o chatserver
+//    c++ -I../.. chatserver.cc -o chatserver
 //
-// When run, it will listen on port 8367 for incoming client connections. You can use "telnet", if
-// you have it installed, to connect:
+// When run, it will listen on port 8367 for incoming client connections. You can use either "telnet" or "nc"
+// (GNU netcat) to connect:
 //
 //    telnet localhost 8367
+//      or
+//    nc localhost 8367
 //
 // If you open multiple connections from different terminal windows, you'll see that anything you
 // type from one client is distributed to all the other clients.
@@ -163,7 +165,7 @@ int main(int argc, char **argv)
         return dasynq::rearm::REARM;
     });
 
-    // TODO Periodically output time to other clients
+    // TODO Periodically output time to all clients
 
     while (true) {
         eloop.run();

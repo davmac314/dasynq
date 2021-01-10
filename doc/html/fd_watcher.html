@@ -178,7 +178,7 @@ subclassing <i class="code-name">fd_watcher</i> directly, subclass an instantiat
 For example:</p>
 
 <pre>
-class my_watcher : public fd_watcher_impl&lt;my_watcher&gt;
+class my_watcher : event_loop_t::public fd_watcher_impl&lt;my_watcher&gt;
 {
     // ...
 }

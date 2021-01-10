@@ -127,7 +127,7 @@ subclassing <i class="code-name">bidi_fd_watcher</i> directly, subclass an insta
 For example:</p>
 
 <pre>
-class my_watcher : public bidi_fd_watcher_impl&lt;my_watcher&gt;
+class my_watcher : event_loop_t::public bidi_fd_watcher_impl&lt;my_watcher&gt;
 {
     // ...
 }

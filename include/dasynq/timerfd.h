@@ -142,6 +142,13 @@ template <class Base> class timer_fd_events : public timer_base<Base>
         }
     }
 
+    void cleanup() noexcept
+    {
+        Base::cleanup();
+        close(timerfd_fd);
+        close(systemtime_fd);
+    }
+
     void stop_timer(timer_handle_t &timer_id, clock_type clock = clock_type::MONOTONIC) noexcept
     {
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
@@ -195,8 +202,6 @@ template <class Base> class timer_fd_events : public timer_base<Base>
     
     ~timer_fd_events()
     {
-        close(timerfd_fd);
-        close(systemtime_fd);
     }
 };
 
