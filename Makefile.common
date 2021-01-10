@@ -1,6 +1,6 @@
 # Installation:
 #DESTDIR=  (acts as prefix to other paths for installation)
-HEADERDIR=/usr/include/dasynq
+HEADERDIR=/usr/include
 LIBDIR=/usr/lib
 
 VERSION=1.2.0
@@ -27,15 +27,16 @@ dasynq.pc:
 	@rm -f dasynq.pc
 	@echo "# Dasynq - event loop library" >> dasynq.pc
 	@echo "Name: Dasynq" >> dasynq.pc
-	@echo "Description:  Event-loop library, C++" >> dasynq.pc
+	@echo "Description: Thread-safe cross-platform event loop library in C++" >> dasynq.pc
 	@echo "Version: $(VERSION)" >> dasynq.pc
 	@echo "URL: http://github.com/davmac314/dasynq" >> dasynq.pc
 	@echo "Libs: $(CXXLINKOPTS)" >> dasynq.pc
 	@echo "Cflags: $(CXXOPTS) -I\"$(HEADERDIR)\"" >> dasynq.pc
 
 install: dasynq.pc
-	install -d "$(DESTDIR)$(HEADERDIR)" "$(DESTDIR)$(LIBDIR)/pkgconfig"
-	install -m644 dasynq.h dasynq-*.h "$(DESTDIR)$(HEADERDIR)"
+	install -d "$(DESTDIR)$(HEADERDIR)/dasynq" "$(DESTDIR)$(LIBDIR)/pkgconfig"
+	install -m644 include/dasynq/* "$(DESTDIR)$(HEADERDIR)/dasynq"
+	install -m644 include/dasynq.h "$(DESTDIR)$(HEADERDIR)"
 	install -m644 dasynq.pc "$(DESTDIR)$(LIBDIR)/pkgconfig"
 	$(MAKE) -C cmake install
 

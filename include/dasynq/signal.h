@@ -1,10 +1,10 @@
-#ifndef DASYNQ_SIGNAL_INCLUDED
-#define DASYNQ_SIGNAL_INCLUDED 1
+#ifndef DASYNQ_SIGNAL_H_
+#define DASYNQ_SIGNAL_H_
 
 #include <atomic>
 
-#include <signal.h>
-#include <setjmp.h>
+#include <csignal>
+#include <csetjmp>
 #include <sys/types.h>
 
 // Support for the standard POSIX signal mechanisms. This can be used by backends that don't
@@ -100,7 +100,8 @@ inline siginfo_t * get_siginfo()
     return &sig_capture::siginfo_cap;
 }
 
-} } // namespace dprivate :: signal_mech
+} // namespace signal_mech
+} // namespace dprivate
 
 // signal_events template.
 //
@@ -243,6 +244,6 @@ template <class Base, bool mask_enables = false> class signal_events : public Ba
 
 };
 
-}
+} // namespace dasynq
 
-#endif
+#endif /* DASYNQ_SIGNAL_H_ */

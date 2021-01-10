@@ -8,3 +8,5 @@ dasynq-test
 /cmake/Dasynq.cmake
 /cmake/DasynqConfigVersion.cmake
 /Makefile
+
+/build/
