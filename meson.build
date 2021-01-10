@@ -33,8 +33,9 @@ install_subdir('include',
 pc = import('pkgconfig')
 pc.generate(
   description: 'Thread-safe cross-platform event loop library in C++',
+  filebase: 'dasynq',
   libraries: dasynq_deps,
-  name: meson.project_name(),
+  name: 'Dasynq',
   url: 'http://github.com/davmac314/dasynq',
 )
 
