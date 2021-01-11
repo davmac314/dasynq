@@ -73,8 +73,9 @@ On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too
 4.9+ is required). The existing makefile sample (Makefile.openbsd) has appropriate settings.
 
 Linux, OpenBSD, FreeBSD and MacOS are supported "out of the box". For other systems you may need to edit
-the `dasynq-config.h` file (see instructions within). Currently either epoll or kqueue are required; in
-many BSD variants it may be possible to build by defining `DASYNQ_HAVE_KQUEUE` to `1`.
+the `dasynq-config.h` file (see instructions within). It's desirable to have either epoll or kqueue; on many
+BSD variants it may be possible to build by defining `DASYNQ_HAVE_KQUEUE` to `1`. However, if neither epoll
+nor kqueue are available, the build will fall back to using pselect.
 
 After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq,
 assuming you have pkg-config installed:
@@ -84,7 +85,7 @@ assuming you have pkg-config installed:
 
 There is also CMake support. You can add the following to your `CMakeLists.txt` file:
 
-    find_package(Dasynq 1.1.5)
+    find_package(Dasynq 1.2.0)
     
     # The "old way". Not sexy, but works without hitches.
     #target_include_directories(testapp PRIVATE "${DASYNQ_INCLUDE_DIRS}")
