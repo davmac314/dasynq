@@ -1,5 +1,5 @@
-Dasynq version X:
-----------------
+Dasynq version 1.2.1:
+--------------------
 
 This version fixes a bug which triggered when an event loop was constructed with delayed initialisation and
 then never initialised before being destroyed. On systems using POSIX timers (such as FreeBSD), this could
@@ -7,6 +7,8 @@ cause a crash.
 
 On Linux, eventfd is used as the mechanism to signal an event loop in another thread, rather than a pipe.
 This uses one less file descriptor and is more efficient generally.
+
+Some minor packaging issues have been resolved.
 
 
 Dasynq version 1.2.0:
