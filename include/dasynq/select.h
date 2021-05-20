@@ -313,10 +313,10 @@ template <class Base> class select_events : public signal_events<Base, true>
             wait_ts = &ts;
         }
 
-        std::atomic_signal_fence(std::memory_order_release);
-
         this->sigmaskf(SIG_UNBLOCK, &active_sigmask, nullptr);
         int r = select(nfds, &read_set_c, &write_set_c, &err_set, wait_ts);
+        // Note, a signal may be received here and the handler may perform siglongjmp to the above
+        // established jmpbuf; that means we will execute the select statement again, but that's fine.
         this->sigmaskf(SIG_BLOCK, &active_sigmask, nullptr);
 
         if (r == -1 || r == 0) {

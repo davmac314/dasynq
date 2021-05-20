@@ -386,8 +386,6 @@ template <class Base> class macos_kqueue_loop : public signal_events<Base, true>
             wait_ts = &ts;
         }
 
-        std::atomic_signal_fence(std::memory_order_release);
-
         // Run kevent with signals unmasked:
         this->sigmaskf(SIG_UNBLOCK, &active_sigmask, nullptr);
         int r = kevent(kqfd, nullptr, 0, events, 16, wait_ts);

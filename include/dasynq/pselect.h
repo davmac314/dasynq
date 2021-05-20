@@ -265,8 +265,6 @@ template <class Base> class pselect_events : public signal_events<Base, false>
             wait_ts = &ts;
         }
 
-        std::atomic_signal_fence(std::memory_order_release);
-
         int r = pselect(nfds, &read_set_c, &write_set_c, &err_set, wait_ts, &sigmask);
 
         if (r == -1 || r == 0) {
