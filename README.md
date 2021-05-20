@@ -1,6 +1,6 @@
 # Dasynq
 
-_Version 1.2.0_
+_Version 1.2.1_
 
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries, it is
 crossplatform / portable. Unlike most other such libraries, it is intended to be completely usable in
@@ -18,7 +18,7 @@ Dasynq is distributed under the terms of the Apache License, version 2.0, as fou
 
 Dasynq is written in C++11, using POSIX functions and some OS-specific system calls.
 
-See the [web site](http://davmac.org/projects/dasynq/) for more information.
+See the [web site](https://davmac.org/projects/dasynq/) for more information.
 
 
 ## Event loops
@@ -56,7 +56,7 @@ during program execution.
 
 See [doc/USAGE.md](doc/USAGE.md) for a quick guide on how to use the Dasynq API. A full reference manual
 can be found in the [doc/html](doc/html) folder of the repository / source bundle, or
-[online](http://davmac.org/projects/dasynq/doc/).
+[online](https://davmac.org/projects/dasynq/doc/).
 
 GNU make is required to run the test suite / automated install.
 
@@ -73,8 +73,9 @@ On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too
 4.9+ is required). The existing makefile sample (Makefile.openbsd) has appropriate settings.
 
 Linux, OpenBSD, FreeBSD and MacOS are supported "out of the box". For other systems you may need to edit
-the `dasynq-config.h` file (see instructions within). Currently either epoll or kqueue are required; in
-many BSD variants it may be possible to build by defining `DASYNQ_HAVE_KQUEUE` to `1`.
+the `dasynq-config.h` file (see instructions within). It's desirable to have either epoll or kqueue; on many
+BSD variants it may be possible to build by defining `DASYNQ_HAVE_KQUEUE` to `1`. However, if neither epoll
+nor kqueue are available, the build will fall back to using pselect.
 
 After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq,
 assuming you have pkg-config installed:
@@ -84,7 +85,7 @@ assuming you have pkg-config installed:
 
 There is also CMake support. You can add the following to your `CMakeLists.txt` file:
 
-    find_package(Dasynq 1.1.5)
+    find_package(Dasynq 1.2.1)
     
     # The "old way". Not sexy, but works without hitches.
     #target_include_directories(testapp PRIVATE "${DASYNQ_INCLUDE_DIRS}")
