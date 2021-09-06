@@ -11,7 +11,7 @@ require the use of threads (and so does not require linking against a thread lib
 
 The existing backends include **epoll** and **kqueue**, meaning that it works on Linux and various
 BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called). There is also
-a less efficient backend based on **pselect**, and an even less efficient backend based on **select*,
+a less efficient backend based on **pselect**, and an even less efficient backend based on **select**,
 meaning that it should also work on nearly all other POSIX-compliant systems (with minor caveats).
 
 Dasynq is distributed under the terms of the Apache License, version 2.0, as found in the LICENSE file.
