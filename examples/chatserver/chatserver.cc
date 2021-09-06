@@ -8,14 +8,14 @@
 #include <iostream>
 #include <algorithm>
 
-#include "dasynq.h"
+#include <dasynq.h>
 
 // Extremely simple chat server example for Dasynq
 //
 // This is an example of a chat server, using Dasynq to manage the event loop. To compile, you
 // will need to specify the include path for Dasynq; something like:
 //
-//    c++ -I../.. chatserver.cc -o chatserver
+//    c++ -I../../include chatserver.cc -o chatserver
 //
 // When run, it will listen on port 8367 for incoming client connections. You can use either "telnet" or "nc"
 // (GNU netcat) to connect:

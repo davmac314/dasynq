@@ -9,14 +9,14 @@
 #include <algorithm>
 #include <thread>
 
-#include "dasynq.h"
+#include <dasynq.h>
 
 // Extremely simple chat server example for Dasynq : multi-threaded event loop version
 //
 // See chatserver.cc for introduction / compilation instructions. You may need to add the system
 // threads library:
 //
-//   c++ -I../../ -lpthread chatserver-mt.cc -o chatserver-mt
+//   c++ -I../../include -lpthread chatserver-mt.cc -o chatserver-mt
 //
 // The differences between this and the single-threaded version are:
 // - the event loop is declared (via the type alias event_loop_t) to be of type event_loop_th
