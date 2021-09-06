@@ -1,3 +1,14 @@
+Dasynq version 1.2.2:
+--------------------
+
+This version includes a fix for a crash/memory leak that could happen when memory was (already) exhausted.
+
+It also uses a new directory structure. This should not affect any existing users. However it is now
+possible to install Dasynq so the main header, dasynq.h, can be included without requiring any additional
+compiler flags (i.e. by installing it directly in /usr/include). The ancillary headers are now installed
+into a subdirectory relative to the main header.
+
+
 Dasynq version 1.2.1:
 --------------------
 

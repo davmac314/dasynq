@@ -1,6 +1,6 @@
 # Dasynq
 
-_Version 1.2.1_
+_Version 1.2.2_
 
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries, it is
 crossplatform / portable. Unlike most other such libraries, it is intended to be completely usable in
@@ -11,8 +11,8 @@ require the use of threads (and so does not require linking against a thread lib
 
 The existing backends include **epoll** and **kqueue**, meaning that it works on Linux and various
 BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called). There is also
-a less efficient backend based on **pselect**, meaning that it should also work on nearly all other
-POSIX-compliant systems (with minor caveats).
+a less efficient backend based on **pselect**, and an even less efficient backend based on **select*,
+meaning that it should also work on nearly all other POSIX-compliant systems (with minor caveats).
 
 Dasynq is distributed under the terms of the Apache License, version 2.0, as found in the LICENSE file.
 
@@ -58,7 +58,10 @@ See [doc/USAGE.md](doc/USAGE.md) for a quick guide on how to use the Dasynq API.
 can be found in the [doc/html](doc/html) folder of the repository / source bundle, or
 [online](https://davmac.org/projects/dasynq/doc/).
 
-GNU make is required to run the test suite / automated install.
+GNU make is required to run the test suite / automated install, or you can try the contributed meson-based
+build.
+
+To build with GNU make:
 
 Find or create an appropriate makefile in the `makefiles` directory and edit it to your liking.
 Either copy/link it to "Makefile" in the root of the source tree, or supply it via the `-f` argument to
@@ -75,7 +78,8 @@ On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too
 Linux, OpenBSD, FreeBSD and MacOS are supported "out of the box". For other systems you may need to edit
 the `dasynq-config.h` file (see instructions within). For full functionality either epoll or kqueue are
 required; in many BSD variants it may be possible to build by defining `DASYNQ_HAVE_KQUEUE` to `1`. If
-epoll and kqueue are not available, Dasynq will fall back to using a `select`-based backend.
+epoll and kqueue are not available, Dasynq will fall back to using a `pselect`-based backend (or a plain
+`select`-based backend on some systems which don't have `pselect`). 
 
 After installation, you can use "pkg-config" to find the appropriate flags to compile against Dasynq,
 assuming you have pkg-config installed:
