@@ -102,14 +102,15 @@ the child process has already been created, the awkward situation can arise that
 created but cannot be monitored. There are two ways to avoid this: the first is to <i>reserve</i> a
 watch (using the <i class="code-name">reserve_watch</i> function) and add the watch after creating
 the child process using the <i class="code-name">add_reserved</i> function instead of the
-<i class="code-name">add_watch</i> function.</p>
+<i class="code-name">add_watch</i> function; the second way is to perform an &quot;atomic&quot; fork
+using the <i class="code-name">fork</i> member function.</p>
 
 <h3>&quot;Atomic&quot; fork</h3>
 
-<p>Another way of avoiding the problem of un-watchable child processes is to use the <i class="code-name">fork</i>
-member function in order to fork the child process. This forks and adds a child watcher; if the watcher
-cannot be added, the child process is either not created or is terminated immediately (before the
-<i class="code-name">fork</i> function returns).</p>
+<p>The <i class="code-name">fork</i> member function avoids the problem of creating unwatchable child
+processes by forking and adding the watch simultaneously. If the watch cannot be created, the child process
+is either not created or is terminated immediately (before the <i class="code-name">fork</i> function
+returns).</p>
 
 <p>Note that, with a multi-threaded event loop, there is a race when creating a child process and watching
 it, because the child might be reaped before the watch is added (resulting either in failure when adding

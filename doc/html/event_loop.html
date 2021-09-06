@@ -132,7 +132,7 @@ straight-forward way to do this once multiple threads have been created, the eve
 in the initial application thread &mdash; or alternatively, these signals must be blocked by the
 application on the initial thread (the signals in question are <i class="code-name">SIGCHLD</i> and
 <i class="code-name">SIGALRM</i>). An event loop with a <i class="code-name">null_mutex</i> mutex type will
-use <i>sigprocmask</i> to mask signals and therefore has (according to POSIX) unpredictable behaviour in
+use <i class="code-name">sigprocmask</i> to mask signals and therefore has (according to POSIX) unpredictable behaviour in
 multi-threaded applications; an event loop with any other mutex type will instead use
 <i class="code-name">pthread_sigmask</i>, which requires linking against the pthreads library. It is
 therefore not possible to use a single-threaded event loop in a multi-threaded program, even if it would be
