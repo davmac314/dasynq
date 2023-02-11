@@ -229,9 +229,9 @@ template <class Base> class pselect_events : public signal_events<Base, false>
         // Check whether any timers are pending, and what the next timeout is.
         this->process_monotonic_timers(do_wait, ts, wait_ts);
 
-        fd_set read_set_c;
-        fd_set write_set_c;
-        fd_set err_set;
+        volatile fd_set read_set_c;
+        volatile fd_set write_set_c;
+        volatile fd_set err_set;
 
         read_set_c = read_set;
         write_set_c = write_set;

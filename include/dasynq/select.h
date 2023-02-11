@@ -18,7 +18,7 @@
 #include "config.h"
 #include "signal.h"
 
-// "pselect"-based event loop mechanism.
+// "select"-based event loop mechanism.
 //
 
 namespace dasynq {
@@ -287,9 +287,9 @@ template <class Base> class select_events : public signal_events<Base, true>
         // Check whether any timers are pending, and what the next timeout is.
         this->process_monotonic_timers(do_wait, ts, wait_ts);
 
-        fd_set read_set_c;
-        fd_set write_set_c;
-        fd_set err_set;
+        volatile fd_set read_set_c;
+        volatile fd_set write_set_c;
+        volatile fd_set err_set;
 
         read_set_c = read_set;
         write_set_c = write_set;
