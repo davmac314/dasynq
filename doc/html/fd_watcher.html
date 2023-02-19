@@ -201,8 +201,16 @@ with the following parameters:</p>
 <li><i class="code-name">fd</i> &mdash; the file descriptor being watched, as specified at registration.</li>
 <li><i class="code-name">flags</i> &mdash; a combination of flags specifying the event type, possibly
     including <i class="code-name">dasynq::IN_EVENTS</i> or <i class="code-name">dasynq::OUT_EVENTS</i> or
-    both.</li>
+    both. It may also include <i class="code-name">dasynq::ERR_EVENTS</i> if an error condition has been
+    detected.</li>
 </ul>
+
+<p>Error conditions (flagged by the presence of <i class="code-name">dasynq::ERR_EVENTS</i>) include, for
+example, when the file descriptor refers to a socket to which data has been written but the other end
+of the connection has been closed. An error condition may not relate to the specific read or write operation
+that is otherwise appropriate for the flags, however, an error condition will not be signalled without
+either of <i class="code-name">dasynq::IN_EVENTS</i> or <i class="code-name">dasynq::OUT_EVENTS</i> also
+being set.</p>
 
 <p>The return value specifies the <a href="dasynq-namespace.html"><i class="code-name">rearm</i></a> action.</p>
 
