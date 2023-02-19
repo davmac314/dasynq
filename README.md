@@ -1,6 +1,6 @@
 # Dasynq
 
-_Version 1.2.2_
+_Version 1.2.3_
 
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries, it is
 crossplatform / portable. Unlike most other such libraries, it is intended to be completely usable in
@@ -89,22 +89,23 @@ assuming you have pkg-config installed:
 
 There is also CMake support. You can add the following to your `CMakeLists.txt` file:
 
-    find_package(Dasynq 1.2.1)
+    find_package(Dasynq 1.2.3)
     
-    # The "old way". Not sexy, but works without hitches.
+    # The "old way":
     #target_include_directories(testapp PRIVATE "${DASYNQ_INCLUDE_DIRS}")
     #target_link_libraries(testapp PRIVATE ${DASYNQ_LINK_LIBS}")
     
-    # The "new way". Supposedly sexier, but harder to use properly:
+    # The "new way":
     target_link_libraries(yourapp
         PRIVATE Dasynq::Dasynq)
     
-    # Problematically, the "new way" adds the Dasynq include directory to the
-    # *system header* include path. On some platforms this may cause problems.
-    # You can prevent that with the following (this affects *all* imports for
+    # The "new way" adds the Dasynq include directory to the *system header*
+    # include path. This should not cause any problems, but if it does, you
+    # can prevent that with the following (this affects *all* imports for
     # the 'yourapp' target):
     set_target_properties(yourapp PROPERTIES
         NO_SYSTEM_FROM_IMPORTED true
     )
 
-It is also possible to simply copy the Dasynq headers directly into your own project.
+It is also possible to simply copy the Dasynq headers directly into your own project (you must
+respect the terms of the license).

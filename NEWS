@@ -1,3 +1,11 @@
+Dasynq version 1.2.3:
+--------------------
+
+This version includes a fix in the epoll backend for incorrectly reporting IN_EVENTS or OUT_EVENTS on file
+descriptor watches for which the respective event type had been disabled, in case of an error condition of
+the descriptor.
+
+
 Dasynq version 1.2.2:
 --------------------
 
