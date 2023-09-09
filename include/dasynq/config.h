@@ -28,10 +28,10 @@
 //     #define DASYNQ_HAVE_EVENTFD 1
 //
 // If the pipe2 system call is available:
-//     #define HAVE_PIPE2 1
+//     #define DASYNQ_HAVE_PIPE2 1
 //
 // If the pselect system call is available:
-//     #define HAVE_PSELECT 1
+//     #define DASYNQ_HAVE_PSELECT 1
 //
 // A tag to include at the end of a class body for a class which is allowed to have zero size.
 // Normally, C++ mandates that all objects (except empty base subobjects) have non-zero size, but on some
@@ -88,7 +88,7 @@
 
 // General feature availability
 
-#if (defined(__OpenBSD__) || defined(__linux__)) && ! defined(HAVE_PIPE2)
+#if (defined(__OpenBSD__) || defined(__linux__)) && ! defined(DASYNQ_HAVE_PIPE2)
 #define DASYNQ_HAVE_PIPE2 1
 #endif
 
