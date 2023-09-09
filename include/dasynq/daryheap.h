@@ -203,11 +203,8 @@ class dary_heap
     //  u... : parameters for data constructor T::T(...)
     template <typename ...U> void allocate(handle_t & hnd, U&&... u)
     {
-        new (& hnd.hd_u.hd) T(std::forward<U>(u)...);
-        hnd.heap_index = -1;
-
-        // largest object size is PTRDIFF_MAX, so we expect the largest vector is that / sizeof node:
-        constexpr hindex_t max_allowed = (std::numeric_limits<std::ptrdiff_t>::max() - 1) / sizeof(heap_node);
+        // Note: this can be constexpr in C++20
+        const hindex_t max_allowed = hvec.max_size();
 
         if (num_nodes == max_allowed) {
             throw std::bad_alloc();
@@ -225,10 +222,20 @@ class dary_heap
                     hvec.reserve(max_allowed);
                 }
             }
-            catch (std::bad_alloc &e) {
-                hvec.reserve(num_nodes);
+            catch (...) {
+                // try with just the needed number of nodes:
+                try {
+                    hvec.reserve(num_nodes);
+                }
+                catch (...) {
+                    num_nodes--;
+                    throw;
+                }
             }
         }
+
+        new (& hnd.hd_u.hd) T(std::forward<U>(u)...);
+        hnd.heap_index = -1;
     }
 
     // Deallocate a slot

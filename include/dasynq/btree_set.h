@@ -3,6 +3,7 @@
 
 #include <functional>
 #include <utility>
+#include <cstddef>
 
 namespace dasynq {
 
@@ -106,10 +107,10 @@ class btree_set
     septnode * left_sept = nullptr; // leftmost child (cache)
     septnode * sn_reserve = nullptr;
 
-    int num_alloced = 0;
-    int num_septs = 0;
-    int num_septs_needed = 0;
-    int next_sept = 1;  // next num_allocd for which we need another septnode in reserve.
+    size_t num_alloced = 0;
+    unsigned num_septs = 0;
+    unsigned num_septs_needed = 0;
+    unsigned next_sept = 1;  // next num_allocd for which we need another septnode in reserve.
 
     // Note that sept nodes are always at least half full, except for the root sept node.
     // For up to N nodes, one sept node is needed;
@@ -122,6 +123,8 @@ class btree_set
     void alloc_slot()
     {
         num_alloced++;
+        // No need to be concerned for overflow in num_alloced: if we've maxed out size_t then
+        // allocation would have failed much earlier on.
 
         if (__builtin_expect(num_alloced == next_sept, 0)) {
             if (++num_septs_needed > num_septs) {
@@ -136,6 +139,12 @@ class btree_set
                     num_alloced--;
                     throw;
                 }
+            }
+            if (num_septs_needed == 0) {
+                // wrapped around
+                num_septs_needed--;
+                num_alloced--;
+                throw std::bad_alloc();
             }
             next_sept += N/2;
         }
