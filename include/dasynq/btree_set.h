@@ -5,6 +5,8 @@
 #include <utility>
 #include <cstddef>
 
+#include "config.h"
+
 namespace dasynq {
 
 // A sorted set based on a B-Tree data structure, supporting pre-allocation of nodes.
@@ -126,7 +128,7 @@ class btree_set
         // No need to be concerned for overflow in num_alloced: if we've maxed out size_t then
         // allocation would have failed much earlier on.
 
-        if (__builtin_expect(num_alloced == next_sept, 0)) {
+        if (DASYNQ_EXPECT(num_alloced == next_sept, 0)) {
             if (++num_septs_needed > num_septs) {
                 try {
                     septnode *new_res = new septnode();
@@ -318,7 +320,7 @@ class btree_set
         num_alloced--;
 
         // Potentially release reserved sept node
-        if (__builtin_expect(num_alloced < next_sept - N/2, 0)) {
+        if (DASYNQ_EXPECT(num_alloced < next_sept - N/2, 0)) {
             next_sept -= N/2;
             num_septs_needed--;
             if (num_septs_needed < num_septs - 1) {

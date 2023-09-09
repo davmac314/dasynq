@@ -212,10 +212,10 @@ class dary_heap
 
         num_nodes++;
 
-        if (__builtin_expect(hvec.capacity() < num_nodes, 0)) {
+        if (DASYNQ_EXPECT(hvec.capacity() < num_nodes, 0)) {
             hindex_t half_point = max_allowed / 2;
             try {
-                if (__builtin_expect(num_nodes < half_point, 1)) {
+                if (DASYNQ_EXPECT(num_nodes < half_point, 1)) {
                     hvec.reserve(num_nodes * 2);
                 }
                 else {

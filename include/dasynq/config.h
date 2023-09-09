@@ -44,6 +44,9 @@
 // A statement to tell the compiler that the current line of code is unreachable, that is, it will never be
 // the case that program execution flow reaches this statement:
 //     #define DASYNQ_UNREACHABLE /* compiler specific! */
+//
+// A compiler builtin to specify the expected (integral) value of an integral expression:
+//     #define DASYNQ_EXPECT(expr,expected) /* compiler specific! */
 
 // ---------------------------------------------------------------------------------------------------------
 // Part 2: Automatic configuration begins here; you should not need to edit beyond this point.
@@ -104,6 +107,15 @@
 #if ! defined(DASYNQ_UNREACHABLE)
 #define DASYNQ_UNREACHABLE          __builtin_unreachable()
 #endif
+
+#if ! defined(DASYNQ_EXPECT)
+#define DASYNQ_EXPECT(a,b)          __builtin_expect(a,b)
+#endif
+
 #endif /* __GNUC__ */
+
+#if ! defined(DASYNQ_EXPECT)
+#define DASYNQ_EXPECT(a,b)          (a)
+#endif
 
 #endif /* DASYNQ_CONFIG_H_ */
