@@ -11,6 +11,4 @@ THREADOPT = -pthread
 # Address sanitizer seems to generate false positives on MacOS/FreeBSD (known issue)
 check: export ASAN_OPTIONS=detect_container_overflow=0
 
-# Makefile will work from this dir or if copied one level up:
 -include Makefile.common
--include ../Makefile.common

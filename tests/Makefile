@@ -3,7 +3,7 @@ objects = dasynq-tests.o
 check: dasynq-test
 	./dasynq-test
 
-$(objects): %.o: %.cc
+$(objects): %.o: %.cc ../include/dasynq.h ../include/dasynq/*.h
 	$(CXX) $(CXXTESTOPTS) -I../include -c $< -o $@
 
 dasynq-test: dasynq-tests.o

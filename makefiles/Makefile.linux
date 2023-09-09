@@ -8,6 +8,4 @@ CXXLINKOPTS =
 CXXTESTLINKOPTS = -g $(SANITIZE)
 THREADOPT = -pthread
 
-# Makefile will work from this dir or if copied one level up:
 -include Makefile.common
--include ../Makefile.common
