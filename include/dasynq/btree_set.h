@@ -333,8 +333,9 @@ class btree_set
         }
     }
 
-    // Insert an allocated slot into the heap.
-    // Return true if it is the leftmost value.
+    // Insert an allocated slot, with a unique value, into the set. Does nothing if the value is
+    // already in the set.
+    // Return true if the value was inserted (or false if already present).
     bool insert(handle_t & hndl, P pval = P()) noexcept
     {
         if (root_sept == nullptr) {
@@ -343,8 +344,6 @@ class btree_set
         }
 
         septnode * srch_sept = root_sept;
-
-        bool leftmost = true;
 
         while (! srch_sept->is_leaf()) {
             int min = 0;
@@ -356,12 +355,11 @@ class btree_set
                     max = i - 1;
                 }
                 else if (srch_sept->prio[i] == pval) {
-                    // Already present?
+                    // Already present
                     return false;
                 }
                 else {
                     min = i + 1;
-                    leftmost = false;
                 }
             }
 
@@ -383,7 +381,7 @@ class btree_set
                     max = i - 1;
                 }
                 else if (srch_sept->prio[i] == pval) {
-                    // Already present?
+                    // Already present
                     return false;
                 }
                 else {
@@ -394,7 +392,6 @@ class btree_set
 
         septnode * left_down = nullptr; // left node going down
         septnode * right_down = nullptr; // right node going down
-        leftmost = leftmost && pval < srch_sept->prio[0];
 
         handle_t * hndl_p = &hndl;
 
@@ -496,7 +493,7 @@ class btree_set
         srch_sept->children[inspos] = left_down;
         srch_sept->children[inspos+1] = right_down;
         hndl_p->parent = srch_sept;
-        return leftmost;
+        return true;
     }
 
     // Remove a slot from the heap (but don't deallocate it)
