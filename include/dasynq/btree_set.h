@@ -361,11 +361,8 @@ class btree_set
                 }
                 else {
                     min = i + 1;
+                    leftmost = false;
                 }
-            }
-
-            if (min != 0) {
-                leftmost = false;
             }
 
             // go up to the right:
@@ -373,7 +370,7 @@ class btree_set
         }
 
         // We got to a leaf: does it have space?
-        // First check if we can add to a linked list
+        // First check if already present
         int children = srch_sept->num_vals();
 
         {
@@ -382,7 +379,7 @@ class btree_set
             while (min <= max) {
                 int i = (min + max) / 2;
 
-                if (srch_sept->hn_p[i] == nullptr || pval < srch_sept->prio[i]) {
+                if (pval < srch_sept->prio[i]) {
                     max = i - 1;
                 }
                 else if (srch_sept->prio[i] == pval) {
