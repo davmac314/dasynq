@@ -1,3 +1,11 @@
+Dasynq version 1.2.4:
+--------------------
+
+This version includes a fix for some minor issues that may manifest after memory is full (i.e. rarely).
+It also includes a fix for using file (output) watchers (in emulation mode) with the /dev/null device on
+FreeBSD (this returns an undocumented error code, which was not previously handled by Dasynq).
+
+
 Dasynq version 1.2.3:
 --------------------
 
