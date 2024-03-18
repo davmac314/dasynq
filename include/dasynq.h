@@ -425,7 +425,7 @@ namespace dprivate {
     // lock; they are also free to use it to protect their own internal data structures.
     template <typename Traits, typename LoopTraits> class event_dispatch
     {
-        friend class dasynq::event_loop<typename LoopTraits::mutex_t, LoopTraits>;;
+        friend class dasynq::event_loop<typename LoopTraits::mutex_t, LoopTraits>;
 
         public:
         using mutex_t = typename LoopTraits::mutex_t;
