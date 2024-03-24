@@ -1,3 +1,9 @@
+Dasynq version 1.2.5:
+--------------------
+
+This version includes a compilation fix for the child_proc_watch::send_signal function.
+
+
 Dasynq version 1.2.4:
 --------------------
 
