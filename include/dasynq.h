@@ -2050,7 +2050,7 @@ class child_proc_watcher : private dprivate::base_child_watcher
     // already terminated.
     int send_signal(event_loop_t &loop, int signo) noexcept
     {
-        auto reaper_mutex = loop.get_reaper_mutex();
+        auto reaper_mutex = loop.get_reaper_lock();
         std::lock_guard<decltype(reaper_mutex)> guard(reaper_mutex);
 
         if (this->child_termd) {
