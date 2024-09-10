@@ -31,6 +31,7 @@ class test_traits : public dasynq::default_traits<checking_mutex>
     public:
     template <typename Base> using backend_t = dasynq::test_loop<Base>;
     using backend_traits_t = dasynq::test_loop_traits;
+    using proc_status_t = proc_status;
 };
 
 using Loop_t = dasynq::event_loop<checking_mutex, test_traits>;
@@ -1489,7 +1490,7 @@ void ftest_child_watch()
         public:
         bool did_exit = false;
 
-        rearm status_change(loop_t &, pid_t child, int status)
+        rearm status_change(loop_t &, pid_t child, proc_status_t status)
         {
             did_exit = true;
             return rearm::DISARM;

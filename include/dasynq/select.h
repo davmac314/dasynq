@@ -22,6 +22,11 @@
 //
 
 namespace dasynq {
+inline namespace v2 {
+
+namespace dprivate {
+class proc_status; // forward declaration
+}
 
 template <class Base> class select_events;
 
@@ -54,6 +59,8 @@ class select_traits : public signal_traits
         {
         }
     };
+
+    using proc_status_t = dprivate::proc_status;
 
     constexpr static bool has_bidi_fd_watch = false;
     constexpr static bool has_separate_rw_fd_watches = true;
@@ -337,6 +344,7 @@ template <class Base> class select_events : public signal_events<Base, true>
     }
 };
 
+} // namespace v2
 } // namespace dasynq
 
 #endif /* DASYNQ_SELECT_H_ */

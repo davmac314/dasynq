@@ -247,7 +247,7 @@ template <class Base> class pselect_events : public signal_events<Base, false>
         // This is horrible, but hopefully will be optimised well. POSIX gives no way to combine signal
         // sets other than this.
         for (int i = 1; i < NSIG; i++) {
-            if (! sigismember(&active_sigmask, i)) {
+            if (!sigismember(&active_sigmask, i)) {
                 sigdelset(&sigmask, i);
             }
         }
@@ -261,7 +261,7 @@ template <class Base> class pselect_events : public signal_events<Base, false>
             do_wait = false;
         }
 
-        if (! do_wait) {
+        if (!do_wait) {
             ts.tv_sec = 0;
             ts.tv_nsec = 0;
             wait_ts = &ts;

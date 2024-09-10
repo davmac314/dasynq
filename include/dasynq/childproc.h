@@ -9,6 +9,7 @@
 #include "btree_set.h"
 
 namespace dasynq {
+inline namespace v2 {
 
 namespace dprivate {
 
@@ -85,6 +86,22 @@ inline void sigchld_handler(int signum)
     // hurt in any case).
 }
 
+class proc_status {
+    int wait_si_code; // CLD_EXITED or a signal-related status
+    int wait_si_status; // exit status as per exit(...), or signal number
+
+    public:
+    proc_status() {}
+    proc_status(int wait_si_code, int wait_si_status)
+        : wait_si_code(wait_si_code), wait_si_status(wait_si_status) {}
+
+    bool did_exit() { return wait_si_code == CLD_EXITED; }
+    bool did_exit_clean() { return wait_si_status == 0; }
+    bool was_signalled() { return !did_exit(); }
+    int get_exit_status() { return wait_si_status; }
+    int get_signal() { return wait_si_status; }
+};
+
 } // namespace dprivate
 
 using pid_watch_handle_t = dprivate::pid_map::pid_handle_t;
@@ -98,6 +115,7 @@ template <class Base> class child_proc_events : public Base
     {
         public:
         constexpr static bool supports_childwatch_reservation = true;
+        using proc_status_t = dprivate::proc_status;
     };
 
     private:
@@ -111,15 +129,22 @@ template <class Base> class child_proc_events : public Base
     bool receive_signal(T & loop_mech, sigdata_t &siginfo, void *userdata)
     {
         if (siginfo.get_signo() == SIGCHLD) {
-            int status;
-            pid_t child;
             reaper_lock.lock();
-            while ((child = waitpid(-1, &status, WNOHANG)) > 0) {
+
+            siginfo_t child_info;
+            child_info.si_pid = 0; // for portability
+            while (waitid(P_ALL, 0 /* ignored */, &child_info, WNOHANG | WEXITED) == 0) {
+                pid_t child = child_info.si_pid;
+                if (child == 0) break;
                 auto ent = child_waiters.remove(child);
                 if (ent.first) {
-                    Base::receive_child_stat(child, status, ent.second);
+                    reaper_lock.unlock();
+                    Base::receive_child_stat(child, { child_info.si_code, child_info.si_status },
+                            ent.second);
+                    reaper_lock.lock();
                 }
             }
+
             reaper_lock.unlock();
             return false; // leave signal watch enabled
         }
@@ -209,6 +234,7 @@ template <class Base> class child_proc_events : public Base
     }
 };
 
+} // namespace v2
 } // namespace dasynq
 
 #endif /* DASYNQ_CHILDPROC_H_ */

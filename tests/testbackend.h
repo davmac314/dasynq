@@ -7,6 +7,22 @@
 #include "dasynq/mutex.h"
 #include "dasynq/timerbase.h"
 
+class proc_status {
+    int pid;
+    int wait_si_code; // exit status as per exit(...), or signal number
+    int wait_si_status; // CLD_EXITED or a signal-related status
+
+    public:
+    proc_status() {}
+    proc_status(int wait_si_code, int wait_si_status)
+        : wait_si_code(wait_si_code), wait_si_status(wait_si_status) {}
+
+    bool did_exit() { return true; }
+    bool was_signalled() { return false; }
+    int get_exit_status() { return wait_si_status; }
+    int get_signal() { return wait_si_status; }
+};
+
 namespace dasynq {
 
 // An interface for a receiver of I/O events
@@ -105,6 +121,8 @@ class test_loop_traits
             return 0; // TODO
         }
     };
+    
+    using proc_status_t = proc_status;
     
     constexpr static bool has_separate_rw_fd_watches = false;
     constexpr static bool interrupt_after_fd_add = false;
