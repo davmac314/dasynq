@@ -84,12 +84,16 @@
 #if _POSIX_TIMERS > 0
 #include "dasynq/posixtimer.h"
 namespace dasynq {
+inline namespace v2 {
     template <typename T, bool provide_mono_timer = true> using timer_events = posix_timer_events<T, provide_mono_timer>;
+} // namespace v2
 } // namespace dasynq
 #else
 #include "dasynq/itimer.h"
 namespace dasynq {
+inline namespace v2 {
     template <typename T, bool provide_mono_timer = true> using timer_events = itimer_events<T, provide_mono_timer>;
+} // namespace v2
 } // namespace dasynq
 #endif
 #endif
@@ -99,15 +103,19 @@ namespace dasynq {
 #include "dasynq/kqueue-macos.h"
 #include "dasynq/childproc.h"
 namespace dasynq {
+inline namespace v2 {
     template <typename T> using loop_t = macos_kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = macos_kqueue_traits;
+} // namespace v2
 } // namespace dasynq
 #else
 #include "dasynq/kqueue.h"
 #include "dasynq/childproc.h"
 namespace dasynq {
+inline namespace v2 {
     template <typename T> using loop_t = kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
     using loop_traits_t = kqueue_traits;
+} // namespace v2
 } // namespace dasynq
 #endif
 #elif DASYNQ_HAVE_EPOLL
@@ -115,22 +123,28 @@ namespace dasynq {
 #include "dasynq/timerfd.h"
 #include "dasynq/childproc.h"
 namespace dasynq {
+inline namespace v2 {
     template <typename T> using loop_t = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
     using loop_traits_t = epoll_traits;
+} // namespace v2
 } // namespace dasynq
 #else
 #include "dasynq/childproc.h"
 #if DASYNQ_HAVE_PSELECT
 #include "dasynq/pselect.h"
 namespace dasynq {
+inline namespace v2 {
     template <typename T> using loop_t = pselect_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
+} // namespace v2
 } // namespace dasynq
 #else
 #include "dasynq/select.h"
 namespace dasynq {
+inline namespace v2 {
     template <typename T> using loop_t = select_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
     using loop_traits_t = select_traits;
+} // namespace v2
 } // namespace dasynq
 #endif
 #endif
@@ -174,6 +188,7 @@ class delayed_init {
     DASYNQ_EMPTY_BODY
 };
 
+inline namespace v2 {
 namespace dprivate {
 
     // Classes for implementing a fair(ish) wait queue.
@@ -438,7 +453,7 @@ namespace dprivate {
         prio_queue event_queue;
         
         using base_signal_watcher = dprivate::base_signal_watcher<typename traits_t::sigdata_t>;
-        using base_child_watcher = dprivate::base_child_watcher;
+        using base_child_watcher = dprivate::base_child_watcher<typename traits_t::proc_status_t>;
         using base_timer_watcher = dprivate::base_timer_watcher;
         
         // Add a watcher into the queueing system (but don't queue it). Call with lock held.
@@ -535,7 +550,7 @@ namespace dprivate {
         }
         
         // Child process terminated. Called with both the main lock and the reaper lock held.
-        void receive_child_stat(pid_t child, int status, void * userdata) noexcept
+        void receive_child_stat(pid_t child, typename LoopTraits::backend_traits_t::proc_status_t status, void * userdata) noexcept
         {
             base_child_watcher * watcher = static_cast<base_child_watcher *>(userdata);
             watcher->child_status = status;
@@ -635,7 +650,7 @@ namespace dprivate {
         event_dispatch(const event_dispatch &) = delete;
     };
 
-} // namespace dasynq
+} // namespace dprivate
 
 // This is the main event_loop implementation. It serves as an interface to the event loop backend (of which
 // it maintains an internal instance). It also serialises polling the backend and provides safe deletion of
@@ -681,7 +696,7 @@ class event_loop
     using base_signal_watcher = dprivate::base_signal_watcher<typename loop_traits_t::sigdata_t>;
     using base_fd_watcher = dprivate::base_fd_watcher;
     using base_bidi_fd_watcher = dprivate::base_bidi_fd_watcher;
-    using base_child_watcher = dprivate::base_child_watcher;
+    using base_child_watcher = dprivate::base_child_watcher<typename loop_traits_t::proc_status_t>;
     using base_timer_watcher = dprivate::base_timer_watcher;
     using watch_type_t = dprivate::watch_type_t;
 
@@ -2034,7 +2049,7 @@ class bidi_fd_watcher_impl : public bidi_fd_watcher<EventLoop>
 
 // Child process event watcher
 template <typename EventLoop>
-class child_proc_watcher : private dprivate::base_child_watcher
+class child_proc_watcher : private dprivate::base_child_watcher<typename EventLoop::loop_traits_t::proc_status_t>
 {
     template <typename, typename> friend class child_proc_watcher_impl;
 
@@ -2044,6 +2059,7 @@ class child_proc_watcher : private dprivate::base_child_watcher
     public:
 
     using event_loop_t = EventLoop;
+    using proc_status_t = typename EventLoop::loop_traits_t::proc_status_t;
 
     // send a signal to this process, if it is still running, in a race-free manner.
     // return is as for POSIX kill(); return is -1 with errno=ESRCH if process has
@@ -2202,7 +2218,7 @@ class child_proc_watcher : private dprivate::base_child_watcher
         }
     }
     
-    // virtual rearm child_status(EventLoop &eloop, pid_t child, int status) = 0;
+    // virtual rearm child_status(EventLoop &eloop, pid_t child, proc_status_t status) = 0;
 };
 
 template <typename EventLoop, typename Derived>
@@ -2367,6 +2383,7 @@ class timer_impl : public timer<EventLoop>
 
 } // namespace dprivate
 
+} // namespace v2
 } // namespace dasynq
 
 #endif /* DASYNQ_H_ */
