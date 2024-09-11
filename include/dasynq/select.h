@@ -296,9 +296,9 @@ template <class Base> class select_events : public signal_events<Base, true>
         // Check whether any timers are pending, and what the next timeout is.
         this->process_monotonic_timers(do_wait, ts, wait_ts);
 
-        volatile fd_set read_set_c;
-        volatile fd_set write_set_c;
-        volatile fd_set err_set;
+        fd_set read_set_c;
+        fd_set write_set_c;
+        fd_set err_set;
 
         read_set_c = read_set;
         write_set_c = write_set;
@@ -316,11 +316,13 @@ template <class Base> class select_events : public signal_events<Base, true>
             do_wait = false;
         }
 
-        if (! do_wait) {
+        if (!do_wait) {
             ts.tv_sec = 0;
             ts.tv_usec = 0;
             wait_ts = &ts;
         }
+
+        std::atomic_signal_fence(std::memory_order::memory_order_release);
 
         this->sigmaskf(SIG_UNBLOCK, &active_sigmask, nullptr);
         int r = select(nfds, &read_set_c, &write_set_c, &err_set, wait_ts);
