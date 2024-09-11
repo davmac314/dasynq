@@ -720,8 +720,8 @@ class event_loop
     // To solve that, we:
     // - allow only one thread to poll for events at a time, using a lock
     // - use the same lock to prevent polling, if we want to unwatch an event source
-    // - generate an event to interrupt any polling that may already be occurring in
-    //   another thread
+    // - generate an event to interrupt, when necessary, any polling that may already be occurring
+    //   in another thread
     // - mark handlers as active if they are currently executing, and
     // - when removing an active handler, simply set a flag which causes it to be
     //   removed once the current processing is finished, rather than removing it
@@ -755,6 +755,9 @@ class event_loop
     //    - if the node is at the head of the queue, lock is claimed; return
     //    - otherwise, if a poll is in progress, interrupt it
     //    - wait until our node is at the head of the attn_waitqueue
+    //
+    // Some backends also need to interrupted in order to add a new watch (eg select/pselect).
+    // However, the attn_waitqueue lock doesn't generally need to be obtained for this.
     
     mutex_t wait_lock;  // protects the wait/attention queues
     bool long_poll_running = false;  // whether any thread is polling the backend (with non-zero timeout)

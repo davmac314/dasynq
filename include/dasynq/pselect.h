@@ -245,6 +245,8 @@ template <class Base> class pselect_events : public signal_events<Base, false>
 
         const sigset_t &active_sigmask = this->get_active_sigmask();
 
+        // We want "poll_sigmask" to have unmasked both the signals that were previously unmasked, and
+        // the signals that we need to see because they are being watched.
         this->sigmaskf(SIG_UNBLOCK, nullptr, &poll_sigmask);
 
         // This is horrible, but hopefully will be optimised well. POSIX gives no way to combine signal

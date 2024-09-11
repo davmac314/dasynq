@@ -74,7 +74,6 @@ template <class Base> class select_events : public signal_events<Base, true>
 {
     fd_set read_set;
     fd_set write_set;
-    //fd_set error_set;  // logical OR of both the above
     int max_fd = -1; // highest fd in any of the sets, -1 if not initialised
 
     // userdata pointers in read and write respectively, for each fd:
@@ -298,7 +297,7 @@ template <class Base> class select_events : public signal_events<Base, true>
 
         fd_set read_set_c;
         fd_set write_set_c;
-        fd_set err_set;
+        fd_set err_set; // "exceptional conditions" eg urgent data
 
         read_set_c = read_set;
         write_set_c = write_set;
