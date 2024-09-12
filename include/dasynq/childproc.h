@@ -91,15 +91,17 @@ class proc_status {
     int wait_si_status; // exit status as per exit(...), or signal number
 
     public:
-    proc_status() {}
-    proc_status(int wait_si_code, int wait_si_status)
+    proc_status() noexcept {}
+    proc_status(int wait_si_code, int wait_si_status) noexcept
         : wait_si_code(wait_si_code), wait_si_status(wait_si_status) {}
+    proc_status(const proc_status &) noexcept = default;
+    proc_status &operator=(const proc_status &) noexcept = default;
 
-    bool did_exit() { return wait_si_code == CLD_EXITED; }
-    bool did_exit_clean() { return wait_si_status == 0; }
-    bool was_signalled() { return !did_exit(); }
-    int get_exit_status() { return wait_si_status; }
-    int get_signal() { return wait_si_status; }
+    bool did_exit() noexcept { return wait_si_code == CLD_EXITED; }
+    bool did_exit_clean() noexcept { return wait_si_status == 0; }
+    bool was_signalled() noexcept { return !did_exit(); }
+    int get_exit_status() noexcept { return wait_si_status; }
+    int get_signal() noexcept { return wait_si_status; }
 };
 
 } // namespace dprivate

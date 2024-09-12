@@ -29,6 +29,7 @@ provides a means for subclassing.</p>
 <h3>Types</h3>
 <ul>
 <li><i class="code-name">event_loop_t</i> &mdash; the event loop type that this watcher registers with.</li>
+<li><a href="#proc_status_t"><i class="code-name">proc_status_t</i></a> &mdash; status information about a watched proces.</i>
 </ul>
 
 <h3>Constructors</h3>
@@ -167,5 +168,48 @@ with the following parameters:</p>
 
 <p>A <i class="code-name">child_proc_watcher_impl</i> instantiation has no public or protected members, other than
 those inherited from <i class="code-name">child_proc_watcher</i>, which it publicly derives from.</p>
+
+<hr>
+
+
+<h2 id="proc_status_t">proc_status_t</h2>
+
+<p><b>Brief</b>: The <i class="code-name">proc_status_t</i> class wraps information about the
+(termination) status of a watched process.</p> 
+
+<p><span class="note"><i>Note:</i> this may be a typedef'd alias of another type internal to Dasynq.</span></p>
+
+<h2>Members</h2>
+
+<div class="small-indent">
+<h3>Constructors</h3>
+<ul>
+<li><i class="code-name">proc_status_t() noexcept</i> &mdash; default constructor; contents unspecified</li>
+<li><i class="code-name">proc_status_t(const proc_status_t &) noexcept</i> &mdash; copy constructor</li>
+</ul>
+
+<h3>Functions</h3>
+<ul>
+<li><i class="code-name">proc_status_t &operator=(const proc_status_t &) noexcept</i>
+    <br>&mdash; assignment</li>
+<li><i class="code-name">bool did_exit() noexcept</i>
+    <br>&mdash; whether the process terminated normally</li>
+<li><i class="code-name">bool did_exit_clean() noexcept</i>
+    <br>&mdash; whether the process terminated normally, with an exit status of 0</li>
+<li><i class="code-name">bool was_signalled() noexcept</i>
+    <br>&mdash; whether the process was terminated via a signal</li>
+<li><i class="code-name">int get_exit_status() noexcept</i>
+    <br>&mdash; if the process exited normally, the exit status it returned; otherwise unspecified</li>
+<li><i class="code-name">int get_signal() noexcept</i>
+    <br>&mdash; if the process was terminated via a signal, the relevant signal number; otherwise unspecified</li>
+</ul>
+
+</div>
+
+<h2>Details and Usage</h2>
+
+<p>The <i class="code-name">proc_status_t</i> class is a straight-forward wrapper around process
+status information. For convenience, a default constructor, copy constructor and assignment operator
+are provided.</p>
 
 </div></body></html>

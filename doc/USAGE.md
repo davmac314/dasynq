@@ -282,7 +282,7 @@ should generally unmask them after forking a child process.
     class my_child_proc_watcher : public loop_t::child_proc_watcher<my_child_proc_watcher>
     {
         public:
-        rearm status_change(loop_t &, pid_t child, int status)
+        rearm status_change(loop_t &, pid_t child, proc_status_t status)
         {
             return rearm::DISARM; // or REMOVE, REMOVED, NOOP
         }
