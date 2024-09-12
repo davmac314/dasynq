@@ -1,3 +1,13 @@
+Dasynq version 2.0.0:
+--------------------
+
+This major new release introduces a small backwards incompatibility. Child watchers now receive information
+about child status via a wrapper type (proc_status_t). On systems which support it (eg. FreeBSD) the full
+integer exit value is available, rather than just the lower 8 bits.
+
+This version also includes compilation fixes and (theoretical) bug fixes for the pselect/select backends.
+
+
 Dasynq version 1.2.5:
 --------------------
 
