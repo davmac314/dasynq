@@ -1039,28 +1039,28 @@ class event_loop
         }
     }
     
-    void set_timer(base_timer_watcher *callBack, const timespec &timeout, clock_type clock) noexcept
+    void set_timer(base_timer_watcher *callback, const timespec &timeout, clock_type clock) noexcept
     {
         struct timespec interval {0, 0};
-        loop_mech.set_timer(callBack->timer_handle, timeout, interval, true, clock);
+        loop_mech.set_timer(callback->timer_handle, timeout, interval, true, clock);
     }
     
-    void set_timer(base_timer_watcher *callBack, const timespec &timeout, const timespec &interval,
+    void set_timer(base_timer_watcher *callback, const timespec &timeout, const timespec &interval,
             clock_type clock) noexcept
     {
-        loop_mech.set_timer(callBack->timer_handle, timeout, interval, true, clock);
+        loop_mech.set_timer(callback->timer_handle, timeout, interval, true, clock);
     }
 
-    void set_timer_rel(base_timer_watcher *callBack, const timespec &timeout, clock_type clock) noexcept
+    void set_timer_rel(base_timer_watcher *callback, const timespec &timeout, clock_type clock) noexcept
     {
         struct timespec interval {0, 0};
-        loop_mech.set_timer_rel(callBack->timer_handle, timeout, interval, true, clock);
+        loop_mech.set_timer_rel(callback->timer_handle, timeout, interval, true, clock);
     }
     
-    void set_timer_rel(base_timer_watcher *callBack, const timespec &timeout,
+    void set_timer_rel(base_timer_watcher *callback, const timespec &timeout,
             const timespec &interval, clock_type clock) noexcept
     {
-        loop_mech.set_timer_rel(callBack->timer_handle, timeout, interval, true, clock);
+        loop_mech.set_timer_rel(callback->timer_handle, timeout, interval, true, clock);
     }
 
     void set_timer_enabled(base_timer_watcher *callback, clock_type clock, bool enabled) noexcept
