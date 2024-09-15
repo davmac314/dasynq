@@ -9,8 +9,6 @@
 #include "btree_set.h"
 
 namespace dasynq {
-inline namespace v2 {
-
 namespace dprivate {
 
 // Map of pid_t to void *, with possibility of reserving entries so that mappings can
@@ -91,7 +89,7 @@ class proc_status {
     int wait_si_status; // exit status as per exit(...), or signal number
 
     public:
-    proc_status() noexcept {}
+    proc_status() noexcept : wait_si_code(0), wait_si_status(0) { }
     proc_status(int wait_si_code, int wait_si_status) noexcept
         : wait_si_code(wait_si_code), wait_si_status(wait_si_status) {}
     proc_status(const proc_status &) noexcept = default;
@@ -102,11 +100,16 @@ class proc_status {
     bool was_signalled() noexcept { return !did_exit(); }
     int get_exit_status() noexcept { return wait_si_status; }
     int get_signal() noexcept { return wait_si_status; }
+
+    int get_si_status() noexcept { return wait_si_status; }
+    int get_si_code() noexcept { return wait_si_code; }
 };
 
 } // namespace dprivate
 
-using pid_watch_handle_t = dprivate::pid_map::pid_handle_t;
+inline namespace v2 {
+
+using pid_watch_handle_t = dasynq::dprivate::pid_map::pid_handle_t;
 
 template <class Base> class child_proc_events : public Base
 {
@@ -121,7 +124,7 @@ template <class Base> class child_proc_events : public Base
     };
 
     private:
-    dprivate::pid_map child_waiters;
+    dasynq::dprivate::pid_map child_waiters;
     reaper_mutex_t reaper_lock; // used to prevent reaping while trying to signal a process
     
     protected:
@@ -225,13 +228,13 @@ template <class Base> class child_proc_events : public Base
         // On some systems a SIGCHLD handler must be established, or SIGCHLD will not be
         // generated:
         struct sigaction chld_action;
-        chld_action.sa_handler = dprivate::sigchld_handler;
+        chld_action.sa_handler = dasynq::dprivate::sigchld_handler;
         sigemptyset(&chld_action.sa_mask);
         chld_action.sa_flags = 0;
         sigaction(SIGCHLD, &chld_action, nullptr);
 
         // Specify a dummy user data value - sigchld_handler
-        loop_mech->add_signal_watch(SIGCHLD, (void *) dprivate::sigchld_handler);
+        loop_mech->add_signal_watch(SIGCHLD, (void *) dasynq::dprivate::sigchld_handler);
         Base::init(loop_mech);
     }
 };

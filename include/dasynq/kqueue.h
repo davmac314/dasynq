@@ -31,11 +31,12 @@
 // mechanism must be used together with kqueue.
 
 namespace dasynq {
-inline namespace v2 {
 
 namespace dprivate {
 class proc_status; // forward declaration
 }
+
+inline namespace v2 {
 
 template <class Base> class kqueue_loop;
 
@@ -75,7 +76,7 @@ class kqueue_traits
         void set_signo(int signo) { info.si_signo = signo; }
     };
 
-    using proc_status_t = dprivate::proc_status;
+    using proc_status_t = dasynq::dprivate::proc_status;
 
     class fd_r;
 
@@ -109,6 +110,8 @@ class kqueue_traits
     constexpr static bool interrupt_after_signal_add = false;
     constexpr static bool supports_non_oneshot_fd = false;
 };
+
+} // namespace v2
 
 namespace dprivate {
 namespace dkqueue {
@@ -170,6 +173,8 @@ inline bool get_siginfo(int signo, siginfo_t *siginfo)
 #endif
 } // namespace dkqueue
 } // namespace dprivate
+
+inline namespace v2 {
 
 template <class Base> class kqueue_loop : public Base
 {

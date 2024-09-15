@@ -32,13 +32,12 @@
 // mechanism must be used together with kqueue.
 
 namespace dasynq {
-inline namespace v2 {
 
 namespace dprivate {
 class proc_status; // forward declaration
 }
 
-template <class Base> class kqueue_loop;
+inline namespace v2 {
 
 class macos_kqueue_traits : public signal_traits
 {

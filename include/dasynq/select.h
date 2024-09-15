@@ -22,7 +22,6 @@
 //
 
 namespace dasynq {
-inline namespace v2 {
 
 namespace dprivate {
 class proc_status; // forward declaration
@@ -345,7 +344,6 @@ template <class Base> class select_events : public signal_events<Base, true>
     }
 };
 
-} // namespace v2
 } // namespace dasynq
 
 #endif /* DASYNQ_SELECT_H_ */
