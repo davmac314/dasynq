@@ -137,7 +137,7 @@ template <class Base> class child_proc_events : public Base
             reaper_lock.lock();
 
             siginfo_t child_info;
-            child_info.si_pid = 0; // for portability
+            child_info.si_pid = 0; // for portability inc. Musl, MacOS
             while (waitid(P_ALL, 0 /* ignored */, &child_info, WNOHANG | WEXITED) == 0) {
                 pid_t child = child_info.si_pid;
                 if (child == 0) break;
@@ -148,6 +148,7 @@ template <class Base> class child_proc_events : public Base
                             ent.second);
                     reaper_lock.lock();
                 }
+                child_info.si_pid = 0;
             }
 
             reaper_lock.unlock();
