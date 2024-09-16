@@ -143,10 +143,8 @@ template <class Base> class child_proc_events : public Base
                 if (child == 0) break;
                 auto ent = child_waiters.remove(child);
                 if (ent.first) {
-                    reaper_lock.unlock();
                     Base::receive_child_stat(child, { child_info.si_code, child_info.si_status },
                             ent.second);
-                    reaper_lock.lock();
                 }
                 child_info.si_pid = 0;
             }
