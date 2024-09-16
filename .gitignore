@@ -1,12 +1,8 @@
+.*
+!/.gitignore
 *.o
-dasynq-test
+/tests/dasynq-test
 /dasynq.pc
-/extra/iobench/libev/**
-/.project
-/.cproject
-/.settings
 /cmake/Dasynq.cmake
 /cmake/DasynqConfigVersion.cmake
 /Makefile
-
-/build/
