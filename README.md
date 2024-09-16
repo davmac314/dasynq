@@ -1,20 +1,23 @@
 # Dasynq
 
-_Version 2.0_
+_Version 2.1.0(pre)_
 
-Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries, it is
-crossplatform / portable. Unlike most other such libraries, it is intended to be completely usable in
-a multi-threaded client program, and it is written in C++; furthermore the API is designed to allow
-the creation of extremely robust clients, by allowing allocation of resources up front (before they
-are needed in critical sections). However, it is also designed to be lightweight, and it does not
-require the use of threads (and so does not require linking against a thread library).
+Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries,
+it is crossplatform / portable. Unlike most other such libraries, it is intended to be completely
+usable in a multi-threaded client program, and it is written in C++; furthermore the API is
+designed to allow the creation of extremely robust clients, by allowing allocation of resources up
+front (before they are needed in critical sections). However, it is also designed to be
+lightweight, and it does not require the use of threads (and so does not require linking against a
+thread library).
 
-The existing backends include **epoll** and **kqueue**, meaning that it works on Linux and various
-BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called). There is also
-a less efficient backend based on **pselect**, and an even less efficient backend based on **select**,
-meaning that it should also work on nearly all other POSIX-compliant systems (with minor caveats).
+The existing backends include **epoll** and **kqueue**, meaning that Dasynq works well on Linux
+and various BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called).
+There is also a less efficient backend based on **pselect**, and an even less efficient backend
+based on **select**, meaning that it should also work on nearly all other POSIX-compliant systems
+(with minor caveats).
 
-Dasynq is distributed under the terms of the Apache License, version 2.0, as found in the LICENSE file.
+Dasynq is distributed under the terms of the Apache License, version 2.0, as found in the LICENSE
+file.
 
 Dasynq is written in C++11, using POSIX functions and some OS-specific system calls.
 
