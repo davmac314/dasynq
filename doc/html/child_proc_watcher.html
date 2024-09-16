@@ -199,9 +199,18 @@ those inherited from <i class="code-name">child_proc_watcher</i>, which it publi
 <li><i class="code-name">bool was_signalled() noexcept</i>
     <br>&mdash; whether the process was terminated via a signal</li>
 <li><i class="code-name">int get_exit_status() noexcept</i>
-    <br>&mdash; if the process exited normally, the exit status it returned; otherwise unspecified</li>
+    <br>&mdash; if the process exited normally, the exit status it returned; otherwise unspecified.
+        Note that on some systems (notably Linux) only 8 bits of the exit status are available.</li>
 <li><i class="code-name">int get_signal() noexcept</i>
     <br>&mdash; if the process was terminated via a signal, the relevant signal number; otherwise unspecified</li>
+<li><i class="code-name">int get_si_code() noexcept</i>
+    <br>&mdash; returns value indicating cause of process termination; can be <i class="code-name">CLD_EXITED</i>
+        (process called <i class="code-name">exit(...)</i> or returned from <i class="code-name">main</i>),
+        <i class="code-name">CLD_KILLED</i> if the process was terminated by reception of a signal.</li>
+<li><i class="code-name">int get_si_status() noexcept</i>
+    <br>&mdash; if the process exited, returns the exit status (passed to <i class="code-name">exit(...)</i> or
+        returned from <i class="code-name">main</i>); note that some systems (such as Linux) may limit the result
+        to 8 bits. If the process was terminated by reception of a signal, returns the signal number.</li>
 </ul>
 
 </div>
