@@ -8,7 +8,7 @@ project('dasynq', 'cpp',
   # 'werror=true',
   ],
   license: 'Apache-2.0',
-  version: '2.0',
+  version: '2.1.0',
 )
 
 dasynq_deps = []

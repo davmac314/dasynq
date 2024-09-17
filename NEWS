@@ -1,3 +1,13 @@
+Dasynq version 2.1.0:
+--------------------
+
+This version includes bugfixes and a minor new feature: the ability to retrieve the "si_code" and
+"si_status" values associated with a child process termination (proc_status_t) directly.
+
+Fixes include some compilation issues, and a hang fix for macOS (due to POSIX non-conformance),
+possibly also affecting some other systems.
+
+
 Dasynq version 2.0.0:
 --------------------
 
