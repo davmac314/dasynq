@@ -2,13 +2,12 @@
 
 CXX = clang++
 CXXOPTS =
-SANITIZE = -fsanitize=address,null,return,bounds,alignment,object-size
+SANITIZE = -fsanitize=address,null,return,bounds,alignment
 CXXTESTOPTS = -g -std=c++11 -Os -Wall $(SANITIZE)
 CXXLINKOPTS = -lrt
 CXXTESTLINKOPTS = -g $(SANITIZE)
 THREADOPT = -pthread
 
-# Address sanitizer seems to generate false positives on MacOS/FreeBSD (known issue)
-check: export ASAN_OPTIONS=detect_container_overflow=0
+# Note: "object-size" sanitizer disabled due to https://github.com/llvm/llvm-project/issues/50464
 
 -include Makefile.common
