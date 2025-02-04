@@ -11,7 +11,7 @@ lightweight, and it does not require the use of threads (and so does not require
 thread library).
 
 The existing backends include **epoll** and **kqueue**, meaning that Dasynq works well on Linux
-and various BSDs (at least OpenBSD and FreeBSD) as well as Mac OS X ("macOS" as it is now called).
+and various BSDs (at least OpenBSD, FreeBSD and NetBSD) as well as Mac OS X ("macOS" as it is now called).
 There is also a less efficient backend based on **pselect**, and an even less efficient backend
 based on **select**, meaning that it should also work on nearly all other POSIX-compliant systems
 (with minor caveats).
@@ -78,7 +78,7 @@ etc).
 On OpenBSD, you must install "eg++" or llvm; the g++ from the base system is too old (4.2 in OpenBSD 6.1;
 4.9+ is required). The existing makefile sample (Makefile.openbsd) has appropriate settings.
 
-Linux, OpenBSD, FreeBSD and MacOS are supported "out of the box". For other systems you may need to edit
+Linux, OpenBSD, FreeBSD, NetBSD and MacOS are supported "out of the box". For other systems you may need to edit
 the `dasynq-config.h` file (see instructions within). For full functionality either epoll or kqueue are
 required; in many BSD variants it may be possible to build by defining `DASYNQ_HAVE_KQUEUE` to `1`. If
 epoll and kqueue are not available, Dasynq will fall back to using a `pselect`-based backend (or a plain
