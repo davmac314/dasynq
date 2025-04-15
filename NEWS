@@ -1,3 +1,10 @@
+Dasynq version 2.1.1:
+--------------------
+
+This version includes a minor error-handling bugfix and recognises NetBSD as a platform with
+kqueue support (as well as including a suitable Makefile for NetBSD).
+
+
 Dasynq version 2.1.0:
 --------------------
 
