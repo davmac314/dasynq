@@ -16,6 +16,8 @@
 
 * User notification mechanism (add a watch to the event loop which can be signalled manually).
 
+* kqueue: (re)investigate using kqueue timers.
+
 * kqueue: use EVDISPATCH where available. On OS X, potentially use EVDISPATCH2 (which potentially
   also allows removing the wait lock, though this is obviously considerable work).
   
