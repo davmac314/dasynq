@@ -1,10 +1,3 @@
-#include "dasynq-stableheap.h"
-#include "dasynq-btreequeue.h"
-#include "dasynq-pairingheap.h"
-#include "dasynq-binaryheap.h"
-#include "dasynq-naryheap.h"
-#include "dasynq-daryheap.h"
-
 #include <functional>
 #include <random>
 #include <chrono>
@@ -12,26 +5,38 @@
 
 #include <iostream>
 
+#define DASYNQ_EXPECT(A,B) __builtin_expect(A,B)
+
+#include "dasynq/stableheap.h"
+#include "dasynq-btreequeue.h"
+#include "dasynq-pairingheap.h"
+#include "dasynq-binaryheap.h"
+#include "dasynq-naryheap.h"
+#include "dasynq/daryheap.h"
+
+
 template <typename A, typename B, typename C> using Nary = dasynq::nary_heap<A,B,C, 16>;
 template <typename A, typename B, typename C> using Dary = dasynq::dary_heap<A,B,C, 4>;
+
 
 int main(int argc, char **argv)
 {
     // Template arguments are: data type, priority type, comparator
-    // dasynq::BinaryHeap<int, int, std::less<int>> heap;
+    // dasynq::binary_heap<int, int, std::less<int>> heap;
     // dasynq::nary_heap<int, int> heap;
     // dasynq::dary_heap<int, int, std::less<int>, 4> heap;
-    // dasynq::PairingHeap<int, int> heap;
-    // dasynq::btree_queue<int, int, std::less<int>, 16> heap;
+    // dasynq::pairing_heap<int, int> heap;
+    dasynq::btree_queue<int, int, std::less<int>, 16> heap;
     
-    // dasynq::stable_heap<Dary, int, int> heap;
-    // dasynq::stable_heap<dasynq::BinaryHeap, int, int> heap;
-    // dasynq::stable_heap<Nary, int, int> heap;
-    dasynq::stable_heap<dasynq::pairing_heap, int, int> heap;
+    // Stabilised variants:
+    // dasynq::stable_heap<dasynq::dary_heap, int, int> heap;
+    // dasynq::stable_heap<dasynq::binary_heap, int, int> heap;
+    // dasynq::stable_heap<dasynq::nary_heap, int, int> heap;
+    // dasynq::stable_heap<dasynq::pairing_heap, int, int> heap;
     
     constexpr int NUM = 10000000;
-    // constexpr int NUM = 5;
-    // constexpr int NUM = 100000;
+    //constexpr int NUM = 5;
+    //constexpr int NUM = 100000;
     
     std::mt19937 gen(0);
     std::uniform_int_distribution<> r(0, NUM);

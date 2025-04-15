@@ -1,10 +1,11 @@
 #ifndef DASYNC_NARYHEAP_H_INCLUDED
 #define DASYNC_NARYHEAP_H_INCLUDED
 
-#include "dasynq-svec.h"
 #include <type_traits>
 #include <functional>
 #include <limits>
+
+#include <dasynq/svec.h>
 
 namespace dasynq {
 

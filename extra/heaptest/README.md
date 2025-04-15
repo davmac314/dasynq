@@ -73,12 +73,12 @@ beats the PairingHeap in the important "random fill/dequeue" test and edges
 out the nary_heap in the "cyclic fill/dequeue" test. It is beaten in nearly all
 tests by the the D-ary heap, however, and in most by the nary_heap.
 
-Against expectations, the btree_queue performs quite well, coming first or
-second in 4 out of 5 tests. Its "flat priority" performance clearly outperforms
-the heap-based queues (probably because it essentially degenerates to a linked-
-list for this usage pattern, which is quite efficient). However, its "random
-remove" time is somewhat high and it is handily beaten by the D-ary heap in the
-important "random fill/dequeue" test.
+Against expectations, the btree_queue performs reasonably well in several
+tests. Its "flat priority" performance clearly outperforms the heap-based
+queues (probably because it essentially degenerates to a linked- list for this
+usage pattern, which is quite efficient). However, its "random remove" time is
+very high and it is handily beaten by the D-ary heap in the important "random
+fill/dequeue" test.
 
 For unstable heaps, the results are as follows:
 
