@@ -7,7 +7,7 @@
 #include <system_error>
 #include <tuple>
 
-#ifdef DASYNQ_HAVE_EVENTFD
+#if DASYNQ_HAVE_EVENTFD
 #include <sys/eventfd.h>
 #endif
 
