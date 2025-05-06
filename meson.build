@@ -1,14 +1,10 @@
 project('dasynq', 'cpp',
   default_options: [
-    'b_lto=true',
     'b_ndebug=if-release',
     'buildtype=debugoptimized',
     'c_std=c++11',
-    'warning_level=3',
-  # 'werror=true',
+    'warning_level=1',
   ],
-  license: 'Apache-2.0',
-  version: '2.1.1',
 )
 
 dasynq_deps = []
@@ -26,7 +22,7 @@ if meson.is_subproject()
 endif
 
 install_subdir('include',
-  install_dir: 'include',
+  install_dir: get_option('includedir'),
   strip_directory: true,
 )
 
@@ -36,21 +32,13 @@ pc.generate(
   filebase: 'dasynq',
   libraries: dasynq_deps,
   name: 'Dasynq',
-  url: 'http://github.com/davmac314/dasynq',
-)
-
-executable('chatserver', 'examples/chatserver/chatserver.cc',
-  dependencies: dasynq_dep,
+  url: 'https://davmac.org/projects/dasynq/',
 )
 
 threads_dep = dependency('threads')
-
-executable('chatserver_mt', 'examples/chatserver/chatserver-mt.cc',
-  dependencies: [dasynq_dep, threads_dep],
-)
 
 dasynq_test = executable('dasynq_test', 'tests/dasynq-tests.cc',
   dependencies: [dasynq_dep, threads_dep],
 )
 
-test('dasynq_test', dasynq_test)
+test('dasynq_test', dasynq_test, verbose: true)
