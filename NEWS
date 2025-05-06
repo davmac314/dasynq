@@ -1,3 +1,11 @@
+Dasynq version 2.1.2:
+--------------------
+
+This version includes a single build configuration fix. If DASYNQ_HAVE_EVENTFD was defined as 0,
+the build would include support for eventfd as if DASYNQ_HAVE_EVENTFD was instead defined as 1.
+The meson.build file has been updated to install headers to the correct 'includedir' location.
+
+
 Dasynq version 2.1.1:
 --------------------
 
