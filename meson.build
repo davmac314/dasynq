@@ -5,6 +5,7 @@ project('dasynq', 'cpp',
     'c_std=c++11',
     'warning_level=1',
   ],
+  version: '2.1.2',
 )
 
 dasynq_deps = []
