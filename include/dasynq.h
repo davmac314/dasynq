@@ -188,8 +188,8 @@ class delayed_init {
     DASYNQ_EMPTY_BODY
 };
 
-inline namespace v2 {
 namespace dprivate {
+inline namespace v2 {
 
     // Classes for implementing a fair(ish) wait queue.
     // A queue node can be signalled when it reaches the head of
@@ -650,7 +650,10 @@ namespace dprivate {
         event_dispatch(const event_dispatch &) = delete;
     };
 
+} // namespace v2
 } // namespace dprivate
+
+inline namespace v2 {
 
 // This is the main event_loop implementation. It serves as an interface to the event loop backend (of which
 // it maintains an internal instance). It also serialises polling the backend and provides safe deletion of
@@ -1566,6 +1569,8 @@ class event_loop
 typedef event_loop<null_mutex> event_loop_n;
 typedef event_loop<std::mutex> event_loop_th;
 
+} // namespace v2
+
 namespace dprivate {
 
 // Posix signal event watcher
@@ -2386,7 +2391,6 @@ class timer_impl : public timer<EventLoop>
 
 } // namespace dprivate
 
-} // namespace v2
 } // namespace dasynq
 
 #endif /* DASYNQ_H_ */

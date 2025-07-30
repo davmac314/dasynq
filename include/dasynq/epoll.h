@@ -16,11 +16,12 @@
 #include <csignal>
 
 namespace dasynq {
-inline namespace v2 {
 
 namespace dprivate {
 class proc_status; // forward declaration
 }
+
+inline namespace v2 {
 
 template <class Base> class epoll_loop;
 
