@@ -12,20 +12,21 @@
 #include <type_traits>
 
 namespace dasynq {
-
 namespace dprivate {
-    // POSIX says that sigprocmask has unspecified behaviour if used in a multi-threaded process. We can use
-    // pthread_sigmask instead, but that may require linking with the threads library. This function is
-    // specialised to call one or the other depending on the mutex type:
-    template <typename T_Mutex> void sigmaskf(int how, const sigset_t *set, sigset_t *oset)
-    {
-        pthread_sigmask(how, set, oset);
-    }
 
-    template <> inline void sigmaskf<null_mutex>(int how, const sigset_t *set, sigset_t *oset)
-    {
-        sigprocmask(how, set, oset);
-    }
+// POSIX says that sigprocmask has unspecified behaviour if used in a multi-threaded process. We can use
+// pthread_sigmask instead, but that may require linking with the threads library. This function is
+// specialised to call one or the other depending on the mutex type:
+template <typename T_Mutex> void sigmaskf(int how, const sigset_t *set, sigset_t *oset)
+{
+    pthread_sigmask(how, set, oset);
+}
+
+template <> inline void sigmaskf<null_mutex>(int how, const sigset_t *set, sigset_t *oset)
+{
+    sigprocmask(how, set, oset);
+}
+
 } // namespace dprivate
 
 inline namespace v2 {
@@ -85,14 +86,16 @@ template <typename A, typename B, typename C> using dary_heap_def = dary_heap<A,
 template <typename A, typename B> using heap_def = stable_heap<dary_heap_def,A,B>;
 
 namespace {
-    // use empty handles (not containing basewatcher *) if the handles returned from the
-    // queue are handle references, because we can derive a pointer to the containing basewatcher
-    // via the address of the handle in that case:
-    constexpr bool use_empty_node = std::is_same<
-            typename heap_def<empty_node, int>::handle_t_r,
-            typename heap_def<empty_node, int>::handle_t &>::value;
 
-    using node_type = std::conditional<use_empty_node, empty_node, base_watcher *>::type;
+// use empty handles (not containing basewatcher *) if the handles returned from the
+// queue are handle references, because we can derive a pointer to the containing basewatcher
+// via the address of the handle in that case:
+constexpr bool use_empty_node = std::is_same<
+        typename heap_def<empty_node, int>::handle_t_r,
+        typename heap_def<empty_node, int>::handle_t &>::value;
+
+using node_type = std::conditional<use_empty_node, empty_node, base_watcher *>::type;
+
 } // namespace
 
 using prio_queue = heap_def<node_type, int>;
@@ -173,7 +176,7 @@ class base_watcher
 };
 
 // Retrieve watcher from queue handle:
-inline base_watcher * get_watcher(prio_queue_emptynode &q, prio_queue_emptynode::handle_t &n)
+inline base_watcher *get_watcher(prio_queue_emptynode &q, prio_queue_emptynode::handle_t &n)
 {
     uintptr_t bptr = (uintptr_t)&n;
     _Pragma ("GCC diagnostic push")
@@ -183,7 +186,7 @@ inline base_watcher * get_watcher(prio_queue_emptynode &q, prio_queue_emptynode:
     return (base_watcher *)bptr;
 }
 
-inline base_watcher * get_watcher(prio_queue_bwnode &q, prio_queue_bwnode::handle_t &n)
+inline base_watcher *get_watcher(prio_queue_bwnode &q, prio_queue_bwnode::handle_t &n)
 {
     return q.node_data(n);
 }

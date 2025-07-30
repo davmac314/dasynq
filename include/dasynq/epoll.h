@@ -43,10 +43,10 @@ class epoll_traits
         int get_sicode() { return info.ssi_code; }
         pid_t get_sipid() { return info.ssi_pid; }
         uid_t get_siuid() { return info.ssi_uid; }
-        void * get_siaddr() { return reinterpret_cast<void *>(info.ssi_addr); }
+        void *get_siaddr() { return reinterpret_cast<void *>(info.ssi_addr); }
         int get_sistatus() { return info.ssi_status; }
         int get_sival_int() { return info.ssi_int; }
-        void * get_sival_ptr() { return reinterpret_cast<void *>(info.ssi_ptr); }
+        void *get_sival_ptr() { return reinterpret_cast<void *>(info.ssi_ptr); }
 
         // XSI
         int get_sierrno() { return info.ssi_errno; }
@@ -125,7 +125,7 @@ template <class Base> class epoll_loop : public Base
         std::lock_guard<decltype(Base::lock)> guard(Base::lock);
         
         for (int i = 0; i < r; i++) {
-            void * ptr = events[i].data.ptr;
+            void *ptr = events[i].data.ptr;
             
             if (ptr == &sigfd) {
                 // Signal
