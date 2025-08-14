@@ -25,12 +25,8 @@ inline namespace v2 {
 
 template <class Base> class epoll_loop;
 
-class epoll_traits
+struct epoll_traits
 {
-    template <class Base> friend class epoll_loop;
-
-    public:
-
     class sigdata_t
     {
         template <class Base> friend class epoll_loop;
