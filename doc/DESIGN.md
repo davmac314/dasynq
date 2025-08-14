@@ -75,3 +75,21 @@ virtual dispatch, rather than a separate virtual call for both the `dispatch` an
 For timers, multiple application timers are multiplexed over a single system level timer (or actually a pair
 of systems timers - one for each clock type). Most of the functionality is common to all timer
 implementations and has been factored out into the `timer_base` class.
+
+
+## Namespaces and ABI compatibility
+
+Dasynq external interface is found in the 'dasynq' (`::dasynq`) namespace. Implementation-private classes
+and functions are found in 'dasynq::private'.
+
+Within both 'dasynq' and 'dasynq::private' are inline namespaces used to prevent ABI issues and ODR
+violations in case a client application is linked (directly or indirectly) against multiple versions of
+Dasynq (egs. if multiple objects are compiled against different versions and then linked together, or if an
+application is compiled against one version and a shared library that it links to is compiled against
+another). These are in the form 'vX' where 'X' is an incrementing version number (not necessarily
+corresponding to the Dasynq version).
+
+Any time that a class or function has its definition changed, it must be moved into another 'vX' namespace -
+either the most recent, or if already in that namespace, into a new 'vX' namespace. This includes the case
+of a function that uses a changed class internally. Technically there may be cases where this is not
+strictly necessary, but the general principle should be adhered to regardless.
