@@ -44,10 +44,16 @@
 // backends.
 //
 // The differences are exposed as traits, partly via a separate traits class (loop_traits_t as defined
-// below, which contains the "main" traits, particularly the sigdata_t, fd_r and fd_s types). Note that the
-// event_dispatch class exposes the loop traits as traits_t, and these are then potentially augmented at
-// each stage of the mechanism inheritance chain (i.e. the final traits are exposed as
-// `loop_t<event_dispatch>::traits_t'.
+// below, which contains the "main" traits, particularly the sigdata_t, fd_r and fd_s types). The traits
+// classes are composable via inheritance in a similar way to the backend components (and in fact, the
+// traits expose the composed backend template via the `backend_tmpl' member, so that `loop_t' is defined
+// via reference to that rather than as in the example above). Currently `child_proc_traits' is always
+// the terminal traits in the chain, as all backends use it.
+//
+// Note that the event_dispatch class exposes the loop traits as traits_t, and these are then potentially
+// augmented at each stage of the mechanism inheritance chain (i.e. the final traits are exposed as
+// `loop_t<event_dispatch>::traits_t'). It is currently possible that the `traits_t' member exposed by an
+// event loop instantiation adds additional members, but that is really a historical design accident.
 //
 // The trait members are:
 //   sigdata_t  - a wrapper for the siginfo_t type or equivalent used to pass signal parameters
@@ -85,14 +91,14 @@
 #include "dasynq/posixtimer.h"
 namespace dasynq {
 inline namespace v2 {
-    template <typename T, bool provide_mono_timer = true> using timer_events = posix_timer_events<T, provide_mono_timer>;
+    template <typename T, bool provide_mono_timer = true> using timer_events_traits = posix_timer_traits<T, provide_mono_timer>;
 } // namespace v2
 } // namespace dasynq
 #else
 #include "dasynq/itimer.h"
 namespace dasynq {
 inline namespace v2 {
-    template <typename T, bool provide_mono_timer = true> using timer_events = itimer_events<T, provide_mono_timer>;
+    template <typename T, bool provide_mono_timer = true> using timer_events_traits = itimer_traits<T, provide_mono_timer>;
 } // namespace v2
 } // namespace dasynq
 #endif
@@ -104,8 +110,7 @@ inline namespace v2 {
 #include "dasynq/childproc.h"
 namespace dasynq {
 inline namespace v2 {
-    template <typename T> using loop_t = macos_kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
-    using loop_traits_t = macos_kqueue_traits;
+    using loop_traits_t = macos_kqueue_traits<timer_events_traits<interrupt_channel_traits<child_proc_traits>>>;
 } // namespace v2
 } // namespace dasynq
 #else
@@ -113,8 +118,7 @@ inline namespace v2 {
 #include "dasynq/childproc.h"
 namespace dasynq {
 inline namespace v2 {
-    template <typename T> using loop_t = kqueue_loop<timer_events<child_proc_events<interrupt_channel<T>>, false>>;
-    using loop_traits_t = kqueue_traits;
+    using loop_traits_t = kqueue_traits<timer_events_traits<interrupt_channel_traits<child_proc_traits>>>;
 } // namespace v2
 } // namespace dasynq
 #endif
@@ -124,8 +128,7 @@ inline namespace v2 {
 #include "dasynq/childproc.h"
 namespace dasynq {
 inline namespace v2 {
-    template <typename T> using loop_t = epoll_loop<interrupt_channel<timer_fd_events<child_proc_events<T>>>>;
-    using loop_traits_t = epoll_traits;
+    using loop_traits_t = epoll_traits<interrupt_channel_traits<timer_fd_traits<child_proc_traits>>>;
 } // namespace v2
 } // namespace dasynq
 #else
@@ -134,20 +137,24 @@ inline namespace v2 {
 #include "dasynq/pselect.h"
 namespace dasynq {
 inline namespace v2 {
-    template <typename T> using loop_t = pselect_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
-    using loop_traits_t = select_traits;
+    using loop_traits_t = pselect_traits<timer_events_traits<interrupt_channel_traits<child_proc_traits>>>;
 } // namespace v2
 } // namespace dasynq
 #else
 #include "dasynq/select.h"
 namespace dasynq {
 inline namespace v2 {
-    template <typename T> using loop_t = select_events<timer_events<interrupt_channel<child_proc_events<T>>, false>>;
-    using loop_traits_t = select_traits;
+    using loop_traits_t = select_traits<timer_events_traits<interrupt_channel_traits<child_proc_traits>>>;
 } // namespace v2
 } // namespace dasynq
 #endif
 #endif
+
+namespace dasynq {
+inline namespace v2 {
+    template <typename T> using loop_t = loop_traits_t::backend_tmpl<T>;
+} // namespace dasynq::v2
+} // namespace dasynq
 
 #include <atomic>
 #include <condition_variable>
