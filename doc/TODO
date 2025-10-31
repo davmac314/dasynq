@@ -18,6 +18,13 @@
 
 * kqueue: (re)investigate using kqueue timers.
 
+  On NetBSD, it's clearly documented that absolute kqueue timers are against the REALTIME clock, strongly
+  implying that relative timers are not (and so are presumably against the MONOTONIC clock). That would
+  allow using solely kqueue for timers (instead of kqueue + POSIX timers for example).
+  
+  Other BSDs don't seem to document the same behaviour, leaving the possibility of using this on platforms
+  other than NetBSD as uncertain.
+
 * kqueue: use EVDISPATCH where available. On OS X, potentially use EVDISPATCH2 (which potentially
   also allows removing the wait lock, though this is obviously considerable work).
   
