@@ -1,6 +1,6 @@
 # Dasynq
 
-_Version 2.1.2_
+_Version 2.1.3_
 
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries,
 it is crossplatform / portable. Unlike most other such libraries, it is intended to be completely
@@ -92,7 +92,7 @@ assuming you have pkg-config installed:
 
 There is also CMake support. You can add the following to your `CMakeLists.txt` file:
 
-    find_package(Dasynq 2.1.2)
+    find_package(Dasynq 2.1.3)
     
     # The "old way":
     #target_include_directories(testapp PRIVATE "${DASYNQ_INCLUDE_DIRS}")
