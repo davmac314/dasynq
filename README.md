@@ -1,6 +1,6 @@
 # Dasynq
 
-_Version 2.1.3_
+_Version 2.1.4_
 
 Dasynq is an event loop library similar to libevent, libev and libuv. Like other such libraries,
 it is crossplatform / portable. Unlike most other such libraries, it is intended to be completely
