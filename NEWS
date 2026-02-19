@@ -1,3 +1,11 @@
+Dasynq version 2.1.5:
+--------------------
+
+This version includes a fix for handling of error events when using the epoll backend (default on
+Linux). The fix avoids a null pointer dereference that could occur when a watcher for a file
+descriptor was added to the event loop but not enabled.
+
+
 Dasynq version 2.1.4:
 --------------------
 
